@@ -1,3 +1,16 @@
+/**
+ * Employee Profile Page
+ * 
+ * This page displays and allows editing of employee information.
+ * Users can select an employee from a dropdown and view/edit their profile.
+ * 
+ * Firebase Integration: Complete
+ * - Fetches employee list from Firebase users collection
+ * - Loads individual employee data from Firebase
+ * - Saves employee updates to Firebase
+ * 
+ * Current Status: Fully integrated with Firebase
+ */
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -39,9 +52,13 @@ import {
   Assignment as DocumentIcon,
   ExpandMore as ExpandMoreIcon,
   Save as SaveIcon,
-  Cancel as CancelIcon
+  Cancel as CancelIcon,
+  Refresh as RefreshIcon,
+  Person as PersonIcon
 } from '@mui/icons-material';
-// Date picker imports removed to avoid dependency issues
+import { formatIndianCurrency } from '../utils/currency';
+import firebaseService from '../services/firebaseService';
+import type { User } from '../types';
 
 interface Employee {
   id: string;
@@ -73,13 +90,14 @@ interface Employee {
   bankingInfo: {
     bankName: string;
     accountNumber: string;
-    routingNumber: string;
+    ifscCode: string;
     accountHolderName: string;
-    accountType: 'savings' | 'checking';
+    accountType: 'savings' | 'current';
+    customBankName?: string;
   };
   governmentInfo: {
-    ssn: string;
-    taxId: string;
+    panNumber: string;
+    aadharNumber: string;
     passportNumber: string;
     drivingLicense: string;
   };
@@ -119,7 +137,7 @@ interface DocumentRecord {
 }
 
 const initialEmployee: Employee = {
-    id: '',
+  id: '',
   employeeId: '',
   personalInfo: {
     firstName: '',
@@ -132,7 +150,7 @@ const initialEmployee: Employee = {
     city: '',
     state: '',
     zipCode: '',
-    country: ''
+    country: 'India'
   },
   professionalInfo: {
     department: '',
@@ -147,13 +165,14 @@ const initialEmployee: Employee = {
   bankingInfo: {
     bankName: '',
     accountNumber: '',
-    routingNumber: '',
+    ifscCode: '',
     accountHolderName: '',
-    accountType: 'savings'
+    accountType: 'savings',
+    customBankName: ''
   },
   governmentInfo: {
-    ssn: '',
-    taxId: '',
+    panNumber: '',
+    aadharNumber: '',
     passportNumber: '',
     drivingLicense: ''
   },
@@ -177,6 +196,9 @@ const EmployeePage: React.FC = () => {
     message: '',
     severity: 'info'
   });
+  const [loading, setLoading] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+  const [availableEmployees, setAvailableEmployees] = useState<{ id: string; employeeId: string; name: string }[]>([]);
 
   const steps = [
     'Personal Information',
@@ -189,83 +211,131 @@ const EmployeePage: React.FC = () => {
   ];
 
   useEffect(() => {
-    // Load employee data (mock data for now)
-    const mockEmployee: Employee = {
-      id: '1',
-      employeeId: 'EMP001',
-      personalInfo: {
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john.doe@company.com',
-        phone: '+1 (555) 123-4567',
-        dateOfBirth: new Date('1990-05-15'),
-        gender: 'male',
-        address: '123 Main St',
-        city: 'New York',
-        state: 'NY',
-        zipCode: '10001',
-        country: 'USA'
-      },
-      professionalInfo: {
-        department: 'Information Technology',
-        position: 'Senior Software Engineer',
-        joiningDate: new Date('2022-03-15'),
-        employeeType: 'full-time',
-        workLocation: 'New York Office',
-        manager: 'Jane Smith',
-        salary: 85000,
-        status: 'active'
-      },
-      bankingInfo: {
-        bankName: 'Chase Bank',
-        accountNumber: '****1234',
-        routingNumber: '021000021',
-        accountHolderName: 'John Doe',
-        accountType: 'checking'
-      },
-      governmentInfo: {
-        ssn: '***-**-1234',
-        taxId: '12-3456789',
-        passportNumber: 'A12345678',
-        drivingLicense: 'DL123456789'
-      },
-      emergencyContacts: [
-        {
-          id: '1',
-          name: 'Jane Doe',
-          relationship: 'Spouse',
-          phone: '+1 (555) 123-4568',
-          email: 'jane.doe@email.com',
-          address: '123 Main St, New York, NY 10001'
-        }
-      ],
-      education: [
-        {
-          id: '1',
-          institution: 'University of Technology',
-          degree: 'Bachelor of Science',
-          fieldOfStudy: 'Computer Science',
-          startDate: new Date('2008-09-01'),
-          endDate: new Date('2012-06-15'),
-          gpa: '3.8'
-        }
-      ],
-      documents: [
-        {
-          id: '1',
-          type: 'Resume',
-          name: 'john_doe_resume.pdf',
-          uploadDate: new Date('2022-03-10'),
-          fileUrl: '/documents/john_doe_resume.pdf',
-          status: 'approved'
-        }
-      ],
-      skills: ['React', 'TypeScript', 'Node.js', 'Python', 'AWS'],
-      certifications: ['AWS Certified Developer', 'React Certification']
-    };
-
-    setEmployee(mockEmployee);
+    // Load available employees list
+    loadAvailableEmployees();
   }, []);
+
+  useEffect(() => {
+    // Load employee data when selection changes
+    if (selectedEmployeeId) {
+      loadEmployeeData();
+    } else {
+      setEmployee(initialEmployee);
+    }
+  }, [selectedEmployeeId]);
+
+  const loadAvailableEmployees = async () => {
+    try {
+      const response = await firebaseService.getCollection<User>('users');
+      if (response.success && response.data) {
+        setAvailableEmployees(response.data.map(emp => ({ 
+          id: emp.id, 
+          employeeId: emp.id, // Use id as employeeId since User doesn't have employeeId
+          name: `${emp.firstName} ${emp.lastName}` 
+        })));
+      } else {
+        console.error('Error loading employees:', response.error);
+        setSnackbar({
+          open: true,
+          message: 'Error loading employees list',
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error loading available employees:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error loading employees list',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleEmployeeSelection = (employeeId: string) => {
+    setSelectedEmployeeId(employeeId);
+    setIsEditing(false); // Reset editing state when switching employees
+    setActiveStep(0); // Reset to first step
+  };
+
+  const loadEmployeeData = async () => {
+    setLoading(true);
+    try {
+      const response = await firebaseService.getDocument<User>('users', selectedEmployeeId);
+      if (response.success && response.data) {
+                 // Transform User data to Employee format
+         const employeeData: Employee = {
+           id: response.data.id,
+           employeeId: response.data.id, // Use id as employeeId since User doesn't have employeeId
+           personalInfo: {
+             firstName: response.data.firstName,
+             lastName: response.data.lastName,
+             email: response.data.email,
+             phone: response.data.phone,
+             dateOfBirth: (response.data as any).extendedProfile?.dateOfBirth ? new Date((response.data as any).extendedProfile.dateOfBirth) : null,
+             gender: (response.data as any).extendedProfile?.gender || 'male',
+             address: response.data.address,
+             city: (response.data as any).extendedProfile?.city || '',
+             state: (response.data as any).extendedProfile?.state || '',
+             zipCode: (response.data as any).extendedProfile?.zipCode || '',
+             country: (response.data as any).extendedProfile?.country || 'India'
+           },
+           professionalInfo: {
+             department: response.data.department,
+             position: response.data.position,
+             joiningDate: response.data.hireDate ? new Date(response.data.hireDate) : null,
+             employeeType: (response.data as any).extendedProfile?.employeeType || 'full-time',
+             workLocation: (response.data as any).extendedProfile?.workLocation || '',
+             manager: (response.data as any).extendedProfile?.manager || '',
+             salary: (response.data as any).salary || 0,
+             status: response.data.status
+           },
+           bankingInfo: {
+             bankName: (response.data as any).extendedProfile?.bankingInfo?.bankName || '',
+             accountNumber: (response.data as any).extendedProfile?.bankingInfo?.accountNumber || '',
+             ifscCode: (response.data as any).extendedProfile?.bankingInfo?.ifscCode || '',
+             accountHolderName: (response.data as any).extendedProfile?.bankingInfo?.accountHolderName || `${response.data.firstName} ${response.data.lastName}`,
+             accountType: (response.data as any).extendedProfile?.bankingInfo?.accountType || 'savings',
+             customBankName: (response.data as any).extendedProfile?.bankingInfo?.customBankName || ''
+           },
+           governmentInfo: {
+             panNumber: (response.data as any).extendedProfile?.governmentInfo?.panNumber || '',
+             aadharNumber: (response.data as any).extendedProfile?.governmentInfo?.aadharNumber || '',
+             passportNumber: (response.data as any).extendedProfile?.governmentInfo?.passportNumber || '',
+             drivingLicense: (response.data as any).extendedProfile?.governmentInfo?.drivingLicense || ''
+           },
+           emergencyContacts: response.data.emergencyContact ? [{
+             id: '1',
+             name: response.data.emergencyContact.name,
+             relationship: response.data.emergencyContact.relationship,
+             phone: response.data.emergencyContact.phone,
+             email: (response.data as any).extendedProfile?.emergencyContacts?.[0]?.email || '',
+             address: (response.data as any).extendedProfile?.emergencyContacts?.[0]?.address || ''
+           }] : [],
+           education: (response.data as any).extendedProfile?.education || [],
+           documents: (response.data as any).extendedProfile?.documents || [],
+           skills: (response.data as any).skills || [],
+           certifications: (response.data as any).certifications || []
+         };
+        setEmployee(employeeData);
+      } else {
+        console.error('Error loading employee:', response.error);
+        setSnackbar({
+          open: true,
+          message: 'Error loading employee data',
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error loading employee data:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error loading employee data',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (section: keyof Employee, field: string, value: any) => {
     setEmployee(prev => ({
@@ -284,14 +354,77 @@ const EmployeePage: React.FC = () => {
     }));
   };
 
-  const handleSave = () => {
-    // Save employee data
-    setSnackbar({
-      open: true,
-      message: 'Employee information updated successfully',
-      severity: 'success'
-    });
-    setIsEditing(false);
+    const handleSave = async () => {
+    setLoading(true);
+    try {
+      // Transform Employee data back to User format for Firebase
+      const userUpdateData = {
+        firstName: employee.personalInfo.firstName,
+        lastName: employee.personalInfo.lastName,
+        email: employee.personalInfo.email,
+        phone: employee.personalInfo.phone,
+        address: employee.personalInfo.address,
+        department: employee.professionalInfo.department,
+        position: employee.professionalInfo.position,
+        hireDate: employee.professionalInfo.joiningDate ? employee.professionalInfo.joiningDate.toISOString() : '',
+        status: employee.professionalInfo.status,
+        emergencyContact: {
+          name: employee.emergencyContacts[0]?.name || '',
+          phone: employee.emergencyContacts[0]?.phone || '',
+          relationship: employee.emergencyContacts[0]?.relationship || ''
+        },
+        // Add additional fields that might not be in User interface
+        salary: employee.professionalInfo.salary,
+        skills: employee.skills,
+        certifications: employee.certifications,
+        // Custom fields for extended profile
+        extendedProfile: {
+          dateOfBirth: employee.personalInfo.dateOfBirth,
+          gender: employee.personalInfo.gender,
+          city: employee.personalInfo.city,
+          state: employee.personalInfo.state,
+          zipCode: employee.personalInfo.zipCode,
+          country: employee.personalInfo.country,
+          employeeType: employee.professionalInfo.employeeType,
+          workLocation: employee.professionalInfo.workLocation,
+          manager: employee.professionalInfo.manager,
+          bankingInfo: {
+            bankName: employee.bankingInfo.bankName === 'Other' ? employee.bankingInfo.customBankName : employee.bankingInfo.bankName,
+            accountNumber: employee.bankingInfo.accountNumber,
+            ifscCode: employee.bankingInfo.ifscCode,
+            accountHolderName: employee.bankingInfo.accountHolderName,
+            accountType: employee.bankingInfo.accountType
+          },
+          governmentInfo: employee.governmentInfo,
+          education: employee.education,
+          documents: employee.documents
+        }
+      };
+
+      const response = await firebaseService.updateDocument('users', employee.id, userUpdateData);
+      
+      if (response.success) {
+        setSnackbar({
+          open: true,
+          message: 'Employee information updated successfully',
+          severity: 'success'
+        });
+        setIsEditing(false);
+        // Reload employee data to show updated information
+        await loadEmployeeData();
+      } else {
+        throw new Error(response.error || 'Failed to update employee');
+      }
+    } catch (error) {
+      console.error('Error saving employee data:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error saving employee data: ' + (error instanceof Error ? error.message : 'Unknown error'),
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
@@ -378,14 +511,16 @@ const EmployeePage: React.FC = () => {
                     />
               </Box>
               <Box sx={{ flex: 1, minWidth: 200 }}>
-        <TextField
-          fullWidth
-          label="Phone"
-          value={employee.personalInfo.phone}
-          onChange={(e) => handleInputChange('personalInfo', 'phone', e.target.value)}
-          disabled={!isEditing}
-        />
-      </Box>
+                <TextField
+                  fullWidth
+                  label="Phone"
+                  value={employee.personalInfo.phone}
+                  onChange={(e) => handleInputChange('personalInfo', 'phone', e.target.value)}
+                  placeholder="+91 98765 43210"
+                  disabled={!isEditing}
+                  helperText={isEditing ? "Format: +91 98765 43210" : ""}
+                />
+              </Box>
       <Box sx={{ flex: 1, minWidth: 200 }}>
         <TextField
           fullWidth
@@ -426,33 +561,123 @@ const EmployeePage: React.FC = () => {
       </Box>
       <Box sx={{ display: 'flex', gap: 3 }}>
         <Box sx={{ flex: 1, minWidth: 200 }}>
-        <TextField
-          fullWidth
-          label="City"
-          value={employee.personalInfo.city}
-          onChange={(e) => handleInputChange('personalInfo', 'city', e.target.value)}
-          disabled={!isEditing}
-        />
+          <FormControl fullWidth disabled={!isEditing}>
+            <InputLabel>City</InputLabel>
+            <Select
+              value={employee.personalInfo.city}
+              label="City"
+              onChange={(e) => handleInputChange('personalInfo', 'city', e.target.value)}
+            >
+              <MenuItem value="Mumbai">Mumbai</MenuItem>
+              <MenuItem value="Delhi">Delhi</MenuItem>
+              <MenuItem value="Bangalore">Bangalore</MenuItem>
+              <MenuItem value="Hyderabad">Hyderabad</MenuItem>
+              <MenuItem value="Chennai">Chennai</MenuItem>
+              <MenuItem value="Kolkata">Kolkata</MenuItem>
+              <MenuItem value="Pune">Pune</MenuItem>
+              <MenuItem value="Ahmedabad">Ahmedabad</MenuItem>
+              <MenuItem value="Jaipur">Jaipur</MenuItem>
+              <MenuItem value="Surat">Surat</MenuItem>
+              <MenuItem value="Lucknow">Lucknow</MenuItem>
+              <MenuItem value="Kanpur">Kanpur</MenuItem>
+              <MenuItem value="Nagpur">Nagpur</MenuItem>
+              <MenuItem value="Indore">Indore</MenuItem>
+              <MenuItem value="Thane">Thane</MenuItem>
+              <MenuItem value="Bhopal">Bhopal</MenuItem>
+              <MenuItem value="Visakhapatnam">Visakhapatnam</MenuItem>
+              <MenuItem value="Pimpri-Chinchwad">Pimpri-Chinchwad</MenuItem>
+              <MenuItem value="Patna">Patna</MenuItem>
+              <MenuItem value="Vadodara">Vadodara</MenuItem>
+              <MenuItem value="Ghaziabad">Ghaziabad</MenuItem>
+              <MenuItem value="Ludhiana">Ludhiana</MenuItem>
+              <MenuItem value="Agra">Agra</MenuItem>
+              <MenuItem value="Nashik">Nashik</MenuItem>
+              <MenuItem value="Faridabad">Faridabad</MenuItem>
+              <MenuItem value="Meerut">Meerut</MenuItem>
+              <MenuItem value="Rajkot">Rajkot</MenuItem>
+              <MenuItem value="Kalyan-Dombivali">Kalyan-Dombivali</MenuItem>
+              <MenuItem value="Vasai-Virar">Vasai-Virar</MenuItem>
+              <MenuItem value="Varanasi">Varanasi</MenuItem>
+              <MenuItem value="Srinagar">Srinagar</MenuItem>
+              <MenuItem value="Aurangabad">Aurangabad</MenuItem>
+              <MenuItem value="Navi Mumbai">Navi Mumbai</MenuItem>
+              <MenuItem value="Solapur">Solapur</MenuItem>
+              <MenuItem value="Ranchi">Ranchi</MenuItem>
+              <MenuItem value="Chandigarh">Chandigarh</MenuItem>
+              <MenuItem value="Coimbatore">Coimbatore</MenuItem>
+              <MenuItem value="Kochi">Kochi</MenuItem>
+              <MenuItem value="Guwahati">Guwahati</MenuItem>
+              <MenuItem value="Other">Other</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 200 }}>
+          <FormControl fullWidth disabled={!isEditing}>
+            <InputLabel>State</InputLabel>
+            <Select
+              value={employee.personalInfo.state}
+              label="State"
+              onChange={(e) => handleInputChange('personalInfo', 'state', e.target.value)}
+            >
+              <MenuItem value="Andhra Pradesh">Andhra Pradesh</MenuItem>
+              <MenuItem value="Arunachal Pradesh">Arunachal Pradesh</MenuItem>
+              <MenuItem value="Assam">Assam</MenuItem>
+              <MenuItem value="Bihar">Bihar</MenuItem>
+              <MenuItem value="Chhattisgarh">Chhattisgarh</MenuItem>
+              <MenuItem value="Goa">Goa</MenuItem>
+              <MenuItem value="Gujarat">Gujarat</MenuItem>
+              <MenuItem value="Haryana">Haryana</MenuItem>
+              <MenuItem value="Himachal Pradesh">Himachal Pradesh</MenuItem>
+              <MenuItem value="Jharkhand">Jharkhand</MenuItem>
+              <MenuItem value="Karnataka">Karnataka</MenuItem>
+              <MenuItem value="Kerala">Kerala</MenuItem>
+              <MenuItem value="Madhya Pradesh">Madhya Pradesh</MenuItem>
+              <MenuItem value="Maharashtra">Maharashtra</MenuItem>
+              <MenuItem value="Manipur">Manipur</MenuItem>
+              <MenuItem value="Meghalaya">Meghalaya</MenuItem>
+              <MenuItem value="Mizoram">Mizoram</MenuItem>
+              <MenuItem value="Nagaland">Nagaland</MenuItem>
+              <MenuItem value="Odisha">Odisha</MenuItem>
+              <MenuItem value="Punjab">Punjab</MenuItem>
+              <MenuItem value="Rajasthan">Rajasthan</MenuItem>
+              <MenuItem value="Sikkim">Sikkim</MenuItem>
+              <MenuItem value="Tamil Nadu">Tamil Nadu</MenuItem>
+              <MenuItem value="Telangana">Telangana</MenuItem>
+              <MenuItem value="Tripura">Tripura</MenuItem>
+              <MenuItem value="Uttar Pradesh">Uttar Pradesh</MenuItem>
+              <MenuItem value="Uttarakhand">Uttarakhand</MenuItem>
+              <MenuItem value="West Bengal">West Bengal</MenuItem>
+              <MenuItem value="Delhi">Delhi</MenuItem>
+              <MenuItem value="Jammu and Kashmir">Jammu and Kashmir</MenuItem>
+              <MenuItem value="Ladakh">Ladakh</MenuItem>
+              <MenuItem value="Chandigarh">Chandigarh</MenuItem>
+              <MenuItem value="Puducherry">Puducherry</MenuItem>
+              <MenuItem value="Andaman and Nicobar Islands">Andaman and Nicobar Islands</MenuItem>
+              <MenuItem value="Dadra and Nagar Haveli">Dadra and Nagar Haveli</MenuItem>
+              <MenuItem value="Daman and Diu">Daman and Diu</MenuItem>
+              <MenuItem value="Lakshadweep">Lakshadweep</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 200 }}>
+          <TextField
+            fullWidth
+            label="PIN Code"
+            value={employee.personalInfo.zipCode}
+            onChange={(e) => handleInputChange('personalInfo', 'zipCode', e.target.value)}
+            disabled={!isEditing}
+          />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 200 }}>
+          <TextField
+            fullWidth
+            label="Country"
+            value={employee.personalInfo.country}
+            onChange={(e) => handleInputChange('personalInfo', 'country', e.target.value)}
+            disabled={!isEditing}
+          />
+        </Box>
       </Box>
-      <Box sx={{ flex: 1, minWidth: 200 }}>
-        <TextField
-          fullWidth
-          label="State"
-          value={employee.personalInfo.state}
-          onChange={(e) => handleInputChange('personalInfo', 'state', e.target.value)}
-          disabled={!isEditing}
-        />
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 200 }}>
-        <TextField
-          fullWidth
-          label="Zip Code"
-          value={employee.personalInfo.zipCode}
-          onChange={(e) => handleInputChange('personalInfo', 'zipCode', e.target.value)}
-          disabled={!isEditing}
-        />
-      </Box>
-    </Box>
     </Box>
   );
 
@@ -480,24 +705,64 @@ const EmployeePage: React.FC = () => {
                   </Select>
                 </FormControl>
               </Box>
-              <Box sx={{ flex: 1, minWidth: 200 }}>
-                    <TextField 
-                      fullWidth 
-          label="Department"
-          value={employee.professionalInfo.department}
-          onChange={(e) => handleInputChange('professionalInfo', 'department', e.target.value)}
-          disabled={!isEditing}
-                    />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 200 }}>
-        <TextField
-          fullWidth
-          label="Position"
-          value={employee.professionalInfo.position}
-          onChange={(e) => handleInputChange('professionalInfo', 'position', e.target.value)}
-          disabled={!isEditing}
-        />
-      </Box>
+                             <Box sx={{ flex: 1, minWidth: 200 }}>
+                 <FormControl fullWidth disabled={!isEditing}>
+                   <InputLabel>Department</InputLabel>
+                   <Select
+                     value={employee.professionalInfo.department}
+                     label="Department"
+                     onChange={(e) => handleInputChange('professionalInfo', 'department', e.target.value)}
+                   >
+                     <MenuItem value="Information Technology">Information Technology</MenuItem>
+                     <MenuItem value="Human Resources">Human Resources</MenuItem>
+                     <MenuItem value="Finance">Finance</MenuItem>
+                     <MenuItem value="Marketing">Marketing</MenuItem>
+                     <MenuItem value="Sales">Sales</MenuItem>
+                     <MenuItem value="Operations">Operations</MenuItem>
+                     <MenuItem value="Legal">Legal</MenuItem>
+                     <MenuItem value="Research & Development">Research & Development</MenuItem>
+                     <MenuItem value="Customer Support">Customer Support</MenuItem>
+                     <MenuItem value="Quality Assurance">Quality Assurance</MenuItem>
+                     <MenuItem value="Product Management">Product Management</MenuItem>
+                     <MenuItem value="Business Development">Business Development</MenuItem>
+                     <MenuItem value="Administration">Administration</MenuItem>
+                     <MenuItem value="Other">Other</MenuItem>
+                   </Select>
+                 </FormControl>
+               </Box>
+               <Box sx={{ flex: 1, minWidth: 200 }}>
+                 <FormControl fullWidth disabled={!isEditing}>
+                   <InputLabel>Position</InputLabel>
+                   <Select
+                     value={employee.professionalInfo.position}
+                     label="Position"
+                     onChange={(e) => handleInputChange('professionalInfo', 'position', e.target.value)}
+                   >
+                     <MenuItem value="Software Engineer">Software Engineer</MenuItem>
+                     <MenuItem value="Senior Software Engineer">Senior Software Engineer</MenuItem>
+                     <MenuItem value="Team Lead">Team Lead</MenuItem>
+                     <MenuItem value="Project Manager">Project Manager</MenuItem>
+                     <MenuItem value="Product Manager">Product Manager</MenuItem>
+                     <MenuItem value="Business Analyst">Business Analyst</MenuItem>
+                     <MenuItem value="Data Analyst">Data Analyst</MenuItem>
+                     <MenuItem value="HR Manager">HR Manager</MenuItem>
+                     <MenuItem value="HR Executive">HR Executive</MenuItem>
+                     <MenuItem value="Finance Manager">Finance Manager</MenuItem>
+                     <MenuItem value="Accountant">Accountant</MenuItem>
+                     <MenuItem value="Marketing Manager">Marketing Manager</MenuItem>
+                     <MenuItem value="Marketing Executive">Marketing Executive</MenuItem>
+                     <MenuItem value="Sales Manager">Sales Manager</MenuItem>
+                     <MenuItem value="Sales Executive">Sales Executive</MenuItem>
+                     <MenuItem value="Operations Manager">Operations Manager</MenuItem>
+                     <MenuItem value="CEO">CEO</MenuItem>
+                     <MenuItem value="CTO">CTO</MenuItem>
+                     <MenuItem value="CFO">CFO</MenuItem>
+                     <MenuItem value="Director">Director</MenuItem>
+                     <MenuItem value="VP">VP</MenuItem>
+                     <MenuItem value="Other">Other</MenuItem>
+                   </Select>
+                 </FormControl>
+               </Box>
       <Box sx={{ flex: 1, minWidth: 200 }}>
         <TextField
           fullWidth
@@ -526,24 +791,77 @@ const EmployeePage: React.FC = () => {
                   </Select>
                 </FormControl>
               </Box>
-              <Box sx={{ flex: 1, minWidth: 200 }}>
-        <TextField
-          fullWidth
-          label="Work Location"
-          value={employee.professionalInfo.workLocation}
-          onChange={(e) => handleInputChange('professionalInfo', 'workLocation', e.target.value)}
-          disabled={!isEditing}
-                />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 200 }}>
-        <TextField
-          fullWidth
-          label="Manager"
-          value={employee.professionalInfo.manager}
-          onChange={(e) => handleInputChange('professionalInfo', 'manager', e.target.value)}
-          disabled={!isEditing}
-                />
-              </Box>
+                             <Box sx={{ flex: 1, minWidth: 200 }}>
+                 <FormControl fullWidth disabled={!isEditing}>
+                   <InputLabel>Work Location</InputLabel>
+                   <Select
+                     value={employee.professionalInfo.workLocation}
+                     label="Work Location"
+                     onChange={(e) => handleInputChange('professionalInfo', 'workLocation', e.target.value)}
+                   >
+                     <MenuItem value="Mumbai">Mumbai</MenuItem>
+                     <MenuItem value="Delhi">Delhi</MenuItem>
+                     <MenuItem value="Bangalore">Bangalore</MenuItem>
+                     <MenuItem value="Hyderabad">Hyderabad</MenuItem>
+                     <MenuItem value="Chennai">Chennai</MenuItem>
+                     <MenuItem value="Kolkata">Kolkata</MenuItem>
+                     <MenuItem value="Pune">Pune</MenuItem>
+                     <MenuItem value="Ahmedabad">Ahmedabad</MenuItem>
+                     <MenuItem value="Jaipur">Jaipur</MenuItem>
+                     <MenuItem value="Surat">Surat</MenuItem>
+                     <MenuItem value="Lucknow">Lucknow</MenuItem>
+                     <MenuItem value="Kanpur">Kanpur</MenuItem>
+                     <MenuItem value="Nagpur">Nagpur</MenuItem>
+                     <MenuItem value="Indore">Indore</MenuItem>
+                     <MenuItem value="Thane">Thane</MenuItem>
+                     <MenuItem value="Bhopal">Bhopal</MenuItem>
+                     <MenuItem value="Visakhapatnam">Visakhapatnam</MenuItem>
+                     <MenuItem value="Pimpri-Chinchwad">Pimpri-Chinchwad</MenuItem>
+                     <MenuItem value="Patna">Patna</MenuItem>
+                     <MenuItem value="Vadodara">Vadodara</MenuItem>
+                     <MenuItem value="Ghaziabad">Ghaziabad</MenuItem>
+                     <MenuItem value="Ludhiana">Ludhiana</MenuItem>
+                     <MenuItem value="Agra">Agra</MenuItem>
+                     <MenuItem value="Nashik">Nashik</MenuItem>
+                     <MenuItem value="Faridabad">Faridabad</MenuItem>
+                     <MenuItem value="Meerut">Meerut</MenuItem>
+                     <MenuItem value="Rajkot">Rajkot</MenuItem>
+                     <MenuItem value="Kalyan-Dombivali">Kalyan-Dombivali</MenuItem>
+                     <MenuItem value="Vasai-Virar">Vasai-Virar</MenuItem>
+                     <MenuItem value="Varanasi">Varanasi</MenuItem>
+                     <MenuItem value="Srinagar">Srinagar</MenuItem>
+                     <MenuItem value="Aurangabad">Aurangabad</MenuItem>
+                     <MenuItem value="Navi Mumbai">Navi Mumbai</MenuItem>
+                     <MenuItem value="Solapur">Solapur</MenuItem>
+                     <MenuItem value="Ranchi">Ranchi</MenuItem>
+                     <MenuItem value="Chandigarh">Chandigarh</MenuItem>
+                     <MenuItem value="Coimbatore">Coimbatore</MenuItem>
+                     <MenuItem value="Kochi">Kochi</MenuItem>
+                     <MenuItem value="Guwahati">Guwahati</MenuItem>
+                     <MenuItem value="Remote">Remote</MenuItem>
+                     <MenuItem value="Other">Other</MenuItem>
+                   </Select>
+                 </FormControl>
+               </Box>
+               <Box sx={{ flex: 1, minWidth: 200 }}>
+                 <FormControl fullWidth disabled={!isEditing}>
+                   <InputLabel>Manager</InputLabel>
+                   <Select
+                     value={employee.professionalInfo.manager}
+                     label="Manager"
+                     onChange={(e) => handleInputChange('professionalInfo', 'manager', e.target.value)}
+                   >
+                     <MenuItem value="">No Manager</MenuItem>
+                     {availableEmployees
+                       .filter(emp => emp.id !== selectedEmployeeId) // Exclude current employee
+                       .map((emp) => (
+                         <MenuItem key={emp.id} value={emp.name}>
+                           {emp.name} ({emp.employeeId})
+                         </MenuItem>
+                       ))}
+                   </Select>
+                 </FormControl>
+               </Box>
       <Box sx={{ flex: 1, minWidth: 200 }}>
         <TextField
           fullWidth
@@ -553,9 +871,9 @@ const EmployeePage: React.FC = () => {
           onChange={(e) => handleInputChange('professionalInfo', 'salary', Number(e.target.value))}
           disabled={!isEditing}
           InputProps={{
-            startAdornment: <InputAdornment position="start">$</InputAdornment>
+            startAdornment: <InputAdornment position="start">₹</InputAdornment>
           }}
-                />
+        />
               </Box>
       <Box sx={{ flex: 1 }}>
         <Typography variant="h6" gutterBottom>Skills</Typography>
@@ -598,13 +916,47 @@ const EmployeePage: React.FC = () => {
   const renderBankingInfo = () => (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               <Box sx={{ flex: 1, minWidth: 200 }}>
-                    <TextField 
-                      fullWidth 
-          label="Bank Name"
-          value={employee.bankingInfo.bankName}
-          onChange={(e) => handleInputChange('bankingInfo', 'bankName', e.target.value)}
-          disabled={!isEditing}
-                    />
+                                 <FormControl fullWidth disabled={!isEditing}>
+                   <InputLabel>Bank Name</InputLabel>
+                   <Select
+                     value={employee.bankingInfo.bankName}
+                     label="Bank Name"
+                     onChange={(e) => handleInputChange('bankingInfo', 'bankName', e.target.value)}
+                   >
+                     <MenuItem value="State Bank of India">State Bank of India</MenuItem>
+                     <MenuItem value="HDFC Bank">HDFC Bank</MenuItem>
+                     <MenuItem value="ICICI Bank">ICICI Bank</MenuItem>
+                     <MenuItem value="Axis Bank">Axis Bank</MenuItem>
+                     <MenuItem value="Punjab National Bank">Punjab National Bank</MenuItem>
+                     <MenuItem value="Bank of Baroda">Bank of Baroda</MenuItem>
+                     <MenuItem value="Canara Bank">Canara Bank</MenuItem>
+                     <MenuItem value="Union Bank of India">Union Bank of India</MenuItem>
+                     <MenuItem value="Bank of India">Bank of India</MenuItem>
+                     <MenuItem value="Central Bank of India">Central Bank of India</MenuItem>
+                     <MenuItem value="Indian Bank">Indian Bank</MenuItem>
+                     <MenuItem value="UCO Bank">UCO Bank</MenuItem>
+                     <MenuItem value="Punjab & Sind Bank">Punjab & Sind Bank</MenuItem>
+                     <MenuItem value="Bank of Maharashtra">Bank of Maharashtra</MenuItem>
+                     <MenuItem value="Kotak Mahindra Bank">Kotak Mahindra Bank</MenuItem>
+                     <MenuItem value="Yes Bank">Yes Bank</MenuItem>
+                     <MenuItem value="Federal Bank">Federal Bank</MenuItem>
+                     <MenuItem value="Karnataka Bank">Karnataka Bank</MenuItem>
+                     <MenuItem value="Karnataka Vikas Grameena Bank">Karnataka Vikas Grameena Bank</MenuItem>
+                     <MenuItem value="Other">Other</MenuItem>
+                   </Select>
+                 </FormControl>
+                 {employee.bankingInfo.bankName === 'Other' && isEditing && (
+                   <Box sx={{ flex: 1, minWidth: 200 }}>
+                     <TextField
+                       fullWidth
+                       label="Custom Bank Name"
+                       value={employee.bankingInfo.customBankName || ''}
+                       onChange={(e) => handleInputChange('bankingInfo', 'customBankName', e.target.value)}
+                       placeholder="Enter bank name"
+                       helperText="Please specify the bank name"
+                     />
+                   </Box>
+                 )}
               </Box>
               <Box sx={{ flex: 1, minWidth: 200 }}>
                     <TextField 
@@ -628,10 +980,12 @@ const EmployeePage: React.FC = () => {
               <Box sx={{ flex: 1, minWidth: 200 }}>
         <TextField
           fullWidth
-          label="Routing Number"
-          value={employee.bankingInfo.routingNumber}
-          onChange={(e) => handleInputChange('bankingInfo', 'routingNumber', e.target.value)}
+          label="IFSC Code"
+          value={employee.bankingInfo.ifscCode}
+          onChange={(e) => handleInputChange('bankingInfo', 'ifscCode', e.target.value)}
+          placeholder="SBIN0001234"
           disabled={!isEditing}
+          helperText={isEditing ? "Format: SBIN0001234 (11 characters)" : ""}
         />
       </Box>
       <Box sx={{ flex: 1, minWidth: 200 }}>
@@ -643,7 +997,7 @@ const EmployeePage: React.FC = () => {
             onChange={(e) => handleInputChange('bankingInfo', 'accountType', e.target.value)}
           >
             <MenuItem value="savings">Savings</MenuItem>
-            <MenuItem value="checking">Checking</MenuItem>
+            <MenuItem value="current">Current</MenuItem>
                   </Select>
                 </FormControl>
               </Box>
@@ -653,23 +1007,27 @@ const EmployeePage: React.FC = () => {
   const renderGovernmentInfo = () => (
     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               <Box sx={{ flex: 1, minWidth: 200 }}>
-                    <TextField 
-                      fullWidth 
-          label="Social Security Number"
-          value={employee.governmentInfo.ssn}
-          onChange={(e) => handleInputChange('governmentInfo', 'ssn', e.target.value)}
-          disabled={!isEditing}
-          type={isEditing ? 'text' : 'password'}
-                    />
+                                          <TextField 
+                        fullWidth 
+                        label="PAN Number"
+                        value={employee.governmentInfo.panNumber}
+                        onChange={(e) => handleInputChange('governmentInfo', 'panNumber', e.target.value)}
+                        placeholder="ABCDE1234F"
+                        disabled={!isEditing}
+                        type={isEditing ? 'text' : 'password'}
+                        helperText={isEditing ? "Format: ABCDE1234F (10 characters)" : ""}
+                      />
               </Box>
               <Box sx={{ flex: 1, minWidth: 200 }}>
-                    <TextField 
-                      fullWidth 
-          label="Tax ID"
-          value={employee.governmentInfo.taxId}
-          onChange={(e) => handleInputChange('governmentInfo', 'taxId', e.target.value)}
-          disabled={!isEditing}
-                    />
+                                          <TextField 
+                        fullWidth 
+                        label="Aadhar Number"
+                        value={employee.governmentInfo.aadharNumber}
+                        onChange={(e) => handleInputChange('governmentInfo', 'aadharNumber', e.target.value)}
+                        placeholder="1234-5678-9012"
+                        disabled={!isEditing}
+                        helperText={isEditing ? "Format: 1234-5678-9012 (12 digits)" : ""}
+                      />
               </Box>
               <Box sx={{ flex: 1, minWidth: 200 }}>
                     <TextField 
@@ -730,18 +1088,32 @@ const EmployeePage: React.FC = () => {
                     />
               </Box>
               <Box sx={{ flex: 1, minWidth: 200 }}>
-                    <TextField 
-                      fullWidth 
-                  label="Relationship"
-                  value={contact.relationship}
-                  onChange={(e) => {
-                    const updated = employee.emergencyContacts.map(c =>
-                      c.id === contact.id ? { ...c, relationship: e.target.value } : c
-                    );
-                    handleArrayChange('emergencyContacts', updated);
-                  }}
-                  disabled={!isEditing}
-                    />
+                <FormControl fullWidth disabled={!isEditing}>
+                  <InputLabel>Relationship</InputLabel>
+                  <Select
+                    value={contact.relationship}
+                    label="Relationship"
+                    onChange={(e) => {
+                      const updated = employee.emergencyContacts.map(c =>
+                        c.id === contact.id ? { ...c, relationship: e.target.value } : c
+                      );
+                      handleArrayChange('emergencyContacts', updated);
+                    }}
+                  >
+                    <MenuItem value="Spouse">Spouse</MenuItem>
+                    <MenuItem value="Husband">Husband</MenuItem>
+                    <MenuItem value="Wife">Wife</MenuItem>
+                    <MenuItem value="Father">Father</MenuItem>
+                    <MenuItem value="Mother">Mother</MenuItem>
+                    <MenuItem value="Son">Son</MenuItem>
+                    <MenuItem value="Daughter">Daughter</MenuItem>
+                    <MenuItem value="Brother">Brother</MenuItem>
+                    <MenuItem value="Sister">Sister</MenuItem>
+                    <MenuItem value="Friend">Friend</MenuItem>
+                    <MenuItem value="Guardian">Guardian</MenuItem>
+                    <MenuItem value="Other">Other</MenuItem>
+                  </Select>
+                </FormControl>
               </Box>
               <Box sx={{ flex: 1, minWidth: 200 }}>
                     <TextField 
@@ -842,37 +1214,79 @@ const EmployeePage: React.FC = () => {
                 />
               </Box>
               <Box sx={{ flex: 1, minWidth: 200 }}>
-                    <TextField 
-                      fullWidth 
-                  label="Degree"
-                  value={edu.degree}
-                  onChange={(e) => {
-                    const updated = employee.education.map(eduItem =>
-                      eduItem.id === edu.id ? { ...eduItem, degree: e.target.value } : eduItem
-                    );
-                    handleArrayChange('education', updated);
-                  }}
-                  disabled={!isEditing}
-                    />
+                <FormControl fullWidth disabled={!isEditing}>
+                  <InputLabel>Degree</InputLabel>
+                  <Select
+                    value={edu.degree}
+                    label="Degree"
+                    onChange={(e) => {
+                      const updated = employee.education.map(eduItem =>
+                        eduItem.id === edu.id ? { ...eduItem, degree: e.target.value } : eduItem
+                      );
+                      handleArrayChange('education', updated);
+                    }}
+                  >
+                    <MenuItem value="Bachelor of Technology">Bachelor of Technology (B.Tech)</MenuItem>
+                    <MenuItem value="Bachelor of Engineering">Bachelor of Engineering (B.E.)</MenuItem>
+                    <MenuItem value="Bachelor of Science">Bachelor of Science (B.Sc.)</MenuItem>
+                    <MenuItem value="Bachelor of Commerce">Bachelor of Commerce (B.Com)</MenuItem>
+                    <MenuItem value="Bachelor of Arts">Bachelor of Arts (B.A.)</MenuItem>
+                    <MenuItem value="Bachelor of Business Administration">Bachelor of Business Administration (BBA)</MenuItem>
+                    <MenuItem value="Master of Technology">Master of Technology (M.Tech)</MenuItem>
+                    <MenuItem value="Master of Science">Master of Science (M.Sc.)</MenuItem>
+                    <MenuItem value="Master of Business Administration">Master of Business Administration (MBA)</MenuItem>
+                    <MenuItem value="Master of Arts">Master of Arts (M.A.)</MenuItem>
+                    <MenuItem value="Master of Commerce">Master of Commerce (M.Com)</MenuItem>
+                    <MenuItem value="Doctor of Philosophy">Doctor of Philosophy (Ph.D.)</MenuItem>
+                    <MenuItem value="Diploma">Diploma</MenuItem>
+                    <MenuItem value="Other">Other</MenuItem>
+                  </Select>
+                </FormControl>
               </Box>
               <Box sx={{ flex: 1, minWidth: 200 }}>
-                    <TextField 
-                      fullWidth 
-                  label="Field of Study"
-                  value={edu.fieldOfStudy}
-                  onChange={(e) => {
-                    const updated = employee.education.map(eduItem =>
-                      eduItem.id === edu.id ? { ...eduItem, fieldOfStudy: e.target.value } : eduItem
-                    );
-                    handleArrayChange('education', updated);
-                  }}
-                  disabled={!isEditing}
-                    />
+                <FormControl fullWidth disabled={!isEditing}>
+                  <InputLabel>Field of Study</InputLabel>
+                  <Select
+                    value={edu.fieldOfStudy}
+                    label="Field of Study"
+                    onChange={(e) => {
+                      const updated = employee.education.map(eduItem =>
+                        eduItem.id === edu.id ? { ...eduItem, fieldOfStudy: e.target.value } : eduItem
+                      );
+                      handleArrayChange('education', updated);
+                    }}
+                  >
+                    <MenuItem value="Computer Science">Computer Science</MenuItem>
+                    <MenuItem value="Information Technology">Information Technology</MenuItem>
+                    <MenuItem value="Electronics & Communication">Electronics & Communication</MenuItem>
+                    <MenuItem value="Mechanical Engineering">Mechanical Engineering</MenuItem>
+                    <MenuItem value="Civil Engineering">Civil Engineering</MenuItem>
+                    <MenuItem value="Electrical Engineering">Electrical Engineering</MenuItem>
+                    <MenuItem value="Chemical Engineering">Chemical Engineering</MenuItem>
+                    <MenuItem value="Biotechnology">Biotechnology</MenuItem>
+                    <MenuItem value="Business Administration">Business Administration</MenuItem>
+                    <MenuItem value="Finance">Finance</MenuItem>
+                    <MenuItem value="Marketing">Marketing</MenuItem>
+                    <MenuItem value="Human Resources">Human Resources</MenuItem>
+                    <MenuItem value="Economics">Economics</MenuItem>
+                    <MenuItem value="Mathematics">Mathematics</MenuItem>
+                    <MenuItem value="Physics">Physics</MenuItem>
+                    <MenuItem value="Chemistry">Chemistry</MenuItem>
+                    <MenuItem value="Biology">Biology</MenuItem>
+                    <MenuItem value="English">English</MenuItem>
+                    <MenuItem value="History">History</MenuItem>
+                    <MenuItem value="Geography">Geography</MenuItem>
+                    <MenuItem value="Political Science">Political Science</MenuItem>
+                    <MenuItem value="Sociology">Sociology</MenuItem>
+                    <MenuItem value="Psychology">Psychology</MenuItem>
+                    <MenuItem value="Other">Other</MenuItem>
+                  </Select>
+                </FormControl>
               </Box>
               <Box sx={{ flex: 1, minWidth: 200 }}>
-                    <TextField 
-                      fullWidth 
-                  label="GPA"
+                <TextField 
+                  fullWidth 
+                  label="GPA/CGPA"
                   value={edu.gpa || ''}
                   onChange={(e) => {
                     const updated = employee.education.map(eduItem =>
@@ -880,8 +1294,10 @@ const EmployeePage: React.FC = () => {
                     );
                     handleArrayChange('education', updated);
                   }}
+                  placeholder="8.5"
                   disabled={!isEditing}
-                    />
+                  helperText={isEditing ? "Indian scale: 0-10 (e.g., 8.5)" : ""}
+                />
               </Box>
               <Box sx={{ flex: 1, minWidth: 200 }}>
                 <TextField
@@ -978,7 +1394,7 @@ const EmployeePage: React.FC = () => {
         ))}
       </List>
       {isEditing && (
-                  <Button
+        <Button
           variant="outlined"
           startIcon={<AddIcon />}
           sx={{ mt: 2 }}
@@ -986,6 +1402,11 @@ const EmployeePage: React.FC = () => {
           Upload Document
         </Button>
       )}
+      
+      <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
+        Common document types: Resume, PAN Card, Aadhar Card, Passport, Driving License, 
+        Educational Certificates, Experience Letters, Salary Slips, Bank Statements
+      </Typography>
     </Box>
   );
 
@@ -1012,77 +1433,146 @@ const EmployeePage: React.FC = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Employee Profile: {employee.personalInfo.firstName} {employee.personalInfo.lastName}
+      {/* Employee Selection Section */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <PersonIcon color="primary" />
+            Select Employee
           </Typography>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            {isEditing ? (
-              <>
-                <Button
-                    variant="contained"
-                  startIcon={<SaveIcon />}
-                  onClick={handleSave}
-                  color="primary"
-                >
-                  Save Changes
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            <FormControl sx={{ minWidth: 300 }}>
+              <InputLabel>Choose Employee</InputLabel>
+              <Select
+                value={selectedEmployeeId}
+                label="Choose Employee"
+                onChange={(e) => handleEmployeeSelection(e.target.value)}
+                startAdornment={<PersonIcon sx={{ mr: 1, color: 'action.active' }} />}
+              >
+                <MenuItem value="">
+                  <em>Select an employee to view profile</em>
+                </MenuItem>
+                {availableEmployees.map((emp) => (
+                  <MenuItem key={emp.id} value={emp.id}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                      <Typography variant="body1">{emp.name}</Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {emp.employeeId}
+                      </Typography>
+                    </Box>
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            {selectedEmployeeId && (
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={loadEmployeeData}
+                disabled={loading}
+              >
+                Refresh Profile
+              </Button>
+            )}
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* Employee Profile Section - Only show when employee is selected */}
+      {selectedEmployeeId ? (
+        <>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Typography variant="h4" component="h1" gutterBottom>
+              Employee Profile: {employee.personalInfo.firstName || 'Employee'} {employee.personalInfo.lastName || 'Name'}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {isEditing ? (
+                <>
+                  <Button
+                      variant="contained"
+                    startIcon={<SaveIcon />}
+                    onClick={handleSave}
+                    color="primary"
+                  >
+                    Save Changes
                   </Button>
                   <Button
                     variant="outlined"
-                  startIcon={<CancelIcon />}
-                  onClick={handleCancel}
-                >
-                  Cancel
-              </Button>
-              </>
-            ) : (
-              <Button
-                variant="contained"
-                startIcon={<EditIcon />}
-                onClick={() => setIsEditing(true)}
-                sx={{ bgcolor: 'primary.main' }}
-              >
-                Edit Profile
-              </Button>
-            )}
-            </Box>
-        </Box>
+                    startIcon={<CancelIcon />}
+                    onClick={handleCancel}
+                  >
+                    Cancel
+                </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="contained"
+                    startIcon={<EditIcon />}
+                    onClick={() => setIsEditing(true)}
+                    sx={{ bgcolor: 'primary.main' }}
+                  >
+                    Edit Profile
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<RefreshIcon />}
+                    onClick={loadEmployeeData}
+                    disabled={loading}
+                  >
+                    Refresh
+                  </Button>
+                </>
+              )}
+              </Box>
+          </Box>
 
         {/* Employee Summary Card */}
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <Avatar sx={{ width: 80, height: 80, bgcolor: 'primary.main', fontSize: '2rem' }}>
-                {employee.personalInfo.firstName[0]}{employee.personalInfo.lastName[0]}
-              </Avatar>
-              <Box sx={{ flex: 1 }}>
-                <Typography variant="h5" gutterBottom>
-                  {employee.personalInfo.firstName} {employee.personalInfo.lastName}
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+                <Typography variant="h6" color="textSecondary">
+                  Loading employee data...
                 </Typography>
-                <Typography variant="h6" color="textSecondary" gutterBottom>
-                  {employee.professionalInfo.position}
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                  <Chip
-                    icon={<BusinessIcon />}
-                    label={employee.professionalInfo.department}
-                    variant="outlined"
-                  />
-                  <Chip
-                    icon={<BadgeIcon />}
-                    label={employee.employeeId}
-                    variant="outlined"
-                  />
-                  <Chip
-                    label={employee.professionalInfo.status}
-                    color={employee.professionalInfo.status === 'active' ? 'success' : 'default'}
-                    sx={{ textTransform: 'capitalize' }}
-                  />
+              </Box>
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <Avatar sx={{ width: 80, height: 80, bgcolor: 'primary.main', fontSize: '2rem' }}>
+                  {employee.personalInfo.firstName[0] || 'E'}{employee.personalInfo.lastName[0] || 'M'}
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="h5" gutterBottom>
+                    {employee.personalInfo.firstName || 'Employee'} {employee.personalInfo.lastName || 'Name'}
+                  </Typography>
+                  <Typography variant="h6" color="textSecondary" gutterBottom>
+                    {employee.professionalInfo.position || 'Position'}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    <Chip
+                      icon={<BusinessIcon />}
+                      label={employee.professionalInfo.department || 'Department'}
+                      variant="outlined"
+                    />
+                    <Chip
+                      icon={<BadgeIcon />}
+                      label={employee.employeeId || 'Employee ID'}
+                      variant="outlined"
+                    />
+                    <Chip
+                      label={employee.professionalInfo.status || 'Status'}
+                      color={employee.professionalInfo.status === 'active' ? 'success' : 'default'}
+                      sx={{ textTransform: 'capitalize' }}
+                    />
+                  </Box>
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                    Annual Salary: {formatIndianCurrency(employee.professionalInfo.salary)}
+                  </Typography>
                 </Box>
               </Box>
-            </Box>
-            </CardContent>
-          </Card>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Stepper Navigation */}
         <Paper sx={{ mb: 3 }}>
@@ -1140,7 +1630,21 @@ const EmployeePage: React.FC = () => {
             {snackbar.message}
           </Alert>
         </Snackbar>
-      </Box>
+        </>
+      ) : (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+          <Box sx={{ textAlign: 'center' }}>
+            <PersonIcon sx={{ fontSize: 64, color: 'action.disabled', mb: 2 }} />
+            <Typography variant="h5" color="textSecondary" gutterBottom>
+              No Employee Selected
+            </Typography>
+            <Typography variant="body1" color="textSecondary">
+              Please select an employee from the dropdown above to view their profile.
+            </Typography>
+          </Box>
+        </Box>
+      )}
+    </Box>
   );
 };
 
