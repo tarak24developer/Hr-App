@@ -1,0 +1,543 @@
+@import "tailwindcss";
+
+/* Test styles to verify Tailwind is working */
+.test-tailwind {
+  @apply bg-blue-500 text-white p-4 rounded;
+}
+
+/* Fallback styles in case Tailwind doesn't work */
+.fallback-bg {
+  background-color: #3b82f6;
+}
+
+.fallback-text {
+  color: white;
+}
+
+.fallback-padding {
+  padding: 1rem;
+}
+
+.fallback-rounded {
+  border-radius: 0.25rem;
+}
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Improve touch targets on mobile */
+  button, a, input, select, textarea {
+    @apply touch-manipulation;
+  }
+
+  /* Prevent horizontal scroll on mobile */
+  * {
+    @apply box-border;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+  }
+  
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6;
+  }
+  
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+  }
+
+  /* Responsive container */
+  .container-responsive {
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Mobile-first grid */
+  .grid-responsive {
+    @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+
+  /* Responsive text */
+  .text-responsive {
+    @apply text-sm sm:text-base lg:text-lg;
+  }
+
+  .heading-responsive {
+    @apply text-xl sm:text-2xl lg:text-3xl font-bold;
+  }
+
+  /* Responsive spacing */
+  .section-responsive {
+    @apply py-4 sm:py-6 lg:py-8;
+  }
+
+  .padding-responsive {
+    @apply p-4 sm:p-6 lg:p-8;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    /* text-wrap: balance; - removed for browser compatibility */
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Custom scrollbar styles - Unified and Enhanced */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #9ca3af #f3f4f6;
+    overflow-y: auto !important;
+    max-height: 100% !important;
+  }
+
+  /* Sidebar specific scrollbar */
+  .sidebar-nav {
+    height: 0 !important;
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    position: relative !important;
+  }
+
+  /* Ensure sidebar container has proper height and fixed positioning */
+  .sidebar-container {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 50 !important;
+  }
+
+  /* Ensure navigation area is properly constrained */
+  .sidebar-nav {
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    max-height: calc(100vh - 200px) !important; /* Account for header and footer */
+  }
+
+  /* Force scrollbar to be always visible in sidebar */
+  .sidebar-nav::-webkit-scrollbar {
+    width: 8px !important;
+    height: 8px !important;
+    -webkit-appearance: none !important;
+  }
+
+  .sidebar-nav::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border-radius: 4px !important;
+  }
+
+  .sidebar-nav::-webkit-scrollbar-thumb {
+    background: #6b7280 !important;
+    border-radius: 4px !important;
+    border: 1px solid #4b5563 !important;
+    min-height: 40px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: #4b5563 !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* Ensure scrollbar is always shown in sidebar */
+  .sidebar-nav {
+    scrollbar-width: thin !important;
+    scrollbar-color: #6b7280 rgba(0, 0, 0, 0.05) !important;
+  }
+
+  /* Dark mode sidebar scrollbar */
+  .dark .sidebar-nav {
+    scrollbar-color: #6b7280 rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .dark .sidebar-nav::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .dark .sidebar-nav::-webkit-scrollbar-thumb {
+    background: #6b7280 !important;
+    border-color: #4b5563 !important;
+  }
+
+  .dark .sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af !important;
+  }
+
+  /* Main content area - fixed positioning */
+  .main-content-area {
+    position: fixed !important;
+    top: 0 !important;
+    left: 256px !important; /* 64 * 4 = 256px for w-64 sidebar */
+    right: 0 !important;
+    width: calc(100vw - 256px) !important; /* Full viewport width minus sidebar */
+    height: 100vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    z-index: 40 !important;
+    transition: all 0.3s ease-in-out !important;
+    padding-top: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Main content when sidebar is collapsed */
+  .main-content-area.sidebar-collapsed {
+    left: 64px !important; /* 16 * 4 = 64px for w-16 sidebar */
+    width: calc(100vw - 64px) !important; /* Full viewport width minus collapsed sidebar */
+  }
+
+  /* Body class for sidebar collapsed state */
+  body.sidebar-collapsed .main-content-area {
+    left: 64px !important;
+    width: calc(100vw - 64px) !important;
+  }
+
+  /* Main content scrollbar */
+  .main-content-area::-webkit-scrollbar {
+    width: 8px !important;
+    height: 8px !important;
+    -webkit-appearance: none !important;
+  }
+
+  .main-content-area::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border-radius: 4px !important;
+  }
+
+  .main-content-area::-webkit-scrollbar-thumb {
+    background: #6b7280 !important;
+    border-radius: 4px !important;
+    border: 1px solid #4b5563 !important;
+    min-height: 40px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .main-content-area::-webkit-scrollbar-thumb:hover {
+    background: #4b5563 !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  /* Dark mode main content scrollbar */
+  .dark .main-content-area::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .dark .main-content-area::-webkit-scrollbar-thumb {
+    background: #6b7280 !important;
+    border-color: #4b5563 !important;
+  }
+
+  .dark .main-content-area::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af !important;
+  }
+
+  /* Ensure header is properly positioned in main content */
+  .main-content-area .header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 30 !important;
+    background: inherit !important;
+  }
+
+  /* Ensure content inside main area is responsive */
+  .main-content-area > * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Responsive padding for main content */
+  .main-content-area {
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+  }
+
+  @media (min-width: 640px) {
+    .main-content-area {
+      padding-left: 2rem !important;
+      padding-right: 2rem !important;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .main-content-area {
+      padding-left: 2.5rem !important;
+      padding-right: 2.5rem !important;
+    }
+  }
+
+  /* Responsive adjustments for mobile and tablet */
+  @media (max-width: 1024px) {
+    .main-content-area {
+      left: 0 !important;
+      width: 100vw !important;
+      right: 0 !important;
+    }
+    
+    .sidebar-container {
+      transform: translateX(-100%) !important;
+      z-index: 60 !important;
+    }
+    
+    .sidebar-container.show {
+      transform: translateX(0) !important;
+    }
+  }
+
+  /* Small mobile devices */
+  @media (max-width: 640px) {
+    .main-content-area {
+      left: 0 !important;
+      width: 100vw !important;
+      right: 0 !important;
+      padding-left: 1rem !important;
+      padding-right: 1rem !important;
+    }
+  }
+
+  /* Medium devices */
+  @media (min-width: 1025px) and (max-width: 1280px) {
+    .main-content-area {
+      left: 256px !important;
+      width: calc(100vw - 256px) !important;
+    }
+    
+    body.sidebar-collapsed .main-content-area {
+      left: 64px !important;
+      width: calc(100vw - 64px) !important;
+    }
+  }
+
+  /* Large devices */
+  @media (min-width: 1281px) {
+    .main-content-area {
+      left: 256px !important;
+      width: calc(100vw - 256px) !important;
+      max-width: calc(100vw - 256px) !important;
+    }
+    
+    body.sidebar-collapsed .main-content-area {
+      left: 64px !important;
+      width: calc(100vw - 64px) !important;
+      max-width: calc(100vw - 64px) !important;
+    }
+  }
+
+  .scrollbar-thin.dark {
+    scrollbar-color: #6b7280 #1f2937;
+  }
+
+  .scrollbar-thin-dark {
+    scrollbar-color: #6b7280 #1f2937;
+  }
+
+  /* WebKit scrollbar styles */
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px !important;
+    height: 8px !important;
+    -webkit-appearance: none;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05) !important;
+    border-radius: 4px !important;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #6b7280 !important;
+    border-radius: 4px !important;
+    border: 1px solid #4b5563 !important;
+    min-height: 40px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #4b5563 !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:active {
+    background: #4b5563 !important;
+  }
+
+  /* Dark mode scrollbar */
+  .dark .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #6b7280 !important;
+    border-color: #4b5563 !important;
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af !important;
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:active {
+    background: #9ca3af !important;
+  }
+
+  /* Legacy scrollbar classes - kept for compatibility */
+  .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+    background-color: #9ca3af !important;
+    border-radius: 4px !important;
+    transition: background-color 0.2s ease;
+    border: 1px solid #d1d5db !important;
+  }
+
+  .scrollbar-thumb-gray-300::-webkit-scrollbar-thumb:hover {
+    background-color: #6b7280 !important;
+  }
+
+  .scrollbar-thumb-gray-600::-webkit-scrollbar-thumb {
+    background-color: #6b7280 !important;
+    border-radius: 4px !important;
+    transition: background-color 0.2s ease;
+    border: 1px solid #4b5563 !important;
+  }
+
+  .scrollbar-thumb-gray-600::-webkit-scrollbar-thumb:hover {
+    background-color: #9ca3af !important;
+  }
+
+  .scrollbar-track-gray-100::-webkit-scrollbar-track {
+    background-color: #f3f4f6 !important;
+    border-radius: 4px !important;
+  }
+
+  .scrollbar-track-gray-800::-webkit-scrollbar-track {
+    background-color: #1f2937 !important;
+    border-radius: 4px !important;
+  }
+
+  /* Smooth scrolling */
+  .scroll-smooth {
+    scroll-behavior: smooth;
+  }
+
+
+
+  /* Dark mode scrollbar */
+  .dark .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #6b7280 !important;
+    border-color: #4b5563;
+    display: block !important;
+  }
+
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af !important;
+  }
+
+  /* Responsive visibility */
+  .mobile-only {
+    @apply block sm:hidden;
+  }
+
+  .desktop-only {
+    @apply hidden sm:block;
+  }
+
+  .tablet-up {
+    @apply hidden md:block;
+  }
+
+  .mobile-tablet-only {
+    @apply block lg:hidden;
+  }
+
+  /* Touch-friendly spacing */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Safe area for mobile devices */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Font size utilities for dynamic sizing */
+  .text-xs {
+    font-size: 0.75rem !important;
+    line-height: 1rem !important;
+  }
+
+  .text-sm {
+    font-size: 0.875rem !important;
+    line-height: 1.25rem !important;
+  }
+
+  .text-base {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+  }
+
+  .text-lg {
+    font-size: 1.125rem !important;
+    line-height: 1.75rem !important;
+  }
+
+  .text-xl {
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+  }
+
+  .text-2xl {
+    font-size: 1.5rem !important;
+    line-height: 2rem !important;
+  }
+}
