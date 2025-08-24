@@ -561,12 +561,20 @@ const EmployeePage: React.FC = () => {
         <Typography variant="h6" gutterBottom>Skills</Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
           {employee.skills.map((skill, index) => (
-            <Chip
-              key={index}
-              label={skill}
-              onDelete={isEditing ? () => removeSkill(skill) : undefined}
-              variant="outlined"
-            />
+            isEditing ? (
+              <Chip
+                key={index}
+                label={skill}
+                onDelete={() => removeSkill(skill)}
+                variant="outlined"
+              />
+            ) : (
+              <Chip
+                key={index}
+                label={skill}
+                variant="outlined"
+              />
+            )
           ))}
         </Box>
         {isEditing && (

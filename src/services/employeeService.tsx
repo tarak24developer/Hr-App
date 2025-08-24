@@ -44,7 +44,8 @@ class EmployeeService {
         options.limit = filters.limit;
       }
 
-      return await firebaseService.getAll(this.collection, options);
+      const result = await firebaseService.getCollection(this.collection, options);
+      return result;
     } catch (error) {
       console.error('Error fetching employees:', error);
       throw error;
@@ -54,7 +55,8 @@ class EmployeeService {
   // Get employee by ID
   async getEmployee(id) {
     try {
-      return await firebaseService.getById(this.collection, id);
+      const result = await firebaseService.getDocument(this.collection, id);
+      return result;
     } catch (error) {
       console.error('Error fetching employee:', error);
       throw error;
@@ -64,11 +66,13 @@ class EmployeeService {
   // Get employee by employee ID (not document ID)
   async getEmployeeByEmployeeId(employeeId) {
     try {
-      const employees = await firebaseService.query(
+      const result = await firebaseService.queryDocuments(
         this.collection,
-        [{ field: 'id', operator: '==', value: employeeId }]
+        'id',
+        '==',
+        employeeId
       );
-      return employees.length > 0 ? employees[0] : null;
+      return result.success && result.data && result.data.length > 0 ? result.data[0] : null;
     } catch (error) {
       console.error('Error fetching employee by employee ID:', error);
       throw error;
@@ -78,8 +82,8 @@ class EmployeeService {
   // Create employee
   async createEmployee(employeeData) {
     try {
-      const id = await firebaseService.create(this.collection, employeeData);
-      return await this.getEmployee(id);
+      const result = await firebaseService.addDocument(this.collection, employeeData);
+      return result;
     } catch (error) {
       console.error('Error creating employee:', error);
       throw error;
@@ -89,8 +93,8 @@ class EmployeeService {
   // Update employee
   async updateEmployee(id, updateData) {
     try {
-      await firebaseService.update(this.collection, id, updateData);
-      return await this.getEmployee(id);
+      const result = await firebaseService.updateDocument(this.collection, id, updateData);
+      return result;
     } catch (error) {
       console.error('Error updating employee:', error);
       throw error;
@@ -100,10 +104,11 @@ class EmployeeService {
   // Delete employee (soft delete)
   async deleteEmployee(id) {
     try {
-      return await firebaseService.update(this.collection, id, { 
+      const result = await firebaseService.updateDocument(this.collection, id, { 
         resigned: true,
         resignedAt: new Date()
       });
+      return result;
     } catch (error) {
       console.error('Error deleting employee:', error);
       throw error;
@@ -113,7 +118,8 @@ class EmployeeService {
   // Permanently delete employee
   async permanentDeleteEmployee(id) {
     try {
-      return await firebaseService.delete(this.collection, id);
+      const result = await firebaseService.deleteDocument(this.collection, id);
+      return result;
     } catch (error) {
       console.error('Error permanently deleting employee:', error);
       throw error;
@@ -128,25 +134,26 @@ class EmployeeService {
       const searchUpper = searchTerm.toUpperCase();
       
       // Search by name (prefix)
-      const nameResults = await firebaseService.query(
+      const nameResults = await firebaseService.queryDocuments(
         this.collection,
-        [
-          { field: 'employeeName', operator: '>=', value: searchTerm },
-          { field: 'employeeName', operator: '<=', value: searchTerm + '\uf8ff' }
-        ]
+        'employeeName',
+        '>=',
+        searchTerm
       );
 
       // Search by employee ID (prefix)
-      const idResults = await firebaseService.query(
+      const idResults = await firebaseService.queryDocuments(
         this.collection,
-        [
-          { field: 'id', operator: '>=', value: searchTerm },
-          { field: 'id', operator: '<=', value: searchTerm + '\uf8ff' }
-        ]
+        'id',
+        '>=',
+        searchTerm
       );
 
       // Combine and deduplicate results
-      const allResults = [...nameResults, ...idResults];
+      const allResults = [
+        ...(nameResults.success ? nameResults.data || [] : []),
+        ...(idResults.success ? idResults.data || [] : [])
+      ];
       const uniqueResults = allResults.filter((employee, index, self) => 
         index === self.findIndex(e => e.id === employee.id)
       );
@@ -161,11 +168,13 @@ class EmployeeService {
   // Get employees by department
   async getEmployeesByDepartment(department) {
     try {
-      return await firebaseService.query(
+      const result = await firebaseService.queryDocuments(
         this.collection,
-        [{ field: 'department', operator: '==', value: department }],
-        { field: 'employeeName', direction: 'asc' }
+        'department',
+        '==',
+        department
       );
+      return result.success ? result.data || [] : [];
     } catch (error) {
       console.error('Error fetching employees by department:', error);
       throw error;
@@ -175,7 +184,12 @@ class EmployeeService {
   // Get employee statistics
   async getEmployeeStats() {
     try {
-      const allEmployees = await this.getEmployees();
+      const allEmployeesResult = await this.getEmployees();
+      if (!allEmployeesResult.success) {
+        throw new Error('Failed to fetch employees for stats');
+      }
+      
+      const allEmployees = allEmployeesResult.data || [];
       const activeEmployees = allEmployees.filter(emp => !emp.resigned);
       
       const stats = {
@@ -226,7 +240,11 @@ class EmployeeService {
       // Apply ordering
       options.orderBy = { field: 'employeeName', direction: 'asc' };
 
-      return await firebaseService.getPaginated(this.collection, pageSize, lastDoc, options);
+      // Apply limit
+      options.limit = pageSize;
+
+      const result = await firebaseService.getCollection(this.collection, options);
+      return result;
     } catch (error) {
       console.error('Error fetching paginated employees:', error);
       throw error;
@@ -255,7 +273,10 @@ class EmployeeService {
 
       options.orderBy = { field: 'employeeName', direction: 'asc' };
 
-      return firebaseService.onSnapshot(this.collection, callback, options);
+      // Note: onSnapshot is not implemented in firebaseService yet
+      // This would need to be implemented in firebaseService
+      console.warn('Real-time updates not implemented yet');
+      return null;
     } catch (error) {
       console.error('Error setting up employees snapshot:', error);
       throw error;
@@ -285,7 +306,12 @@ class EmployeeService {
   // Get departments (unique values)
   async getDepartments() {
     try {
-      const employees = await this.getEmployees({ resigned: false });
+      const employeesResult = await this.getEmployees({ resigned: false });
+      if (!employeesResult.success) {
+        throw new Error('Failed to fetch employees for departments');
+      }
+      
+      const employees = employeesResult.data || [];
       const departments = [...new Set(employees.map(emp => emp.department))];
       return departments.filter(dept => dept).sort();
     } catch (error) {
@@ -297,7 +323,12 @@ class EmployeeService {
   // Get designations (unique values)
   async getDesignations() {
     try {
-      const employees = await this.getEmployees({ resigned: false });
+      const employeesResult = await this.getEmployees({ resigned: false });
+      if (!employeesResult.success) {
+        throw new Error('Failed to fetch employees for designations');
+      }
+      
+      const employees = employeesResult.data || [];
       const designations = [...new Set(employees.map(emp => emp.designation))];
       return designations.filter(designation => designation).sort();
     } catch (error) {

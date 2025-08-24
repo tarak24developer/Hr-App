@@ -36,7 +36,8 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemAvatar
+  ListItemAvatar,
+  CircularProgress
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -54,9 +55,12 @@ import {
   LocationOn as LocationIcon,
   Badge as BadgeIcon,
   Download as DownloadIcon,
-  Emergency as EmergencyIcon
+  Emergency as EmergencyIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
-import { useDataService } from '../hooks/useDataService';
+import firebaseService from '../services/firebaseService';
+import { populateSampleUsers, checkUsersCollection } from '../utils/sampleData';
+import { formatIndianCurrency } from '../utils/currency';
 
 interface Employee {
   id: string;
@@ -116,10 +120,13 @@ const EmployeeDirectory: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [filters, setFilters] = useState<EmployeeFilters>(initialFilters);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [formData, setFormData] = useState<Partial<Employee>>({});
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -130,108 +137,84 @@ const EmployeeDirectory: React.FC = () => {
     severity: 'info'
   });
 
-  // Mock data for development
-  const mockDepartments: Department[] = [
-    { id: '1', name: 'Information Technology', description: 'IT Department', headOfDepartment: 'John Smith' },
-    { id: '2', name: 'Human Resources', description: 'HR Department', headOfDepartment: 'Sarah Johnson' },
-    { id: '3', name: 'Marketing', description: 'Marketing Department', headOfDepartment: 'Mike Wilson' },
-    { id: '4', name: 'Finance', description: 'Finance Department', headOfDepartment: 'Lisa Brown' },
-    { id: '5', name: 'Sales', description: 'Sales Department', headOfDepartment: 'David Jones' }
-  ];
+  // Generate next available employee ID
+  const generateNextEmployeeId = useCallback((): string => {
+    const nextNumber = employees.length + 1;
+    return `EMP${nextNumber.toString().padStart(3, '0')}`;
+  }, [employees]);
 
-  const mockEmployees: Employee[] = [
-    {
-      id: '1',
-      employeeId: 'EMP001',
-      name: 'John Doe',
-      email: 'john.doe@company.com',
-      phone: '+1 (555) 123-4567',
-      department: 'Information Technology',
-      position: 'Senior Software Engineer',
-      joiningDate: new Date('2022-03-15'),
-      salary: 85000,
-      status: 'active',
-      address: '123 Main St, Anytown, USA',
-      emergencyContact: {
-        name: 'Jane Doe',
-        phone: '+1 (555) 123-4568',
-        relation: 'Spouse'
-      },
-      skills: ['React', 'Node.js', 'TypeScript', 'Python'],
-      manager: 'John Smith',
-      officeLocation: 'New York Office'
-    },
-    {
-      id: '2',
-      employeeId: 'EMP002',
-      name: 'Jane Smith',
-      email: 'jane.smith@company.com',
-      phone: '+1 (555) 234-5678',
-      department: 'Human Resources',
-      position: 'HR Manager',
-      joiningDate: new Date('2021-01-10'),
-      salary: 75000,
-      status: 'active',
-      address: '456 Oak Ave, Anytown, USA',
-      emergencyContact: {
-        name: 'Bob Smith',
-        phone: '+1 (555) 234-5679',
-        relation: 'Husband'
-      },
-      skills: ['Recruitment', 'Employee Relations', 'Training'],
-      manager: 'Sarah Johnson',
-      officeLocation: 'New York Office'
-    },
-    {
-      id: '3',
-      employeeId: 'EMP003',
-      name: 'Mike Johnson',
-      email: 'mike.johnson@company.com',
-      phone: '+1 (555) 345-6789',
-      department: 'Marketing',
-      position: 'Marketing Specialist',
-      joiningDate: new Date('2023-06-01'),
-      salary: 60000,
-      status: 'active',
-      address: '789 Pine St, Anytown, USA',
-      emergencyContact: {
-        name: 'Sarah Johnson',
-        phone: '+1 (555) 345-6780',
-        relation: 'Sister'
-      },
-      skills: ['Digital Marketing', 'Social Media', 'Content Creation'],
-      manager: 'Mike Wilson',
-      officeLocation: 'Los Angeles Office'
-    },
-    {
-      id: '4',
-      employeeId: 'EMP004',
-      name: 'Sarah Wilson',
-      email: 'sarah.wilson@company.com',
-      phone: '+1 (555) 456-7890',
-      department: 'Finance',
-      position: 'Financial Analyst',
-      joiningDate: new Date('2022-09-15'),
-      salary: 70000,
-      status: 'inactive',
-      address: '321 Elm St, Anytown, USA',
-      emergencyContact: {
-        name: 'Tom Wilson',
-        phone: '+1 (555) 456-7891',
-        relation: 'Father'
-      },
-      skills: ['Financial Analysis', 'Excel', 'QuickBooks'],
-      manager: 'Lisa Brown',
-      officeLocation: 'Chicago Office'
-    }
-  ];
-
+  // Load data from Firebase
   useEffect(() => {
-    // Load mock data
-    setDepartments(mockDepartments);
-    setEmployees(mockEmployees);
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Load users from the existing users collection
+        const usersResult = await firebaseService.getCollection('users');
+        if (usersResult && usersResult.success && usersResult.data) {
+          // Transform the user data to match our Employee interface
+          const transformedEmployees = usersResult.data.map((user: any, index: number) => ({
+            id: user.id,
+            employeeId: user.employeeId || `EMP${(index + 1).toString().padStart(3, '0')}`,
+            name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.email,
+            email: user.email,
+            phone: user.phone || '',
+            department: user.department || 'Unassigned',
+            position: user.position || 'Employee',
+            joiningDate: user.hireDate ? new Date(user.hireDate) : new Date(),
+            salary: user.salary || 0,
+            status: user.status || 'active',
+            address: user.address || '',
+            emergencyContact: {
+              name: user.emergencyContact?.name || '',
+              phone: user.emergencyContact?.phone || '',
+              relation: user.emergencyContact?.relationship || ''
+            },
+            skills: user.skills || [],
+            manager: user.managerId || '',
+            officeLocation: user.officeLocation || ''
+          }));
+          setEmployees(transformedEmployees);
+        } else {
+          console.warn('No users data received or request failed:', usersResult);
+          setEmployees([]);
+        }
+
+        // Extract departments from users
+        if (usersResult && usersResult.success && usersResult.data) {
+          const departments = [...new Set(usersResult.data
+            .map((user: any) => user.department)
+            .filter((dept: string) => dept && dept !== 'Unassigned')
+          )];
+          
+          const transformedDepartments = departments.map((dept: string, index: number) => ({
+            id: index.toString(),
+            name: dept,
+            description: `${dept} Department`,
+            headOfDepartment: ''
+          }));
+          setDepartments(transformedDepartments);
+        } else {
+          setDepartments([]);
+        }
+      } catch (err: any) {
+        console.error('Error loading data:', err);
+        setError(err.message || 'Failed to load data');
+        setSnackbar({
+          open: true,
+          message: 'Failed to load data from Firebase',
+          severity: 'error'
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
+  // Update filtered employees when employees or filters change
   useEffect(() => {
     applyFilters();
   }, [employees, filters]);
@@ -279,77 +262,194 @@ const EmployeeDirectory: React.FC = () => {
     }));
   };
 
-  const handleCreateEmployee = () => {
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
     setSelectedEmployee(null);
+    setFormData({});
+    setIsViewMode(false);
+  };
+
+  const handleCreateEmployee = () => {
+    const newEmployee: Employee = {
+      id: '',
+      employeeId: '',
+      name: '',
+      email: '',
+      phone: '',
+      department: '',
+      position: '',
+      joiningDate: new Date(),
+      salary: 0,
+      status: 'active',
+      address: '',
+      emergencyContact: {
+        name: '',
+        phone: '',
+        relation: ''
+      },
+      skills: [],
+      manager: '',
+      officeLocation: ''
+    };
+    setSelectedEmployee(newEmployee);
+    setFormData(newEmployee);
     setIsViewMode(false);
     setIsDialogOpen(true);
   };
 
   const handleEditEmployee = (employee: Employee) => {
     setSelectedEmployee(employee);
+    setFormData(employee);
     setIsViewMode(false);
     setIsDialogOpen(true);
   };
 
   const handleViewEmployee = (employee: Employee) => {
     setSelectedEmployee(employee);
+    setFormData(employee);
     setIsViewMode(true);
     setIsDialogOpen(true);
   };
 
-  const handleDeleteEmployee = (employeeId: string) => {
-    setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
-    setSnackbar({
-      open: true,
-      message: 'Employee deleted successfully',
-      severity: 'success'
-    });
-  };
-
-  const handleSaveEmployee = (employeeData: Partial<Employee>) => {
-    if (selectedEmployee) {
-      // Update existing employee
-      setEmployees(prev => prev.map(emp =>
-        emp.id === selectedEmployee.id
-          ? { ...emp, ...employeeData }
+  const handleDeleteEmployee = async (employeeId: string) => {
+    try {
+      // Update the user status to terminated instead of deleting
+      await firebaseService.updateDocument('users', employeeId, { 
+        status: 'terminated',
+        updatedAt: new Date().toISOString()
+      });
+      setEmployees(prev => prev.map(emp => 
+        emp.id === employeeId 
+          ? { ...emp, status: 'terminated' }
           : emp
       ));
       setSnackbar({
         open: true,
-        message: 'Employee updated successfully',
+        message: 'Employee status updated to terminated',
         severity: 'success'
       });
-    } else {
-      // Create new employee
-      const newEmployee: Employee = {
-        id: Date.now().toString(),
-        employeeId: `EMP${String(employees.length + 1).padStart(3, '0')}`,
-        name: employeeData.name || '',
-        email: employeeData.email || '',
-        phone: employeeData.phone || '',
-        department: employeeData.department || '',
-        position: employeeData.position || '',
-        joiningDate: employeeData.joiningDate || new Date(),
-        salary: employeeData.salary || 0,
-        status: 'active',
-        address: employeeData.address || '',
-        emergencyContact: employeeData.emergencyContact || {
-          name: '',
-          phone: '',
-          relation: ''
-        },
-        skills: employeeData.skills || [],
-        manager: employeeData.manager || '',
-        officeLocation: employeeData.officeLocation || ''
-      };
-      setEmployees(prev => [newEmployee, ...prev]);
+    } catch (err: any) {
       setSnackbar({
         open: true,
-        message: 'Employee created successfully',
-        severity: 'success'
+        message: `Failed to update employee status: ${err.message}`,
+        severity: 'error'
       });
     }
-    setIsDialogOpen(false);
+  };
+
+  const handleSaveEmployee = async (employeeData: Partial<Employee>) => {
+    try {
+      if (selectedEmployee && selectedEmployee.id) {
+        // Update existing user
+        const updateData = {
+          firstName: employeeData.name?.split(' ')[0] || '',
+          lastName: employeeData.name?.split(' ').slice(1).join(' ') || '',
+          email: employeeData.email || '',
+          phone: employeeData.phone || '',
+          department: employeeData.department || '',
+          position: employeeData.position || '',
+          hireDate: employeeData.joiningDate?.toISOString() || new Date().toISOString(),
+          salary: employeeData.salary || 0,
+          address: employeeData.address || '',
+          skills: employeeData.skills || [],
+          officeLocation: employeeData.officeLocation || '',
+          updatedAt: new Date().toISOString()
+        };
+
+        const updateResult = await firebaseService.updateDocument('users', selectedEmployee.id, updateData);
+        if (updateResult && updateResult.success) {
+          setEmployees(prev => prev.map(emp =>
+            emp.id === selectedEmployee.id
+              ? { ...emp, ...employeeData }
+              : emp
+          ));
+          setSnackbar({
+            open: true,
+            message: 'Employee updated successfully',
+            severity: 'success'
+          });
+        } else {
+          throw new Error(updateResult?.error || 'Failed to update employee');
+        }
+      } else {
+        // Create new user
+        const newUserData = {
+          firstName: employeeData.name?.split(' ')[0] || '',
+          lastName: employeeData.name?.split(' ').slice(1).join(' ') || '',
+          email: employeeData.email || '',
+          phone: employeeData.phone || '',
+          department: employeeData.department || '',
+          position: employeeData.position || '',
+          hireDate: employeeData.joiningDate?.toISOString() || new Date().toISOString(),
+          salary: employeeData.salary || 0,
+          address: employeeData.address || '',
+          skills: employeeData.skills || [],
+          officeLocation: employeeData.officeLocation || '',
+          role: 'employee',
+          status: 'active',
+          avatar: null,
+          emergencyContact: {
+            name: employeeData.emergencyContact?.name || '',
+            phone: employeeData.emergencyContact?.phone || '',
+            relationship: employeeData.emergencyContact?.relation || ''
+          },
+          bankingInfo: {
+            bankName: '',
+            accountHolderName: '',
+            accountNumber: '',
+            ifscCode: '',
+            accountType: 'savings'
+          },
+          governmentInfo: {
+            panNumber: '',
+            aadharNumber: ''
+          },
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isActive: true
+        };
+
+        const createResult = await firebaseService.addDocument('users', newUserData);
+        if (createResult && createResult.success && createResult.data) {
+          const newEmployee: Employee = {
+            id: createResult.data['id'] || Date.now().toString(),
+            employeeId: generateNextEmployeeId(),
+            name: employeeData.name || '',
+            email: employeeData.email || '',
+            phone: employeeData.phone || '',
+            department: employeeData.department || '',
+            position: employeeData.position || '',
+            joiningDate: employeeData.joiningDate || new Date(),
+            salary: employeeData.salary || 0,
+            status: 'active',
+            address: employeeData.address || '',
+            emergencyContact: employeeData.emergencyContact || {
+              name: '',
+              phone: '',
+              relation: ''
+            },
+            skills: employeeData.skills || [],
+            manager: employeeData.manager || '',
+            officeLocation: employeeData.officeLocation || ''
+          };
+          setEmployees(prev => [newEmployee, ...prev]);
+          setSnackbar({
+            open: true,
+            message: 'Employee created successfully',
+            severity: 'success'
+          });
+        } else {
+          throw new Error(createResult?.error || 'Failed to create employee');
+        }
+      }
+      handleCloseDialog();
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        message: `Failed to save employee: ${err.message}`,
+        severity: 'error'
+      });
+    }
   };
 
   const handleExportEmployees = () => {
@@ -400,10 +500,7 @@ const EmployeeDirectory: React.FC = () => {
   };
 
   const formatSalary = (salary: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(salary);
+    return formatIndianCurrency(salary);
   };
 
   const getDepartmentCount = (departmentName: string) => {
@@ -424,6 +521,32 @@ const EmployeeDirectory: React.FC = () => {
   );
 
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress size={60} />
+        <Typography variant="h6" sx={{ ml: 2 }}>
+          Loading Employee Directory...
+        </Typography>
+      </Box>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+        <Button variant="contained" onClick={() => window.location.reload()}>
+          Retry
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -446,6 +569,31 @@ const EmployeeDirectory: React.FC = () => {
             sx={{ bgcolor: 'primary.main' }}
           >
             Add Employee
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={async () => {
+              const userCount = await checkUsersCollection();
+              if (userCount > 0) {
+                setSnackbar({
+                  open: true,
+                  message: `Users collection already has ${userCount} documents.`,
+                  severity: 'info'
+                });
+              } else {
+                await populateSampleUsers();
+                setSnackbar({
+                  open: true,
+                  message: 'Sample data populated successfully!',
+                  severity: 'success'
+                });
+                // Reload the data
+                window.location.reload();
+              }
+            }}
+          >
+            Populate Sample Data
           </Button>
         </Box>
       </Box>
@@ -591,113 +739,123 @@ const EmployeeDirectory: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedEmployees.map((employee) => (
-                <TableRow key={employee.id} hover>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>
-                        {employee.name.split(' ').map(n => n[0]).join('')}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight="bold">
-                          {employee.name}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          {employee.employeeId}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                        <EmailIcon fontSize="small" color="action" />
-                        <Typography variant="body2">
-                          {employee.email}
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <PhoneIcon fontSize="small" color="action" />
-                        <Typography variant="body2">
-                          {employee.phone}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <BusinessIcon fontSize="small" color="action" />
-                      <Typography variant="body2">
-                        {employee.department}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <WorkIcon fontSize="small" color="action" />
-                      <Typography variant="body2">
-                        {employee.position}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={employee.status}
-                      size="small"
-                      sx={{
-                        bgcolor: getStatusColor(employee.status),
-                        color: 'white',
-                        fontWeight: 'bold',
-                        textTransform: 'capitalize'
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CalendarIcon fontSize="small" color="action" />
-                      <Typography variant="body2">
-                        {employee.joiningDate.toLocaleDateString()}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="medium">
-                      {formatSalary(employee.salary)}
+              {paginatedEmployees.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                    <Typography variant="body1" color="textSecondary">
+                      {employees.length === 0 ? 'No employees found. Add your first employee to get started.' : 'No employees match the current filters.'}
                     </Typography>
                   </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="View Details">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleViewEmployee(employee)}
-                          color="primary"
-                        >
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit Employee">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditEmployee(employee)}
-                          color="primary"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete Employee">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteEmployee(employee.id)}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                paginatedEmployees.map((employee) => (
+                  <TableRow key={employee.id} hover>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>
+                          {employee.name.split(' ').map(n => n[0]).join('')}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight="bold">
+                            {employee.name}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary">
+                            {employee.employeeId}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                          <EmailIcon fontSize="small" color="action" />
+                          <Typography variant="body2">
+                            {employee.email}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <PhoneIcon fontSize="small" color="action" />
+                          <Typography variant="body2">
+                            {employee.phone}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <BusinessIcon fontSize="small" color="action" />
+                        <Typography variant="body2">
+                          {employee.department}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <WorkIcon fontSize="small" color="action" />
+                        <Typography variant="body2">
+                          {employee.position}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={employee.status}
+                        size="small"
+                        sx={{
+                          bgcolor: getStatusColor(employee.status),
+                          color: 'white',
+                          fontWeight: 'bold',
+                          textTransform: 'capitalize'
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CalendarIcon fontSize="small" color="action" />
+                        <Typography variant="body2">
+                          {employee.joiningDate.toLocaleDateString()}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="medium">
+                        {formatSalary(employee.salary)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Tooltip title="View Details">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleViewEmployee(employee)}
+                            color="primary"
+                          >
+                            <ViewIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit Employee">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleEditEmployee(employee)}
+                            color="primary"
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Delete Employee">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteEmployee(employee.id)}
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -720,7 +878,7 @@ const EmployeeDirectory: React.FC = () => {
       {/* Employee Details Dialog */}
       <Dialog
         open={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
+        onClose={handleCloseDialog}
         maxWidth="md"
         fullWidth
       >
@@ -733,7 +891,8 @@ const EmployeeDirectory: React.FC = () => {
           </Box>
         </DialogTitle>
         <DialogContent>
-          {selectedEmployee && (
+          {isViewMode && selectedEmployee ? (
+            // View Mode - Display employee details
             <Box sx={{ mt: 2 }}>
               <Box sx={{ 
                 display: 'grid', 
@@ -904,10 +1063,243 @@ const EmployeeDirectory: React.FC = () => {
                 </Box>
               </Box>
             </Box>
+          ) : (
+            // Edit/Create Mode - Show form
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
+                gap: 3 
+              }}>
+                {/* Personal Information */}
+                <Box>
+                  <Typography variant="h6" gutterBottom>Personal Information</Typography>
+                  <TextField
+                    fullWidth
+                    label="Full Name"
+                    value={formData.name || ''}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    sx={{ mb: 2 }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Email"
+                    type="email"
+                    value={formData.email || ''}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    sx={{ mb: 2 }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Phone"
+                    value={formData.phone || ''}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    sx={{ mb: 2 }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Address"
+                    multiline
+                    rows={2}
+                    value={formData.address || ''}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    sx={{ mb: 2 }}
+                  />
+                </Box>
+
+                {/* Professional Information */}
+                <Box>
+                  <Typography variant="h6" gutterBottom>Professional Information</Typography>
+                  <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel>Department</InputLabel>
+                    <Select
+                      value={formData.department || ''}
+                      label="Department"
+                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    >
+                      <MenuItem value="">Select Department</MenuItem>
+                      <MenuItem value="Information Technology">Information Technology</MenuItem>
+                      <MenuItem value="Human Resources">Human Resources</MenuItem>
+                      <MenuItem value="Marketing">Marketing</MenuItem>
+                      <MenuItem value="Finance">Finance</MenuItem>
+                      <MenuItem value="Sales">Sales</MenuItem>
+                      <MenuItem value="Operations">Operations</MenuItem>
+                      <MenuItem value="Customer Support">Customer Support</MenuItem>
+                      <MenuItem value="Research & Development">Research & Development</MenuItem>
+                      <MenuItem value="Legal">Legal</MenuItem>
+                      <MenuItem value="Administration">Administration</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel>Position</InputLabel>
+                    <Select
+                      value={formData.position || ''}
+                      label="Position"
+                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                    >
+                      <MenuItem value="">Select Position</MenuItem>
+                      <MenuItem value="Software Engineer">Software Engineer</MenuItem>
+                      <MenuItem value="Senior Software Engineer">Senior Software Engineer</MenuItem>
+                      <MenuItem value="Lead Software Engineer">Lead Software Engineer</MenuItem>
+                      <MenuItem value="Software Architect">Software Architect</MenuItem>
+                      <MenuItem value="Product Manager">Product Manager</MenuItem>
+                      <MenuItem value="Project Manager">Project Manager</MenuItem>
+                      <MenuItem value="HR Manager">HR Manager</MenuItem>
+                      <MenuItem value="HR Specialist">HR Specialist</MenuItem>
+                      <MenuItem value="Recruiter">Recruiter</MenuItem>
+                      <MenuItem value="Marketing Manager">Marketing Manager</MenuItem>
+                      <MenuItem value="Marketing Specialist">Marketing Specialist</MenuItem>
+                      <MenuItem value="Content Writer">Content Writer</MenuItem>
+                      <MenuItem value="Financial Analyst">Financial Analyst</MenuItem>
+                      <MenuItem value="Accountant">Accountant</MenuItem>
+                      <MenuItem value="Sales Representative">Sales Representative</MenuItem>
+                      <MenuItem value="Sales Manager">Sales Manager</MenuItem>
+                      <MenuItem value="Customer Support Specialist">Customer Support Specialist</MenuItem>
+                      <MenuItem value="Operations Manager">Operations Manager</MenuItem>
+                      <MenuItem value="Business Analyst">Business Analyst</MenuItem>
+                      <MenuItem value="Data Analyst">Data Analyst</MenuItem>
+                      <MenuItem value="Designer">Designer</MenuItem>
+                      <MenuItem value="Intern">Intern</MenuItem>
+                      <MenuItem value="Trainee">Trainee</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    fullWidth
+                    label="Joining Date"
+                    type="date"
+                    value={formData.joiningDate ? formData.joiningDate.toISOString().split('T')[0] : ''}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      joiningDate: e.target.value ? new Date(e.target.value) : new Date() 
+                    })}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ mb: 2 }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Salary (₹)"
+                    type="number"
+                    value={formData.salary || ''}
+                    onChange={(e) => setFormData({ ...formData, salary: Number(e.target.value) || 0 })}
+                    sx={{ mb: 2 }}
+                  />
+                  <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel>Office Location</InputLabel>
+                    <Select
+                      value={formData.officeLocation || ''}
+                      label="Office Location"
+                      onChange={(e) => setFormData({ ...formData, officeLocation: e.target.value })}
+                    >
+                      <MenuItem value="">Select Office Location</MenuItem>
+                      <MenuItem value="Bangalore Office">Bangalore Office</MenuItem>
+                      <MenuItem value="Mumbai Office">Mumbai Office</MenuItem>
+                      <MenuItem value="Hyderabad Office">Hyderabad Office</MenuItem>
+                      <MenuItem value="Delhi Office">Delhi Office</MenuItem>
+                      <MenuItem value="Chennai Office">Chennai Office</MenuItem>
+                      <MenuItem value="Pune Office">Pune Office</MenuItem>
+                      <MenuItem value="Kolkata Office">Kolkata Office</MenuItem>
+                      <MenuItem value="Remote">Remote</MenuItem>
+                      <MenuItem value="Hybrid">Hybrid</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+
+                {/* Emergency Contact */}
+                <Box>
+                  <Typography variant="h6" gutterBottom>Emergency Contact</Typography>
+                  <TextField
+                    fullWidth
+                    label="Contact Name"
+                    value={formData.emergencyContact?.name || ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      emergencyContact: {
+                        name: e.target.value,
+                        phone: formData.emergencyContact?.phone || '',
+                        relation: formData.emergencyContact?.relation || ''
+                      }
+                    })}
+                    sx={{ mb: 2 }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Contact Phone"
+                    value={formData.emergencyContact?.phone || ''}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      emergencyContact: {
+                        name: formData.emergencyContact?.name || '',
+                        phone: e.target.value,
+                        relation: formData.emergencyContact?.relation || ''
+                      }
+                    })}
+                    sx={{ mb: 2 }}
+                  />
+                  <FormControl fullWidth sx={{ mb: 2 }}>
+                    <InputLabel>Relationship</InputLabel>
+                    <Select
+                      value={formData.emergencyContact?.relation || ''}
+                      label="Relationship"
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        emergencyContact: {
+                          name: formData.emergencyContact?.name || '',
+                          phone: formData.emergencyContact?.phone || '',
+                          relation: e.target.value
+                        }
+                      })}
+                    >
+                      <MenuItem value="">Select Relationship</MenuItem>
+                      <MenuItem value="Spouse">Spouse</MenuItem>
+                      <MenuItem value="Husband">Husband</MenuItem>
+                      <MenuItem value="Wife">Wife</MenuItem>
+                      <MenuItem value="Father">Father</MenuItem>
+                      <MenuItem value="Mother">Mother</MenuItem>
+                      <MenuItem value="Son">Son</MenuItem>
+                      <MenuItem value="Daughter">Daughter</MenuItem>
+                      <MenuItem value="Brother">Brother</MenuItem>
+                      <MenuItem value="Sister">Sister</MenuItem>
+                      <MenuItem value="Friend">Friend</MenuItem>
+                      <MenuItem value="Guardian">Guardian</MenuItem>
+                      <MenuItem value="Other">Other</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+
+                {/* Skills */}
+                <Box>
+                  <Typography variant="h6" gutterBottom>Skills</Typography>
+                  <TextField
+                    fullWidth
+                    label="Skills (comma separated)"
+                    placeholder="React, Node.js, TypeScript"
+                    value={formData.skills?.join(', ') || ''}
+                    onChange={(e) => {
+                      const skills = e.target.value.split(',').map(skill => skill.trim()).filter(skill => skill);
+                      setFormData({ ...formData, skills });
+                    }}
+                    sx={{ mb: 2 }}
+                  />
+                </Box>
+              </Box>
+            </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
+          {!isViewMode && (
+            <>
+              <Button onClick={handleCloseDialog}>Cancel</Button>
+              <Button 
+                onClick={() => handleSaveEmployee(formData)} 
+                variant="contained"
+              >
+                {selectedEmployee && selectedEmployee.id ? 'Update Employee' : 'Create Employee'}
+              </Button>
+            </>
+          )}
+          {isViewMode && (
+            <Button onClick={handleCloseDialog}>Close</Button>
+          )}
         </DialogActions>
       </Dialog>
 
