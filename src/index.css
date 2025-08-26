@@ -90,6 +90,41 @@
   .padding-responsive {
     @apply p-4 sm:p-6 lg:p-8;
   }
+
+  /* Progress bars and chart elements */
+  .progress-bar {
+    min-width: 0%;
+  }
+
+  .chart-bar {
+    min-height: 0%;
+  }
+
+  /* Dynamic width utilities for progress bars */
+  .progress-width-0 { width: 0%; }
+  .progress-width-10 { width: 10%; }
+  .progress-width-20 { width: 20%; }
+  .progress-width-30 { width: 30%; }
+  .progress-width-40 { width: 40%; }
+  .progress-width-50 { width: 50%; }
+  .progress-width-60 { width: 60%; }
+  .progress-width-70 { width: 70%; }
+  .progress-width-80 { width: 80%; }
+  .progress-width-90 { width: 90%; }
+  .progress-width-100 { width: 100%; }
+
+  /* Dynamic height utilities for chart bars */
+  .chart-height-0 { height: 0%; }
+  .chart-height-10 { height: 10%; }
+  .chart-height-20 { height: 20%; }
+  .chart-height-30 { height: 30%; }
+  .chart-height-40 { height: 40%; }
+  .chart-height-50 { height: 50%; }
+  .chart-height-60 { height: 60%; }
+  .chart-height-70 { height: 70%; }
+  .chart-height-80 { height: 80%; }
+  .chart-height-90 { height: 90%; }
+  .chart-height-100 { height: 100%; }
 }
 
 @layer utilities {
@@ -109,6 +144,27 @@
 
   /* Custom scrollbar styles - Unified and Enhanced */
   .scrollbar-thin {
+    /* Webkit browsers */
+    &::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: #f3f4f6;
+      border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: #9ca3af;
+      border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: #6b7280;
+    }
+
+    /* Firefox */
     scrollbar-width: thin;
     scrollbar-color: #9ca3af #f3f4f6;
     overflow-y: auto !important;
@@ -175,12 +231,14 @@
 
   /* Ensure scrollbar is always shown in sidebar */
   .sidebar-nav {
+    /* Firefox */
     scrollbar-width: thin !important;
     scrollbar-color: #6b7280 rgba(0, 0, 0, 0.05) !important;
   }
 
   /* Dark mode sidebar scrollbar */
   .dark .sidebar-nav {
+    /* Firefox */
     scrollbar-color: #6b7280 rgba(255, 255, 255, 0.05) !important;
   }
 
