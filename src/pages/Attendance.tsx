@@ -57,6 +57,9 @@ const Attendance: React.FC = () => {
   
   // Quick Actions state
   const [showClockDialog, setShowClockDialog] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showAlertsModal, setShowAlertsModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [clockAction, setClockAction] = useState<'in' | 'out'>('in');
   const [showCalendar, setShowCalendar] = useState(false);
@@ -739,7 +742,7 @@ const Attendance: React.FC = () => {
                    </button>
                    
                    <button 
-                     onClick={() => setShowCalendar(true)}
+                     onClick={() => setShowCalendarModal(true)}
                      className="group flex flex-col items-center p-6 rounded-lg border-2 border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 transform hover:scale-105"
                    >
                      <div className="p-3 bg-blue-100 rounded-full mb-3 group-hover:bg-blue-200 transition-colors">
@@ -750,7 +753,7 @@ const Attendance: React.FC = () => {
                    </button>
                    
                    <button 
-                     onClick={handleExportReport}
+                     onClick={() => setShowExportModal(true)}
                      className="group flex flex-col items-center p-6 rounded-lg border-2 border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 transform hover:scale-105"
                    >
                      <div className="p-3 bg-green-100 rounded-full mb-3 group-hover:bg-green-200 transition-colors">
@@ -761,7 +764,7 @@ const Attendance: React.FC = () => {
                    </button>
                    
                    <button 
-                     onClick={() => setShowAlerts(true)}
+                     onClick={() => setShowAlertsModal(true)}
                      className="group flex flex-col items-center p-6 rounded-lg border-2 border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 transform hover:scale-105"
                    >
                      <div className="p-3 bg-yellow-100 rounded-full mb-3 group-hover:bg-yellow-200 transition-colors">
@@ -1710,31 +1713,31 @@ const Attendance: React.FC = () => {
 
              {/* Alerts View */}
        {showAlerts && (
-         <div className="fixed inset-0 flex items-center justify-center z-50">
-           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-             <div className="flex items-center justify-between mb-4">
-               <h3 className="text-lg font-medium text-gray-900">Attendance Alerts</h3>
+         <div className="fixed inset-0 flex items-center justify-center z-50 p-2">
+           <div className="bg-white rounded-lg p-4 w-full max-w-sm mx-2 shadow-xl max-h-[85vh] overflow-hidden">
+             <div className="flex items-center justify-between mb-3">
+               <h3 className="text-base font-medium text-gray-900">Attendance Alerts</h3>
                               <button
                   onClick={() => setShowAlerts(false)}
                   className="text-gray-400 hover:text-gray-600"
                   aria-label="Close alerts view"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-4 h-4" />
                 </button>
              </div>
              
-              <div className="space-y-3">
+              <div className="space-y-2 overflow-y-auto max-h-32">
                {alerts.map((alert, index) => (
                  <div key={index} className="flex items-start space-x-3 p-3 bg-yellow-50 rounded-lg">
-                   <AlertCircle className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
-                   <p className="text-sm text-yellow-800">{alert}</p>
+                   <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                   <p className="text-sm text-yellow-800 break-words">{alert}</p>
                  </div>
                ))}
              </div>
              
              <button
                onClick={() => setShowAlerts(false)}
-               className="w-full mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+               className="w-full mt-3 px-4 py-2 bg-primary-600 text-white rounded text-sm hover:bg-primary-700"
              >
                Close
              </button>
@@ -2197,9 +2200,160 @@ const Attendance: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-    </div>
-  );
-};
+             )}
+
+       {/* Quick Actions Modals */}
+       
+                     {/* Calendar Modal */}
+       {showCalendarModal && (
+         <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
+           <div className="bg-white rounded-lg p-3 sm:p-4 w-full max-w-lg sm:max-w-xl mx-2 sm:mx-4 shadow-xl max-h-[85vh] overflow-hidden">
+             <div className="flex items-center justify-between mb-3 sm:mb-4">
+               <h3 className="text-base sm:text-lg font-medium text-gray-900">Attendance Calendar</h3>
+               <button
+                 onClick={() => setShowCalendarModal(false)}
+                 className="text-gray-400 hover:text-gray-600"
+                 aria-label="Close calendar modal"
+               >
+                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
+               </button>
+             </div>
+             
+             <div className="text-center mb-3 sm:mb-4">
+               <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-blue-600 mx-auto mb-2 sm:mb-3" />
+               <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-1 sm:mb-2">Monthly Attendance Overview</h4>
+               <p className="text-xs sm:text-sm text-gray-600">View and manage attendance records by month</p>
+             </div>
+             
+             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
+               <div className="text-center p-2 sm:p-3 bg-green-50 rounded-lg border border-green-200">
+                 <div className="text-lg sm:text-xl font-bold text-green-600">{presentToday}</div>
+                 <div className="text-xs text-green-700">Present Today</div>
+               </div>
+               <div className="text-center p-2 sm:p-3 bg-red-50 rounded-lg border border-red-200">
+                 <div className="text-lg sm:text-xl font-bold text-red-600">{absentToday}</div>
+                 <div className="text-xs text-red-700">Absent Today</div>
+               </div>
+               <div className="text-center p-2 sm:p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                 <div className="text-lg sm:text-xl font-bold text-yellow-600">{lateToday}</div>
+                 <div className="text-xs text-red-700">Late Today</div>
+               </div>
+             </div>
+             
+             <div className="flex justify-end">
+               <button
+                 onClick={() => setShowCalendarModal(false)}
+                 className="px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors text-xs sm:text-sm"
+               >
+                 Close
+               </button>
+               </div>
+             </div>
+           </div>
+         )}
+
+              {/* Export Modal */}
+       {showExportModal && (
+         <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
+           <div className="bg-white rounded-lg p-3 sm:p-4 w-full max-w-sm sm:max-w-md mx-2 sm:mx-4 shadow-xl max-h-[85vh] overflow-hidden">
+             <div className="flex items-center justify-between mb-3 sm:mb-4">
+               <h3 className="text-base sm:text-lg font-medium text-gray-900">Export Attendance Report</h3>
+               <button
+                 onClick={() => setShowExportModal(false)}
+                 className="text-gray-400 hover:text-gray-600"
+                 aria-label="Close export modal"
+               >
+                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
+               </button>
+             </div>
+             
+             <div className="text-center mb-3 sm:mb-4">
+               <Download className="w-10 h-10 sm:w-12 sm:h-12 text-green-600 mx-auto mb-2 sm:mb-3" />
+               <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-1 sm:mb-2">Generate Report</h4>
+               <p className="text-xs sm:text-sm text-gray-600">Export attendance data as CSV file</p>
+             </div>
+             
+             <div className="space-y-2 sm:space-y-3 mb-3 sm:mb-4">
+               <div className="text-xs sm:text-sm text-gray-600">
+                 <p>• Total Records: {attendanceRecords.length}</p>
+                 <p>• Date Range: All available dates</p>
+                 <p>• Format: CSV (Comma Separated Values)</p>
+               </div>
+             </div>
+             
+             <div className="flex space-x-2 sm:space-x-3">
+               <button
+                 onClick={() => setShowExportModal(false)}
+                 className="flex-1 px-3 py-2 sm:px-4 sm:py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 font-medium transition-colors text-xs sm:text-sm"
+               >
+                 Cancel
+               </button>
+               <button
+                 onClick={() => {
+                   handleExportReport();
+                   setShowExportModal(false);
+                 }}
+                 className="flex-1 px-3 py-2 sm:px-4 sm:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors text-xs sm:text-sm"
+               >
+                 Export Report
+               </button>
+               </div>
+             </div>
+           </div>
+         )}
+
+       {/* Alerts Modal */}
+       {showAlertsModal && (
+         <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
+           <div className="bg-white rounded-lg p-3 sm:p-4 w-full max-w-sm sm:max-w-md mx-2 sm:mx-4 shadow-xl max-h-[85vh] overflow-hidden">
+             <div className="flex items-center justify-between mb-3 sm:mb-4">
+               <h3 className="text-base sm:text-lg font-medium text-gray-900">System Alerts</h3>
+               <button
+                 onClick={() => setShowAlertsModal(false)}
+                 className="text-gray-400 hover:text-gray-600"
+                 aria-label="Close alerts modal"
+               >
+                 <X className="w-5 h-5 sm:w-6 sm:h-6" />
+               </button>
+             </div>
+             
+             <div className="text-center mb-3 sm:mb-4">
+               <AlertCircle className="w-10 h-10 sm:w-12 sm:h-12 text-yellow-600 mx-auto mb-2 sm:mb-3" />
+               <h4 className="text-sm sm:text-base font-medium text-gray-900 mb-1 sm:mb-2">Recent Notifications</h4>
+               <p className="text-xs sm:text-sm text-gray-600">View system alerts and notifications</p>
+             </div>
+             
+             <div className="flex-1 overflow-y-auto space-y-2 sm:space-y-3 mb-3 sm:mb-4 max-h-32 sm:max-h-40">
+               {alerts.length > 0 ? (
+                 alerts.map((alert, index) => (
+                   <div key={index} className="p-2 sm:p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                     <div className="flex items-start space-x-2 sm:space-x-3">
+                       <AlertCircle className="w-4 h-4 sm:w-5 sm:w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                       <p className="text-xs sm:text-sm text-gray-700 break-words leading-relaxed">{alert}</p>
+                     </div>
+                   </div>
+                 ))
+               ) : (
+                 <div className="text-center py-4 sm:py-6 text-gray-500">
+                   <AlertCircle className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400 mx-auto mb-2" />
+                   <p className="text-xs sm:text-sm">No alerts at the moment</p>
+                 </div>
+               )}
+             </div>
+             
+             <div className="flex justify-end">
+               <button
+                 onClick={() => setShowAlertsModal(false)}
+                 className="px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition-colors text-xs sm:text-sm"
+               >
+                 Close
+               </button>
+             </div>
+           </div>
+         </div>
+       )}
+     </div>
+   );
+ };
 
 export default Attendance;
