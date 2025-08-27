@@ -44,8 +44,10 @@ import {
   Event as EventIcon,
   Public as PublicIcon,
   Business as BusinessIcon,
-  Star as StarIcon
+  Star as StarIcon,
+  Save as SaveIcon
 } from '@mui/icons-material';
+import firebaseService from '@/services/firebaseService';
 
 interface Holiday {
   id: string;
@@ -138,78 +140,41 @@ const Holidays: React.FC = () => {
     severity: 'info'
   });
 
-  // Mock data for development
-  const mockHolidays: Holiday[] = [
-    {
-      id: '1',
-      name: 'New Year\'s Day',
-      date: '2024-01-01',
-      type: 'Public Holiday',
-      description: 'Celebration of the new year',
-      isActive: true,
-      isRecurring: true,
-      country: 'India',
-      region: 'All',
-      createdAt: new Date('2024-01-01'),
-      updatedAt: new Date('2024-01-01')
-    },
-    {
-      id: '2',
-      name: 'Republic Day',
-      date: '2024-01-26',
-      type: 'Public Holiday',
-      description: 'Celebration of India becoming a republic',
-      isActive: true,
-      isRecurring: true,
-      country: 'India',
-      region: 'All',
-      createdAt: new Date('2024-01-01'),
-      updatedAt: new Date('2024-01-01')
-    },
-    {
-      id: '3',
-      name: 'Company Foundation Day',
-      date: '2024-03-15',
-      type: 'Company Holiday',
-      description: 'Annual company celebration',
-      isActive: true,
-      isRecurring: true,
-      country: 'India',
-      region: 'All',
-      createdAt: new Date('2024-01-01'),
-      updatedAt: new Date('2024-01-01')
-    },
-    {
-      id: '4',
-      name: 'Independence Day',
-      date: '2024-08-15',
-      type: 'Public Holiday',
-      description: 'Celebration of India\'s independence',
-      isActive: true,
-      isRecurring: true,
-      country: 'India',
-      region: 'All',
-      createdAt: new Date('2024-01-01'),
-      updatedAt: new Date('2024-01-01')
-    },
-    {
-      id: '5',
-      name: 'Gandhi Jayanti',
-      date: '2024-10-02',
-      type: 'Public Holiday',
-      description: 'Birthday of Mahatma Gandhi',
-      isActive: true,
-      isRecurring: true,
-      country: 'India',
-      region: 'All',
-      createdAt: new Date('2024-01-01'),
-      updatedAt: new Date('2024-01-01')
+  // Remove mock data; integrate Firebase
+  const fetchHolidays = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const result = await firebaseService.getCollection('holidays');
+      if (result && result.success && result.data) {
+        const mapped: Holiday[] = result.data.map((doc: any) => ({
+          id: doc.id,
+          name: doc.name || '',
+          date: doc.date || '',
+          type: (doc.type as Holiday['type']) || 'Public Holiday',
+          description: doc.description || '',
+          isActive: doc.isActive !== false,
+          isRecurring: !!doc.isRecurring,
+          country: doc.country || '',
+          region: doc.region || '',
+          createdAt: doc.createdAt ? new Date(doc.createdAt) : new Date(),
+          updatedAt: doc.updatedAt ? new Date(doc.updatedAt) : new Date()
+        }));
+        setHolidays(mapped);
+      } else {
+        setHolidays([]);
+      }
+    } catch (e: any) {
+      console.error('Error fetching holidays:', e);
+      setError('Failed to load holidays');
+      setHolidays([]);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   useEffect(() => {
-    // Load mock data
-    setHolidays(mockHolidays);
+    fetchHolidays();
   }, []);
 
   useEffect(() => {
@@ -224,8 +189,8 @@ const Holidays: React.FC = () => {
       filtered = filtered.filter(holiday =>
         holiday.name.toLowerCase().includes(searchLower) ||
         holiday.description.toLowerCase().includes(searchLower) ||
-        holiday.country?.toLowerCase().includes(searchLower) ||
-        holiday.region?.toLowerCase().includes(searchLower)
+        (holiday.country || '').toLowerCase().includes(searchLower) ||
+        (holiday.region || '').toLowerCase().includes(searchLower)
       );
     }
 
@@ -291,16 +256,21 @@ const Holidays: React.FC = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDeleteHoliday = (holidayId: string) => {
-    setHolidays(prev => prev.filter(h => h.id !== holidayId));
-    setSnackbar({
-      open: true,
-      message: 'Holiday deleted successfully',
-      severity: 'success'
-    });
+  const handleDeleteHoliday = async (holidayId: string) => {
+    try {
+      const result = await firebaseService.deleteDocument('holidays', holidayId);
+      if (result && result.success) {
+        await fetchHolidays();
+        setSnackbar({ open: true, message: 'Holiday deleted successfully', severity: 'success' });
+      } else {
+        setSnackbar({ open: true, message: 'Failed to delete holiday', severity: 'error' });
+      }
+    } catch (e) {
+      setSnackbar({ open: true, message: 'Error deleting holiday', severity: 'error' });
+    }
   };
 
-  const handleSaveHoliday = () => {
+  const handleSaveHoliday = async () => {
     if (!formData.name || !formData.date || !formData.type) {
       setSnackbar({
         open: true,
@@ -310,38 +280,40 @@ const Holidays: React.FC = () => {
       return;
     }
 
-    if (selectedHoliday) {
-      // Update existing holiday
-      setHolidays(prev => prev.map(holiday =>
-        holiday.id === selectedHoliday.id
-          ? {
-              ...holiday,
-              ...formData,
-              updatedAt: new Date()
-            }
-          : holiday
-      ));
-      setSnackbar({
-        open: true,
-        message: 'Holiday updated successfully',
-        severity: 'success'
-      });
-    } else {
-      // Create new holiday
-      const newHoliday: Holiday = {
-        id: Date.now().toString(),
-        ...formData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      setHolidays(prev => [newHoliday, ...prev]);
-      setSnackbar({
-        open: true,
-        message: 'Holiday created successfully',
-        severity: 'success'
-      });
+    try {
+      if (selectedHoliday) {
+        // Update existing holiday
+        const updateData = {
+          ...formData,
+          updatedAt: new Date().toISOString()
+        };
+        const result = await firebaseService.updateDocument('holidays', selectedHoliday.id, updateData);
+        if (result && result.success) {
+          setSnackbar({ open: true, message: 'Holiday updated successfully', severity: 'success' });
+          setIsDialogOpen(false);
+          await fetchHolidays();
+        } else {
+          setSnackbar({ open: true, message: 'Failed to update holiday', severity: 'error' });
+        }
+      } else {
+        // Create new holiday
+        const createData = {
+          ...formData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        const result = await firebaseService.addDocument('holidays', createData);
+        if (result && result.success) {
+          setSnackbar({ open: true, message: 'Holiday created successfully', severity: 'success' });
+          setIsDialogOpen(false);
+          await fetchHolidays();
+        } else {
+          setSnackbar({ open: true, message: 'Failed to create holiday', severity: 'error' });
+        }
+      }
+    } catch (e) {
+      setSnackbar({ open: true, message: 'Error saving holiday', severity: 'error' });
     }
-    setIsDialogOpen(false);
   };
 
   const getTypeColor = (type: string) => {
@@ -508,9 +480,9 @@ const Holidays: React.FC = () => {
           <FormControl fullWidth>
             <InputLabel>Country</InputLabel>
             <Select
-              value={filters.country || ''}
+              value={(filters as any).country || ''}
               label="Country"
-              onChange={(e) => handleFilterChange('country', e.target.value)}
+              onChange={(e) => handleFilterChange('country' as any, e.target.value)}
             >
               <MenuItem value="">All Countries</MenuItem>
               {countries.map(country => (
@@ -663,135 +635,186 @@ const Holidays: React.FC = () => {
       <Dialog
         open={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
       >
-        <DialogTitle>
-          {isViewMode ? 'View Holiday' : selectedHoliday ? 'Edit Holiday' : 'Add New Holiday'}
+        <DialogTitle sx={{ pb: 1, borderBottom: (t) => `1px solid ${t.palette.divider}` }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <EventIcon color="primary" />
+            <Typography variant="h6" component="span">
+              {isViewMode ? 'View Holiday' : selectedHoliday ? 'Edit Holiday' : 'Add New Holiday'}
+            </Typography>
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {isViewMode
+              ? 'Viewing holiday details'
+              : `Fill the details below to ${selectedHoliday ? 'update the' : 'create a new'} holiday. Fields marked with * are required.`}
+          </Typography>
         </DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Holiday Name"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  disabled={isViewMode}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Date"
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                  disabled={isViewMode}
-                  required
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel>Type</InputLabel>
-                  <Select
-                    value={formData.type}
-                    label="Type"
-                    onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+        <DialogContent dividers>
+          <Box sx={{ pt: 1 }}>
+            <Paper variant="outlined" sx={{ p: 2.5, mb: 2.5, bgcolor: 'grey.50', borderRadius: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                Basic Details
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Holiday Name *"
+                    placeholder="e.g., Independence Day"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                     disabled={isViewMode}
-                  >
-                    {holidayTypes.map(type => (
-                      <MenuItem key={type} value={type}>
-                        {type}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Country</InputLabel>
-                  <Select
-                    value={formData.country}
-                    label="Country"
-                    onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
+                    required
+                    size="medium"
+                    margin="normal"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Date *"
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
                     disabled={isViewMode}
-                  >
-                    <MenuItem value="">Select Country</MenuItem>
-                    {countries.map(country => (
-                      <MenuItem key={country} value={country}>
-                        {country}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Region</InputLabel>
-                  <Select
-                    value={formData.region}
-                    label="Region"
-                    onChange={(e) => setFormData(prev => ({ ...prev, region: e.target.value }))}
+                    required
+                    InputLabelProps={{ shrink: true }}
+                    helperText={!isViewMode ? 'Select the calendar date for the holiday' : undefined}
+                    size="medium"
+                    margin="normal"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth required disabled={isViewMode} size="medium" sx={{ minWidth: 240 }}>
+                    <InputLabel id="holiday-type-label">Type *</InputLabel>
+                    <Select
+                      labelId="holiday-type-label"
+                      id="holiday-type-select"
+                      value={formData.type}
+                      label="Type *"
+                      onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
+                    >
+                      {holidayTypes.map(type => (
+                        <MenuItem key={type} value={type}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {getTypeIcon(type)}
+                            <span>{type}</span>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Description"
+                    placeholder="Optional: short note about the holiday"
+                    value={formData.description}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                     disabled={isViewMode}
-                  >
-                    <MenuItem value="">All Regions</MenuItem>
-                    {regions.map(region => (
-                      <MenuItem key={region} value={region}>
-                        {region}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                    multiline
+                    rows={3}
+                    size="medium"
+                    margin="normal"
+                  />
+                </Grid>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={formData.isRecurring}
-                      onChange={(e) => setFormData(prev => ({ ...prev, isRecurring: e.target.checked }))}
-                      disabled={isViewMode}
-                    />
-                  }
-                  label="Recurring Holiday"
-                />
+            </Paper>
+
+            <Paper variant="outlined" sx={{ p: 2.5, mb: 1.5, bgcolor: 'grey.50', borderRadius: 2 }}>
+              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                Region & Settings
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth disabled={isViewMode} size="medium" sx={{ minWidth: 240 }}>
+                    <InputLabel id="holiday-country-label">Country</InputLabel>
+                    <Select
+                      labelId="holiday-country-label"
+                      id="holiday-country-select"
+                      value={formData.country}
+                      label="Country"
+                      onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
+                      MenuProps={{
+                        PaperProps: {
+                          style: {
+                            maxHeight: 200
+                          }
+                        }
+                      }}
+                    >
+                      {countries.map(country => (
+                        <MenuItem key={country} value={country}>
+                          {country}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth disabled={isViewMode} size="medium" sx={{ minWidth: 240 }}>
+                    <InputLabel id="holiday-region-label">Region</InputLabel>
+                    <Select
+                      labelId="holiday-region-label"
+                      id="holiday-region-select"
+                      value={formData.region}
+                      label="Region"
+                      onChange={(e) => setFormData(prev => ({ ...prev, region: e.target.value }))}
+                      MenuProps={{
+                        PaperProps: {
+                          style: {
+                            maxHeight: 200
+                          }
+                        }
+                      }}
+                    >
+                      <MenuItem value=""><em>All Regions</em></MenuItem>
+                      {regions.map(region => (
+                        <MenuItem key={region} value={region}>
+                          {region}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={formData.isRecurring}
+                        onChange={(e) => setFormData(prev => ({ ...prev, isRecurring: e.target.checked }))}
+                        disabled={isViewMode}
+                      />
+                    }
+                    label="Recurring every year"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={formData.isActive}
+                        onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                        disabled={isViewMode}
+                      />
+                    }
+                    label="Active"
+                  />
+                </Grid>
               </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Description"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  disabled={isViewMode}
-                  multiline
-                  rows={3}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={formData.isActive}
-                      onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
-                      disabled={isViewMode}
-                    />
-                  }
-                  label="Active"
-                />
-              </Grid>
-            </Grid>
+            </Paper>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsDialogOpen(false)}>
+        <DialogActions sx={{ px: 3, pb: 2, borderTop: (t) => `1px solid ${t.palette.divider}` }}>
+          <Button onClick={() => setIsDialogOpen(false)} color="inherit">
             {isViewMode ? 'Close' : 'Cancel'}
           </Button>
           {!isViewMode && (
-            <Button onClick={handleSaveHoliday} variant="contained">
-              {selectedHoliday ? 'Update' : 'Create'}
+            <Button onClick={handleSaveHoliday} variant="contained" startIcon={<SaveIcon />}> 
+              {selectedHoliday ? 'Update Holiday' : 'Create Holiday'}
             </Button>
           )}
         </DialogActions>

@@ -44,6 +44,15 @@ interface Employee {
   currentStatus: 'clocked-in' | 'clocked-out' | 'on-break';
 }
 
+// Add minimal interfaces for holidays and leave requests used in attendance summary
+interface LeaveRequestDoc {
+  id: string;
+  employeeId: string;
+  startDate: string; // ISO yyyy-mm-dd
+  endDate?: string;  // ISO yyyy-mm-dd; if absent, assume single day
+  status?: string;   // optional: approved/pending/etc.
+}
+
 const Attendance: React.FC = () => {
   const user = useUser();
   const [searchQuery, setSearchQuery] = useState('');
@@ -102,6 +111,60 @@ const Attendance: React.FC = () => {
   const [showDeleteEmployeeDialog, setShowDeleteEmployeeDialog] = useState(false);
   const [selectedEmployeeForView, setSelectedEmployeeForView] = useState<Employee | null>(null);
   const [editEmployee, setEditEmployee] = useState<Partial<Employee> | null>(null);
+
+  // Track active holiday dates and leave requests for holiday-aware absence counting
+  const [activeHolidayDates, setActiveHolidayDates] = useState<Set<string>>(new Set());
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequestDoc[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadHolidaysAndLeaves = async () => {
+      try {
+        const [holidaysRes, leavesRes] = await Promise.all([
+          firebaseService.getCollection('holidays'),
+          firebaseService.getCollection('leaveRequests')
+        ]);
+
+        if (!cancelled) {
+          const holidaySet = new Set<string>(
+            (holidaysRes.success && holidaysRes.data ? holidaysRes.data : [])
+              .filter((h: any) => h && (h.isActive ?? true) && typeof h.date === 'string')
+              .map((h: any) => h.date)
+          );
+          setActiveHolidayDates(holidaySet);
+
+          const leaves: LeaveRequestDoc[] = (leavesRes.success && leavesRes.data ? leavesRes.data : []).map((lr: any) => ({
+            id: lr.id,
+            employeeId: lr.employeeId,
+            startDate: lr.startDate,
+            endDate: lr.endDate,
+            status: lr.status
+          }));
+          setLeaveRequests(leaves);
+        }
+      } catch (e) {
+        // Non-blocking; keep defaults
+      }
+    };
+
+    loadHolidaysAndLeaves();
+    return () => { cancelled = true; };
+  }, []);
+
+  const isDateWithinRange = (dateStr: string, startStr: string, endStr?: string) => {
+    if (!startStr) return false;
+    const d = dateStr;
+    const start = startStr;
+    const end = endStr ?? startStr;
+    return d >= start && d <= end;
+  };
+
+  const employeeHasLeaveOnDate = (employeeId: string, dateStr: string) => {
+    return leaveRequests.some(lr => lr.employeeId === employeeId && isDateWithinRange(dateStr, lr.startDate, lr.endDate));
+  };
+
+  const isHolidayDate = (dateStr: string) => activeHolidayDates.has(dateStr);
 
   // Quick Actions functions
   const handleClockInOut = async () => {
@@ -485,13 +548,23 @@ const Attendance: React.FC = () => {
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
   const { presentToday, absentToday, lateToday, totalEmployees } = useMemo(() => {
     const todayRecords = attendanceRecords.filter(record => record.date === today);
+
+    const adjustedAbsentCount = todayRecords.filter(record => {
+      if (record.status !== 'absent') return false;
+      // Exclude from absent if it's a defined holiday AND the employee has a leave covering that date
+      if (isHolidayDate(record.date) && employeeHasLeaveOnDate(record.employeeId, record.date)) {
+        return false;
+      }
+      return true;
+    }).length;
+
     return {
       presentToday: todayRecords.filter(record => record.status === 'present').length,
-      absentToday: todayRecords.filter(record => record.status === 'absent').length,
+      absentToday: adjustedAbsentCount,
       lateToday: todayRecords.filter(record => record.status === 'late').length,
       totalEmployees: employees.length
     };
-  }, [attendanceRecords, employees, today]);
+  }, [attendanceRecords, employees, today, activeHolidayDates, leaveRequests]);
 
   const filteredRecords = attendanceRecords.filter(record => {
     const matchesSearch = record.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -2349,11 +2422,11 @@ const Attendance: React.FC = () => {
                  Close
                </button>
              </div>
-           </div>
-         </div>
-       )}
-     </div>
-   );
- };
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default Attendance;
