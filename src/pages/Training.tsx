@@ -378,6 +378,30 @@ const Training: React.FC = () => {
     return 'text-red-600';
   };
 
+  // Utility function to get width class for progress bars
+  const getProgressWidthClass = (percentage: number) => {
+    if (percentage <= 5) return 'w-1';
+    if (percentage <= 10) return 'w-2';
+    if (percentage <= 15) return 'w-3';
+    if (percentage <= 20) return 'w-4';
+    if (percentage <= 25) return 'w-5';
+    if (percentage <= 30) return 'w-6';
+    if (percentage <= 35) return 'w-7';
+    if (percentage <= 40) return 'w-8';
+    if (percentage <= 45) return 'w-9';
+    if (percentage <= 50) return 'w-10';
+    if (percentage <= 55) return 'w-11';
+    if (percentage <= 60) return 'w-12';
+    if (percentage <= 65) return 'w-13';
+    if (percentage <= 70) return 'w-14';
+    if (percentage <= 75) return 'w-15';
+    if (percentage <= 80) return 'w-16';
+    if (percentage <= 85) return 'w-17';
+    if (percentage <= 90) return 'w-18';
+    if (percentage <= 95) return 'w-19';
+    return 'w-20';
+  };
+
   const categories = ['Leadership', 'Technical Skills', 'Soft Skills', 'Compliance', 'Analytics'];
   const levels = ['beginner', 'intermediate', 'advanced'];
   const statuses = ['active', 'inactive', 'completed'];
@@ -761,8 +785,7 @@ const Training: React.FC = () => {
                       <div className="flex items-center">
                         <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                           <div 
-                            className={cn('h-2 rounded-full', getProgressColor(enrollment.progress))}
-                            style={{ width: `${enrollment.progress}%` }}
+                            className={cn('h-2 rounded-full', getProgressColor(enrollment.progress), getProgressWidthClass(enrollment.progress))}
                           />
                         </div>
                         <span className={cn('text-sm font-medium', getProgressColor(enrollment.progress))}>
@@ -811,11 +834,10 @@ const Training: React.FC = () => {
                     <span className="text-sm text-gray-600">{category}</span>
                     <div className="flex items-center space-x-2">
                       <div className="w-24 bg-gray-200 rounded-full h-2">
-                                                 <div 
-                           className="bg-primary-600 h-2 rounded-full"
-                           style={{ width: `${enrollments.filter(e => e.status === 'completed').length > 0 ? (enrollments.filter(e => e.status === 'completed').length / enrollments.length) * 100 : 0}%` }}
-                         />
-                       </div>
+                        <div 
+                          className={cn('bg-primary-600 h-2 rounded-full', getProgressWidthClass(enrollments.filter(e => e.status === 'completed').length > 0 ? (enrollments.filter(e => e.status === 'completed').length / enrollments.length) * 100 : 0))}
+                        />
+                      </div>
                        <span className="text-sm font-medium text-gray-900">
                          {enrollments.filter(e => e.status === 'completed').length > 0 ? Math.round((enrollments.filter(e => e.status === 'completed').length / enrollments.length) * 100) : 0}%
                        </span>
@@ -833,11 +855,10 @@ const Training: React.FC = () => {
                     <span className="text-sm text-gray-600">{month}</span>
                     <div className="flex items-center space-x-2">
                       <div className="w-24 bg-gray-200 rounded-full h-2">
-                                                 <div 
-                           className="bg-green-600 h-2 rounded-full"
-                           style={{ width: `${enrollments.length > 0 ? (enrollments.length / 5) * 100 : 0}%` }}
-                         />
-                       </div>
+                        <div 
+                          className={cn('bg-green-600 h-2 rounded-full', getProgressWidthClass(enrollments.length > 0 ? (enrollments.length / 5) * 100 : 0))}
+                        />
+                      </div>
                        <span className="text-sm font-medium text-gray-900">
                          {enrollments.length}
                        </span>
