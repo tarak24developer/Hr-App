@@ -21,7 +21,7 @@ const Training = React.lazy(() => import('./pages/Training'));
 const FeedbackSurveys = React.lazy(() => import('./pages/FeedbackSurveys'));
 const RequestPortal = React.lazy(() => import('./pages/RequestPortal'));
 const Payroll = React.lazy(() => import('./pages/Payroll'));
-const EnhancedPayroll = React.lazy(() => import('./pages/EnhancedPayroll'));
+
 const ExpenseManagement = React.lazy(() => import('./pages/ExpenseManagement'));
 const Assets = React.lazy(() => import('./pages/Assets'));
 const AssetManagement = React.lazy(() => import('./pages/AssetManagement'));
@@ -180,7 +180,6 @@ function App() {
                       
                       {/* Financial Management Routes */}
                       <Route path="/payroll" element={<Payroll />} />
-                      <Route path="/enhanced-payroll" element={<EnhancedPayroll />} />
                       <Route path="/expense-management" element={<ExpenseManagement />} />
                       
                       {/* Asset & Inventory Routes */}
