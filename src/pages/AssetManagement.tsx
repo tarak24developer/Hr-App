@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Paper,
+  Card,
+  CardContent,
   Typography,
   Button,
   TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Paper,
   Table,
   TableBody,
   TableCell,
@@ -17,351 +19,201 @@ import {
   TableRow,
   IconButton,
   Chip,
-  Alert,
-  Card,
-  CardContent,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   CircularProgress,
-  Snackbar,
   Tooltip,
-  Stack,
-  Container,
-  Fade,
-  TablePagination,
-  useTheme
+  Pagination,
+  Alert,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
+  Visibility as ViewIcon,
   Delete as DeleteIcon,
   Search as SearchIcon,
-  Visibility as ViewIcon,
+  FilterList as FilterListIcon,
+  Category as CategoryIcon,
   Computer as ComputerIcon,
-  PhoneAndroid as PhoneIcon,
+  Phone as PhoneIcon,
   Print as PrinterIcon,
   Chair as FurnitureIcon,
   DirectionsCar as VehicleIcon,
-  Category as CategoryIcon,
-  Business as BuildingIcon,
-  Assignment as AssignmentIcon
+  Assignment as AssignmentIcon,
+  LocationOn as LocationIcon,
+  Build as BuildIcon,
+  Warning as WarningIcon,
+  CheckCircle as CheckCircleIcon,
+  Schedule as ScheduleIcon
 } from '@mui/icons-material';
+import firebaseService from '../services/firebaseService';
+import { showNotification } from '../utils/notification';
 
-// Types
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+}
+
 interface Asset {
   id: string;
   name: string;
-  category: AssetCategory;
+  category: 'computer' | 'mobile' | 'printer' | 'furniture' | 'vehicle' | 'other';
   serialNumber: string;
   model: string;
   manufacturer: string;
-  purchaseDate: string;
+  purchaseDate: any; // Can be Date, Firebase Timestamp, or string
   purchasePrice: number;
   currentValue: number;
-  status: AssetStatus;
+  status: 'available' | 'assigned' | 'maintenance' | 'retired' | 'lost';
   assignedTo?: string;
-  assignedEmployee?: string;
   location: string;
-  condition: AssetCondition;
-  warrantyExpiry?: string;
+  condition: 'excellent' | 'good' | 'fair' | 'poor';
+  warrantyExpiry?: any; // Can be Date, Firebase Timestamp, or string
   description?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-type AssetCategory = 'computer' | 'mobile' | 'printer' | 'furniture' | 'vehicle' | 'other';
-type AssetStatus = 'available' | 'assigned' | 'maintenance' | 'retired' | 'lost';
-type AssetCondition = 'excellent' | 'good' | 'fair' | 'poor';
-
-interface AssetFormData {
-  name: string;
-  category: AssetCategory;
-  serialNumber: string;
-  model: string;
-  manufacturer: string;
-  purchaseDate: string;
-  purchasePrice: number;
-  status: AssetStatus;
-  assignedTo: string;
-  location: string;
-  condition: AssetCondition;
-  warrantyExpiry: string;
-  description: string;
+  createdAt: any; // Can be Date, Firebase Timestamp, or string
+  updatedAt: any; // Can be Date, Firebase Timestamp, or string
 }
 
 const AssetManagement: React.FC = () => {
-  const theme = useTheme();
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<AssetCategory | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<AssetStatus | 'all'>('all');
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [assetsLoading, setAssetsLoading] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [openDialog, setOpenDialog] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showViewDialog, setShowViewDialog] = useState(false);
-  const [formData, setFormData] = useState<AssetFormData>({
+  const [dialogMode, setDialogMode] = useState<'add' | 'edit' | 'view'>('add');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage] = useState(10);
+  const [filters, setFilters] = useState({
+    search: '',
+    category: '',
+    status: '',
+    condition: ''
+  });
+
+  const [assetForm, setAssetForm] = useState({
     name: '',
-    category: 'computer',
+    category: 'computer' as Asset['category'],
     serialNumber: '',
     model: '',
     manufacturer: '',
     purchaseDate: '',
-    purchasePrice: 0,
-    status: 'available',
+    purchasePrice: '',
+    status: 'available' as Asset['status'],
     assignedTo: '',
     location: '',
-    condition: 'excellent',
+    condition: 'excellent' as Asset['condition'],
     warrantyExpiry: '',
     description: ''
   });
-  const [snackbar, setSnackbar] = useState({ 
-    open: false, 
-    message: '', 
-    severity: 'success' as 'success' | 'error' 
-  });
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [processing, setProcessing] = useState(false);
 
-  // Sample data
-  const sampleAssets: Asset[] = [
-    {
-      id: '1',
-      name: 'MacBook Pro 16"',
-      category: 'computer',
-      serialNumber: 'MBP2023001',
-      model: 'MacBook Pro M2',
-      manufacturer: 'Apple',
-      purchaseDate: '2023-01-15',
-      purchasePrice: 2500,
-      currentValue: 2200,
-      status: 'assigned',
-      assignedTo: 'emp001',
-      assignedEmployee: 'John Doe',
-      location: 'Office Floor 3',
-      condition: 'excellent',
-      warrantyExpiry: '2025-01-15',
-      description: '16-inch MacBook Pro with M2 chip, 16GB RAM, 512GB SSD',
-      createdAt: '2023-01-15T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z'
-    },
-    {
-      id: '2',
-      name: 'iPhone 14 Pro',
-      category: 'mobile',
-      serialNumber: 'IP14P001',
-      model: 'iPhone 14 Pro',
-      manufacturer: 'Apple',
-      purchaseDate: '2023-02-01',
-      purchasePrice: 1200,
-      currentValue: 900,
-      status: 'assigned',
-      assignedTo: 'emp002',
-      assignedEmployee: 'Jane Smith',
-      location: 'Office Floor 2',
-      condition: 'good',
-      warrantyExpiry: '2024-02-01',
-      description: 'iPhone 14 Pro 256GB Space Black',
-      createdAt: '2023-02-01T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z'
-    },
-    {
-      id: '3',
-      name: 'HP LaserJet Pro',
-      category: 'printer',
-      serialNumber: 'HPP2023001',
-      model: 'LaserJet Pro 4025dn',
-      manufacturer: 'HP',
-      purchaseDate: '2023-03-10',
-      purchasePrice: 800,
-      currentValue: 600,
-      status: 'available',
-      location: 'Office Floor 1',
-      condition: 'good',
-      warrantyExpiry: '2025-03-10',
-      description: 'Color laser printer with duplex printing',
-      createdAt: '2023-03-10T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z'
-    },
-    {
-      id: '4',
-      name: 'Herman Miller Chair',
-      category: 'furniture',
-      serialNumber: 'HMC2023001',
-      model: 'Aeron Chair',
-      manufacturer: 'Herman Miller',
-      purchaseDate: '2023-04-20',
-      purchasePrice: 1400,
-      currentValue: 1200,
-      status: 'assigned',
-      assignedTo: 'emp003',
-      assignedEmployee: 'Mike Johnson',
-      location: 'Office Floor 3',
-      condition: 'excellent',
-      description: 'Ergonomic office chair, size B',
-      createdAt: '2023-04-20T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z'
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean;
+    assetId?: string;
+    assetName?: string;
+  }>({
+    open: false
+  });
+
+  // Firebase integration functions
+  const fetchAssets = async () => {
+    try {
+      setAssetsLoading(true);
+      const result = await firebaseService.getCollection('assets');
+      if (result.success) {
+        setAssets(result.data as Asset[] || []);
+      } else {
+        showNotification('Failed to fetch assets', 'error');
+        setAssets([]);
+      }
+    } catch (error) {
+      console.error('Error fetching assets:', error);
+      showNotification('Error fetching assets', 'error');
+      setAssets([]);
+    } finally {
+      setAssetsLoading(false);
     }
-  ];
+  };
+
+  const fetchUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const result = await firebaseService.getCollection('users');
+      if (result.success) {
+        setUsers(result.data as User[] || []);
+      } else {
+        showNotification('Failed to fetch users', 'error');
+        setUsers([]);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      showNotification('Error fetching users', 'error');
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
 
   useEffect(() => {
-    loadAssets();
+    // Load data from Firebase
+    fetchAssets();
+    fetchUsers();
   }, []);
 
-  const loadAssets = async () => {
-    try {
-      setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setAssets(sampleAssets);
-    } catch (err) {
-      setError('Failed to load assets');
-    } finally {
-      setLoading(false);
-    }
+  const handleFilterChange = (field: string, value: string) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
+    setCurrentPage(1);
   };
 
   const filteredAssets = assets.filter(asset => {
-    const matchesSearch = 
-      asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.manufacturer.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || asset.category === categoryFilter;
-    const matchesStatus = statusFilter === 'all' || asset.status === statusFilter;
-    return matchesSearch && matchesCategory && matchesStatus;
+    const matchesSearch = asset.name.toLowerCase().includes(filters.search.toLowerCase()) ||
+                         asset.serialNumber.toLowerCase().includes(filters.search.toLowerCase()) ||
+                         asset.model.toLowerCase().includes(filters.search.toLowerCase());
+    const matchesCategory = !filters.category || asset.category === filters.category;
+    const matchesStatus = !filters.status || asset.status === filters.status;
+    const matchesCondition = !filters.condition || asset.condition === filters.condition;
+    
+    return matchesSearch && matchesCategory && matchesStatus && matchesCondition;
   });
 
-  const handleCreateClick = () => {
-    setFormData({
-      name: '',
-      category: 'computer',
-      serialNumber: '',
-      model: '',
-      manufacturer: '',
-      purchaseDate: '',
-      purchasePrice: 0,
-      status: 'available',
-      assignedTo: '',
-      location: '',
-      condition: 'excellent',
-      warrantyExpiry: '',
-      description: ''
-    });
-    setShowCreateDialog(true);
+  const paginatedAssets = filteredAssets.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
+
+  const getTotalAssets = () => {
+    return assets.reduce((total, asset) => total + asset.purchasePrice, 0);
   };
 
-  const handleEditClick = (asset: Asset) => {
-    setSelectedAsset(asset);
-    setFormData({
-      name: asset.name,
-      category: asset.category,
-      serialNumber: asset.serialNumber,
-      model: asset.model,
-      manufacturer: asset.manufacturer,
-      purchaseDate: asset.purchaseDate,
-      purchasePrice: asset.purchasePrice,
-      status: asset.status,
-      assignedTo: asset.assignedTo || '',
-      location: asset.location,
-      condition: asset.condition,
-      warrantyExpiry: asset.warrantyExpiry || '',
-      description: asset.description || ''
-    });
-    setShowEditDialog(true);
+  const getAvailableAssets = () => {
+    return assets.filter(asset => asset.status === 'available');
   };
 
-  const handleViewClick = (asset: Asset) => {
-    setSelectedAsset(asset);
-    setShowViewDialog(true);
+  const getAssignedAssets = () => {
+    return assets.filter(asset => asset.status === 'assigned');
   };
 
-  const handleDeleteClick = (asset: Asset) => {
-    setSelectedAsset(asset);
-    setShowDeleteDialog(true);
+  const getMaintenanceAssets = () => {
+    return assets.filter(asset => asset.status === 'maintenance');
   };
 
-  const handleFormSubmit = async () => {
-    try {
-      setProcessing(true);
-      
-      if (showCreateDialog) {
-        const newAsset: Asset = {
-          id: Date.now().toString(),
-          name: formData.name,
-          category: formData.category,
-          serialNumber: formData.serialNumber,
-          model: formData.model,
-          manufacturer: formData.manufacturer,
-          purchaseDate: formData.purchaseDate,
-          purchasePrice: formData.purchasePrice,
-          currentValue: formData.purchasePrice, // Initially same as purchase price
-          status: formData.status,
-          assignedTo: formData.assignedTo || undefined,
-          assignedEmployee: formData.assignedTo ? `Employee ${formData.assignedTo}` : undefined,
-          location: formData.location,
-          condition: formData.condition,
-          warrantyExpiry: formData.warrantyExpiry || undefined,
-          description: formData.description || undefined,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        
-        setAssets(prev => [newAsset, ...prev]);
-        setSnackbar({ open: true, message: 'Asset created successfully', severity: 'success' });
-        setShowCreateDialog(false);
-      } else if (showEditDialog && selectedAsset) {
-        const updatedAsset: Asset = {
-          ...selectedAsset,
-          name: formData.name,
-          category: formData.category,
-          serialNumber: formData.serialNumber,
-          model: formData.model,
-          manufacturer: formData.manufacturer,
-          purchaseDate: formData.purchaseDate,
-          purchasePrice: formData.purchasePrice,
-          status: formData.status,
-          assignedTo: formData.assignedTo || undefined,
-          assignedEmployee: formData.assignedTo ? `Employee ${formData.assignedTo}` : undefined,
-          location: formData.location,
-          condition: formData.condition,
-          warrantyExpiry: formData.warrantyExpiry || undefined,
-          description: formData.description || undefined,
-          updatedAt: new Date().toISOString()
-        };
-        
-        setAssets(prev => prev.map(asset => 
-          asset.id === selectedAsset.id ? updatedAsset : asset
-        ));
-        setSnackbar({ open: true, message: 'Asset updated successfully', severity: 'success' });
-        setShowEditDialog(false);
-      }
-    } catch (err) {
-      setSnackbar({ open: true, message: 'Operation failed', severity: 'error' });
-    } finally {
-      setProcessing(false);
-    }
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR'
+    }).format(amount);
   };
 
-  const handleDelete = async () => {
-    try {
-      if (selectedAsset) {
-        setAssets(prev => prev.filter(asset => asset.id !== selectedAsset.id));
-        setSnackbar({ open: true, message: 'Asset deleted successfully', severity: 'success' });
-        setShowDeleteDialog(false);
-        setSelectedAsset(null);
-      }
-    } catch (err) {
-      setSnackbar({ open: true, message: 'Failed to delete asset', severity: 'error' });
-    }
-  };
-
-  const getCategoryIcon = (category: AssetCategory) => {
+  const getCategoryIcon = (category: Asset['category']) => {
     switch (category) {
       case 'computer': return <ComputerIcon />;
       case 'mobile': return <PhoneIcon />;
@@ -372,170 +224,725 @@ const AssetManagement: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: AssetStatus) => {
-    switch (status) {
-      case 'available': return 'success';
-      case 'assigned': return 'info';
-      case 'maintenance': return 'warning';
-      case 'retired': return 'default';
-      case 'lost': return 'error';
-      default: return 'default';
+  // Helper function to safely convert Firebase date fields to ISO date strings
+  const convertToDateString = (dateField: any): string => {
+    if (!dateField) return '';
+    if (dateField instanceof Date) {
+      return dateField.toISOString().split('T')[0];
+    }
+    if (typeof dateField === 'string') {
+      try {
+        return new Date(dateField).toISOString().split('T')[0];
+      } catch {
+        return dateField;
+      }
+    }
+    // Handle Firebase Timestamp objects
+    if (dateField && typeof dateField.toDate === 'function') {
+      return dateField.toDate().toISOString().split('T')[0];
+    }
+    return '';
+  };
+
+  // Helper function to safely convert any date type to a display string
+  const convertToDisplayDate = (dateField: any): string => {
+    if (!dateField) return 'Not specified';
+    if (dateField instanceof Date) {
+      return dateField.toLocaleDateString();
+    }
+    if (typeof dateField === 'string') {
+      try {
+        return new Date(dateField).toLocaleDateString();
+      } catch {
+        return dateField;
+      }
+    }
+    // Handle Firebase Timestamp objects
+    if (dateField && typeof dateField.toDate === 'function') {
+      return dateField.toDate().toLocaleDateString();
+    }
+    return 'Invalid date';
+  };
+
+  const handleOpenDialog = (mode: 'add' | 'edit' | 'view', asset?: Asset) => {
+    setDialogMode(mode);
+    if (asset) {
+      setSelectedAsset(asset);
+      setAssetForm({
+        name: asset.name,
+        category: asset.category,
+        serialNumber: asset.serialNumber,
+        model: asset.model,
+        manufacturer: asset.manufacturer,
+        purchaseDate: convertToDateString(asset.purchaseDate),
+        purchasePrice: asset.purchasePrice.toString(),
+        status: asset.status,
+        assignedTo: asset.assignedTo || '',
+        location: asset.location,
+        condition: asset.condition,
+        warrantyExpiry: convertToDateString(asset.warrantyExpiry),
+        description: asset.description || ''
+      });
+    } else {
+      setSelectedAsset(null);
+      setAssetForm({
+        name: '',
+        category: 'computer',
+        serialNumber: '',
+        model: '',
+        manufacturer: '',
+        purchaseDate: '',
+        purchasePrice: '',
+        status: 'available',
+        assignedTo: '',
+        location: '',
+        condition: 'excellent',
+        warrantyExpiry: '',
+        description: ''
+      });
+    }
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setSelectedAsset(null);
+    setAssetForm({
+      name: '',
+      category: 'computer',
+      serialNumber: '',
+      model: '',
+      manufacturer: '',
+      purchaseDate: '',
+      purchasePrice: '',
+      status: 'available',
+      assignedTo: '',
+      location: '',
+      condition: 'excellent',
+      warrantyExpiry: '',
+      description: ''
+    });
+  };
+
+  const handleSaveAsset = async () => {
+    if (!assetForm.name || !assetForm.serialNumber || !assetForm.model || !assetForm.manufacturer || !assetForm.purchasePrice) {
+      showNotification('Please fill in all required fields', 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const assetData = {
+        ...assetForm,
+        purchasePrice: parseFloat(assetForm.purchasePrice),
+        currentValue: parseFloat(assetForm.purchasePrice), // Initially same as purchase price
+        purchaseDate: new Date(assetForm.purchaseDate),
+        warrantyExpiry: assetForm.warrantyExpiry ? new Date(assetForm.warrantyExpiry) : undefined,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      if (dialogMode === 'add') {
+        const result = await firebaseService.addDocument('assets', assetData);
+        if (result.success) {
+          showNotification('Asset added successfully!', 'success');
+          fetchAssets();
+        } else {
+          showNotification('Failed to add asset', 'error');
+        }
+      } else if (dialogMode === 'edit' && selectedAsset) {
+        const result = await firebaseService.updateDocument('assets', selectedAsset.id, assetData);
+        if (result.success) {
+          showNotification('Asset updated successfully!', 'success');
+          fetchAssets();
+        } else {
+          showNotification('Failed to update asset', 'error');
+        }
+      }
+
+      handleCloseDialog();
+    } catch (error) {
+      console.error('Error saving asset:', error);
+      showNotification('Error saving asset', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getConditionColor = (condition: AssetCondition) => {
-    switch (condition) {
-      case 'excellent': return 'success';
-      case 'good': return 'info';
-      case 'fair': return 'warning';
-      case 'poor': return 'error';
-      default: return 'default';
+  const handleDeleteAsset = async (assetId: string) => {
+    try {
+      const result = await firebaseService.deleteDocument('assets', assetId);
+      if (result.success) {
+        showNotification('Asset deleted successfully!', 'success');
+        fetchAssets();
+      } else {
+        showNotification('Failed to delete asset', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting asset:', error);
+      showNotification('Error deleting asset', 'error');
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+  const handleStatusChange = async (assetId: string, newStatus: string) => {
+    try {
+      const updateData = {
+        status: newStatus,
+        updatedAt: new Date()
+      };
+
+      const result = await firebaseService.updateDocument('assets', assetId, updateData);
+      if (result.success) {
+        showNotification(`Asset status updated to ${newStatus}`, 'success');
+        fetchAssets();
+      } else {
+        showNotification('Failed to update asset status', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating asset status:', error);
+      showNotification('Error updating asset status', 'error');
+    }
   };
 
-  const handleChangePage = (_event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  if (loading) {
+  if (assetsLoading || usersLoading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center' }}>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
         <CircularProgress />
-      </Container>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Fade in timeout={300}>
-        <Box>
-          {/* Header */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
-              Asset Management
+    <Box sx={{ p: 3 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1">
+          Asset Management
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpenDialog('add')}
+        >
+          Add Asset
+        </Button>
+        
+      </Box>
+
+      {/* Statistics Cards */}
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+        gap: 3, 
+        mb: 3 
+      }}>
+        <Card>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Total Assets
             </Typography>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreateClick}
-              sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                },
-              }}
+            <Typography variant="h4" component="div">
+              {assets.length}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              {formatCurrency(getTotalAssets())} total value
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Available
+            </Typography>
+            <Typography variant="h4" component="div" color="success.main">
+              {getAvailableAssets().length}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Ready for assignment
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Assigned
+            </Typography>
+            <Typography variant="h4" component="div" color="primary.main">
+              {getAssignedAssets().length}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Currently in use
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Maintenance
+            </Typography>
+            <Typography variant="h4" component="div" color="warning.main">
+              {getMaintenanceAssets().length}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Under repair
+            </Typography>
+          </CardContent>
+        </Card>
+      </Box>
+
+      {/* Filters */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <FilterListIcon sx={{ mr: 1 }} />
+          <Typography variant="h6">Filters</Typography>
+        </Box>
+        <Box sx={{ 
+          display: 'grid', 
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+          gap: 2 
+        }}>
+          <TextField
+            fullWidth
+            label="Search"
+            value={filters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
+            InputProps={{
+              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+            }}
+          />
+          <FormControl fullWidth>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={filters.category}
+              label="Category"
+              onChange={(e) => handleFilterChange('category', e.target.value)}
             >
-              Add Asset
-            </Button>
+              <MenuItem value="">All Categories</MenuItem>
+              <MenuItem value="computer">Computer</MenuItem>
+              <MenuItem value="mobile">Mobile</MenuItem>
+              <MenuItem value="printer">Printer</MenuItem>
+              <MenuItem value="furniture">Furniture</MenuItem>
+              <MenuItem value="vehicle">Vehicle</MenuItem>
+              <MenuItem value="other">Other</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl fullWidth>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={filters.status}
+              label="Status"
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+            >
+              <MenuItem value="">All Statuses</MenuItem>
+              <MenuItem value="available">Available</MenuItem>
+              <MenuItem value="assigned">Assigned</MenuItem>
+              <MenuItem value="maintenance">Maintenance</MenuItem>
+              <MenuItem value="retired">Retired</MenuItem>
+              <MenuItem value="lost">Lost</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl fullWidth>
+            <InputLabel>Condition</InputLabel>
+            <Select
+              value={filters.condition}
+              label="Condition"
+              onChange={(e) => handleFilterChange('condition', e.target.value)}
+            >
+              <MenuItem value="">All Conditions</MenuItem>
+              <MenuItem value="excellent">Excellent</MenuItem>
+              <MenuItem value="good">Good</MenuItem>
+              <MenuItem value="fair">Fair</MenuItem>
+              <MenuItem value="poor">Poor</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+      </Paper>
+
+      {/* Assets Table */}
+      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+        <TableContainer>
+          <Table stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell>Asset</TableCell>
+                <TableCell>Serial Number</TableCell>
+                <TableCell>Value</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Assigned To</TableCell>
+                <TableCell>Location</TableCell>
+                <TableCell>Condition</TableCell>
+                <TableCell>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {paginatedAssets.map((asset) => {
+                const assignedUser = users.find(u => u.id === asset.assignedTo);
+                return (
+                  <TableRow key={asset.id} hover>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {getCategoryIcon(asset.category)}
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight="bold">
+                            {asset.name}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            {asset.model} - {asset.manufacturer}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontFamily="monospace">
+                        {asset.serialNumber}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="subtitle2" fontWeight="bold">
+                        {formatCurrency(asset.currentValue)}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Purchased: {formatCurrency(asset.purchasePrice)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={asset.status}
+                        size="small"
+                        color={
+                          asset.status === 'available' ? 'success' :
+                          asset.status === 'assigned' ? 'primary' :
+                          asset.status === 'maintenance' ? 'warning' :
+                          asset.status === 'retired' ? 'default' : 'error'
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {assignedUser ? (
+                        <Box>
+                          <Typography variant="body2">
+                            {assignedUser.name}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary">
+                            {assignedUser.department}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="textSecondary">
+                          Unassigned
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {asset.location}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={asset.condition}
+                        size="small"
+                        color={
+                          asset.condition === 'excellent' ? 'success' :
+                          asset.condition === 'good' ? 'primary' :
+                          asset.condition === 'fair' ? 'warning' : 'error'
+                        }
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Tooltip title="View Details">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDialog('view', asset)}
+                            color="info"
+                          >
+                            <ViewIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit Asset">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDialog('edit', asset)}
+                            color="primary"
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <FormControl size="small" sx={{ minWidth: 120 }}>
+                          <Select
+                            value={asset.status}
+                            onChange={(e) => handleStatusChange(asset.id, e.target.value)}
+                            size="small"
+                          >
+                            <MenuItem value="available">Available</MenuItem>
+                            <MenuItem value="assigned">Assigned</MenuItem>
+                            <MenuItem value="maintenance">Maintenance</MenuItem>
+                            <MenuItem value="retired">Retired</MenuItem>
+                            <MenuItem value="lost">Lost</MenuItem>
+                          </Select>
+                        </FormControl>
+                        <Tooltip title="Delete Asset">
+                          <IconButton
+                            size="small"
+                            onClick={() => setDeleteConfirm({
+                              open: true,
+                              assetId: asset.id,
+                              assetName: asset.name
+                            })}
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        
+        {filteredAssets.length === 0 && (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography color="textSecondary">
+              No assets found matching your criteria
+            </Typography>
           </Box>
+        )}
+      </Paper>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
+      {/* Pagination */}
+      {filteredAssets.length > rowsPerPage && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <Pagination
+            count={Math.ceil(filteredAssets.length / rowsPerPage)}
+            page={currentPage}
+            onChange={(_, page) => setCurrentPage(page)}
+            color="primary"
+          />
+        </Box>
+      )}
 
-          {/* Stats Cards */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 2, mb: 3 }}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <AssignmentIcon sx={{ mr: 2, color: 'primary.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {assets.length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Assets
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <BuildingIcon sx={{ mr: 2, color: 'success.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {assets.filter(a => a.status === 'available').length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Available
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <AssignmentIcon sx={{ mr: 2, color: 'info.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {assets.filter(a => a.status === 'assigned').length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Assigned
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <CategoryIcon sx={{ mr: 2, color: 'warning.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {formatCurrency(assets.reduce((sum, asset) => sum + asset.currentValue, 0))}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Total Value
-                    </Typography>
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
+      {/* Add/Edit/View Dialog */}
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {dialogMode === 'add' ? <AddIcon /> : 
+             dialogMode === 'edit' ? <EditIcon /> : <ViewIcon />}
+            <Typography variant="h6">
+              {dialogMode === 'add' ? 'Add New Asset' :
+               dialogMode === 'edit' ? 'Edit Asset' : 'View Asset Details'}
+            </Typography>
           </Box>
-
-          {/* Filters */}
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-              <TextField
-                placeholder="Search assets..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                }}
-                size="small"
-                sx={{ minWidth: 300 }}
-              />
+        </DialogTitle>
+        <DialogContent dividers>
+          {dialogMode === 'view' && selectedAsset ? (
+            // View Mode - Display asset details in structured format
+            <Box sx={{ mt: 2 }}>
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
+                gap: 3 
+              }}>
+                <Box>
+                  <Typography variant="h6" gutterBottom>Asset Information</Typography>
+                  <List dense>
+                    <ListItem>
+                      <ListItemIcon>
+                        {getCategoryIcon(selectedAsset.category)}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Asset Name"
+                        secondary={selectedAsset.name}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <AssignmentIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Serial Number"
+                        secondary={selectedAsset.serialNumber}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <CategoryIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Category"
+                        secondary={selectedAsset.category.charAt(0).toUpperCase() + selectedAsset.category.slice(1)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <BuildIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Model"
+                        secondary={selectedAsset.model}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <BuildIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Manufacturer"
+                        secondary={selectedAsset.manufacturer}
+                      />
+                    </ListItem>
+                                         <ListItem>
+                       <ListItemIcon>
+                         <ScheduleIcon />
+                       </ListItemIcon>
+                       <ListItemText
+                         primary="Purchase Date"
+                         secondary={convertToDisplayDate(selectedAsset.purchaseDate)}
+                       />
+                     </ListItem>
+                  </List>
+                </Box>
+                <Box>
+                  <Typography variant="h6" gutterBottom>Asset Details</Typography>
+                  <List dense>
+                                         <ListItem>
+                       <ListItemIcon>
+                         <CheckCircleIcon />
+                       </ListItemIcon>
+                       <ListItemText
+                         primary="Status"
+                         secondary={selectedAsset.status.charAt(0).toUpperCase() + selectedAsset.status.slice(1)}
+                       />
+                       <Chip
+                         label={selectedAsset.status}
+                         size="small"
+                         sx={{
+                           bgcolor: selectedAsset.status === 'available' ? 'success.main' :
+                                    selectedAsset.status === 'assigned' ? 'primary.main' :
+                                    selectedAsset.status === 'maintenance' ? 'warning.main' :
+                                    selectedAsset.status === 'retired' ? 'default' : 'error.main',
+                           color: 'white',
+                           textTransform: 'capitalize'
+                         }}
+                       />
+                     </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <LocationIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Location"
+                        secondary={selectedAsset.location}
+                      />
+                    </ListItem>
+                                         <ListItem>
+                       <ListItemIcon>
+                         <WarningIcon />
+                       </ListItemIcon>
+                       <ListItemText
+                         primary="Condition"
+                         secondary={selectedAsset.condition.charAt(0).toUpperCase() + selectedAsset.condition.slice(1)}
+                       />
+                       <Chip
+                         label={selectedAsset.condition}
+                         size="small"
+                         sx={{
+                           bgcolor: selectedAsset.condition === 'excellent' ? 'success.main' :
+                                    selectedAsset.condition === 'good' ? 'primary.main' :
+                                    selectedAsset.condition === 'fair' ? 'warning.main' : 'error.main',
+                           color: 'white',
+                           textTransform: 'capitalize'
+                         }}
+                       />
+                     </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <AssignmentIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Assigned To"
+                        secondary={
+                          selectedAsset.assignedTo ? 
+                          users.find(u => u.id === selectedAsset.assignedTo)?.name || 'Unknown User' :
+                          'Unassigned'
+                        }
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <CheckCircleIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Purchase Price"
+                        secondary={formatCurrency(selectedAsset.purchasePrice)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <CheckCircleIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Current Value"
+                        secondary={formatCurrency(selectedAsset.currentValue)}
+                      />
+                    </ListItem>
+                  </List>
+                </Box>
+              </Box>
               
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+              {selectedAsset.warrantyExpiry && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="h6" gutterBottom>Warranty Information</Typography>
+                  <List dense>
+                                         <ListItem>
+                       <ListItemIcon>
+                         <ScheduleIcon />
+                       </ListItemIcon>
+                       <ListItemText
+                         primary="Warranty Expiry"
+                         secondary={convertToDisplayDate(selectedAsset.warrantyExpiry)}
+                       />
+                     </ListItem>
+                  </List>
+                </Box>
+              )}
+              
+              {selectedAsset.description && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="h6" gutterBottom>Description</Typography>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="body2">
+                      {selectedAsset.description}
+                    </Typography>
+                  </Paper>
+                </Box>
+              )}
+            </Box>
+          ) : (
+            // Edit/Add Mode - Show form fields
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3, mt: 2 }}>
+              <TextField
+                fullWidth
+                label="Asset Name"
+                value={assetForm.name}
+                onChange={(e) => setAssetForm(prev => ({ ...prev, name: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+                InputProps={{
+                  startAdornment: <CategoryIcon sx={{ color: 'action.active', mr: 1 }} />
+                }}
+              />
+              <FormControl fullWidth>
                 <InputLabel>Category</InputLabel>
                 <Select
-                  value={categoryFilter}
+                  value={assetForm.category}
                   label="Category"
-                  onChange={(e) => setCategoryFilter(e.target.value as AssetCategory | 'all')}
+                  onChange={(e) => setAssetForm(prev => ({ ...prev, category: e.target.value as Asset['category'] }))}
+                  disabled={dialogMode === 'view'}
+                  required
                 >
-                  <MenuItem value="all">All Categories</MenuItem>
                   <MenuItem value="computer">Computer</MenuItem>
                   <MenuItem value="mobile">Mobile</MenuItem>
                   <MenuItem value="printer">Printer</MenuItem>
@@ -544,15 +951,61 @@ const AssetManagement: React.FC = () => {
                   <MenuItem value="other">Other</MenuItem>
                 </Select>
               </FormControl>
-
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+              <TextField
+                fullWidth
+                label="Serial Number"
+                value={assetForm.serialNumber}
+                onChange={(e) => setAssetForm(prev => ({ ...prev, serialNumber: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+                InputProps={{
+                  startAdornment: <AssignmentIcon sx={{ color: 'action.active', mr: 1 }} />
+                }}
+              />
+              <TextField
+                fullWidth
+                label="Model"
+                value={assetForm.model}
+                onChange={(e) => setAssetForm(prev => ({ ...prev, model: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Manufacturer"
+                value={assetForm.manufacturer}
+                onChange={(e) => setAssetForm(prev => ({ ...prev, manufacturer: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Purchase Price"
+                type="number"
+                value={assetForm.purchasePrice}
+                onChange={(e) => setAssetForm(prev => ({ ...prev, purchasePrice: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Purchase Date"
+                type="date"
+                value={assetForm.purchaseDate}
+                onChange={(e) => setAssetForm(prev => ({ ...prev, purchaseDate: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+                InputLabelProps={{ shrink: true }}
+              />
+              <FormControl fullWidth>
                 <InputLabel>Status</InputLabel>
                 <Select
-                  value={statusFilter}
+                  value={assetForm.status}
                   label="Status"
-                  onChange={(e) => setStatusFilter(e.target.value as AssetStatus | 'all')}
+                  onChange={(e) => setAssetForm(prev => ({ ...prev, status: e.target.value as Asset['status'] }))}
+                  disabled={dialogMode === 'view'}
+                  required
                 >
-                  <MenuItem value="all">All Status</MenuItem>
                   <MenuItem value="available">Available</MenuItem>
                   <MenuItem value="assigned">Assigned</MenuItem>
                   <MenuItem value="maintenance">Maintenance</MenuItem>
@@ -560,431 +1013,134 @@ const AssetManagement: React.FC = () => {
                   <MenuItem value="lost">Lost</MenuItem>
                 </Select>
               </FormControl>
-            </Box>
-          </Paper>
-
-          {/* Assets Table */}
-          <Paper>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Asset</TableCell>
-                    <TableCell>Category</TableCell>
-                    <TableCell>Serial Number</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Condition</TableCell>
-                    <TableCell>Assigned To</TableCell>
-                    <TableCell>Value</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredAssets
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((asset) => (
-                      <TableRow key={asset.id} hover>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            {getCategoryIcon(asset.category)}
-                            <Box sx={{ ml: 2 }}>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                {asset.name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {asset.manufacturer} {asset.model}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Chip 
-                            label={asset.category} 
-                            size="small" 
-                            variant="outlined"
-                            sx={{ textTransform: 'capitalize' }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                            {asset.serialNumber}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={asset.status}
-                            size="small"
-                            color={getStatusColor(asset.status) as any}
-                            sx={{ textTransform: 'capitalize' }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={asset.condition}
-                            size="small"
-                            color={getConditionColor(asset.condition) as any}
-                            sx={{ textTransform: 'capitalize' }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {asset.assignedEmployee ? (
-                            <Typography variant="body2">{asset.assignedEmployee}</Typography>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">-</Typography>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {formatCurrency(asset.currentValue)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Stack direction="row" spacing={1} justifyContent="center">
-                            <Tooltip title="View Details">
-                              <IconButton size="small" onClick={() => handleViewClick(asset)}>
-                                <ViewIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Edit Asset">
-                              <IconButton size="small" onClick={() => handleEditClick(asset)}>
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete Asset">
-                              <IconButton size="small" onClick={() => handleDeleteClick(asset)}>
-                                <DeleteIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={filteredAssets.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </Paper>
-
-          {/* Create/Edit Dialog */}
-          <Dialog 
-            open={showCreateDialog || showEditDialog} 
-            onClose={() => {
-              setShowCreateDialog(false);
-              setShowEditDialog(false);
-            }} 
-            maxWidth="md" 
-            fullWidth
-          >
-            <DialogTitle>
-              {showCreateDialog ? 'Add New Asset' : 'Edit Asset'}
-            </DialogTitle>
-            <DialogContent>
-              <Stack spacing={3} sx={{ mt: 1 }}>
-                <TextField
-                  label="Asset Name"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  fullWidth
+              <FormControl fullWidth>
+                <InputLabel>Assigned To</InputLabel>
+                <Select
+                  value={assetForm.assignedTo}
+                  label="Assigned To"
+                  onChange={(e) => setAssetForm(prev => ({ ...prev, assignedTo: e.target.value }))}
+                  disabled={dialogMode === 'view'}
+                >
+                  <MenuItem value="">Unassigned</MenuItem>
+                  {users.map(user => (
+                    <MenuItem key={user.id} value={user.id}>
+                      {user.name} - {user.department}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                fullWidth
+                label="Location"
+                value={assetForm.location}
+                onChange={(e) => setAssetForm(prev => ({ ...prev, location: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+                InputProps={{
+                  startAdornment: <LocationIcon sx={{ color: 'action.active', mr: 1 }} />
+                }}
+              />
+              <FormControl fullWidth>
+                <InputLabel>Condition</InputLabel>
+                <Select
+                  value={assetForm.condition}
+                  label="Condition"
+                  onChange={(e) => setAssetForm(prev => ({ ...prev, condition: e.target.value as Asset['condition'] }))}
+                  disabled={dialogMode === 'view'}
                   required
-                />
-
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                  <FormControl fullWidth>
-                    <InputLabel>Category</InputLabel>
-                    <Select
-                      value={formData.category}
-                      label="Category"
-                      onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value as AssetCategory }))}
-                    >
-                      <MenuItem value="computer">Computer</MenuItem>
-                      <MenuItem value="mobile">Mobile</MenuItem>
-                      <MenuItem value="printer">Printer</MenuItem>
-                      <MenuItem value="furniture">Furniture</MenuItem>
-                      <MenuItem value="vehicle">Vehicle</MenuItem>
-                      <MenuItem value="other">Other</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <TextField
-                    label="Serial Number"
-                    value={formData.serialNumber}
-                    onChange={(e) => setFormData(prev => ({ ...prev, serialNumber: e.target.value }))}
-                    fullWidth
-                    required
-                  />
-                </Box>
-
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                  <TextField
-                    label="Manufacturer"
-                    value={formData.manufacturer}
-                    onChange={(e) => setFormData(prev => ({ ...prev, manufacturer: e.target.value }))}
-                    fullWidth
-                  />
-
-                  <TextField
-                    label="Model"
-                    value={formData.model}
-                    onChange={(e) => setFormData(prev => ({ ...prev, model: e.target.value }))}
-                    fullWidth
-                  />
-                </Box>
-
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                  <TextField
-                    label="Purchase Date"
-                    type="date"
-                    value={formData.purchaseDate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, purchaseDate: e.target.value }))}
-                    InputLabelProps={{ shrink: true }}
-                    fullWidth
-                  />
-
-                  <TextField
-                    label="Purchase Price"
-                    type="number"
-                    value={formData.purchasePrice}
-                    onChange={(e) => setFormData(prev => ({ ...prev, purchasePrice: parseFloat(e.target.value) || 0 }))}
-                    fullWidth
-                    InputProps={{
-                      startAdornment: <Typography sx={{ mr: 1 }}>$</Typography>
-                    }}
-                  />
-                </Box>
-
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
-                  <FormControl fullWidth>
-                    <InputLabel>Status</InputLabel>
-                    <Select
-                      value={formData.status}
-                      label="Status"
-                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as AssetStatus }))}
-                    >
-                      <MenuItem value="available">Available</MenuItem>
-                      <MenuItem value="assigned">Assigned</MenuItem>
-                      <MenuItem value="maintenance">Maintenance</MenuItem>
-                      <MenuItem value="retired">Retired</MenuItem>
-                      <MenuItem value="lost">Lost</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <FormControl fullWidth>
-                    <InputLabel>Condition</InputLabel>
-                    <Select
-                      value={formData.condition}
-                      label="Condition"
-                      onChange={(e) => setFormData(prev => ({ ...prev, condition: e.target.value as AssetCondition }))}
-                    >
-                      <MenuItem value="excellent">Excellent</MenuItem>
-                      <MenuItem value="good">Good</MenuItem>
-                      <MenuItem value="fair">Fair</MenuItem>
-                      <MenuItem value="poor">Poor</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <TextField
-                    label="Location"
-                    value={formData.location}
-                    onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                    fullWidth
-                  />
-                </Box>
-
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                  <TextField
-                    label="Assigned To (Employee ID)"
-                    value={formData.assignedTo}
-                    onChange={(e) => setFormData(prev => ({ ...prev, assignedTo: e.target.value }))}
-                    fullWidth
-                    placeholder="Leave empty if not assigned"
-                  />
-
-                  <TextField
-                    label="Warranty Expiry"
-                    type="date"
-                    value={formData.warrantyExpiry}
-                    onChange={(e) => setFormData(prev => ({ ...prev, warrantyExpiry: e.target.value }))}
-                    InputLabelProps={{ shrink: true }}
-                    fullWidth
-                  />
-                </Box>
-
-                <TextField
-                  label="Description"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  multiline
-                  rows={3}
-                  fullWidth
-                  placeholder="Additional details about the asset..."
-                />
-              </Stack>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => {
-                setShowCreateDialog(false);
-                setShowEditDialog(false);
-              }}>
-                Cancel
-              </Button>
-              <Button 
-                variant="contained" 
-                onClick={handleFormSubmit}
-                disabled={processing || !formData.name || !formData.serialNumber}
-              >
-                {processing ? <CircularProgress size={20} /> : (showCreateDialog ? 'Add Asset' : 'Update Asset')}
-              </Button>
-            </DialogActions>
-          </Dialog>
-
-          {/* View Dialog */}
-          <Dialog open={showViewDialog} onClose={() => setShowViewDialog(false)} maxWidth="md" fullWidth>
-            <DialogTitle>Asset Details</DialogTitle>
-            <DialogContent>
-              {selectedAsset && (
-                <Box sx={{ mt: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                    {getCategoryIcon(selectedAsset.category)}
-                    <Box sx={{ ml: 2 }}>
-                      <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                        {selectedAsset.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {selectedAsset.manufacturer} {selectedAsset.model}
-                      </Typography>
-                      <Box sx={{ mt: 1 }}>
-                        <Chip
-                          label={selectedAsset.status}
-                          size="small"
-                          color={getStatusColor(selectedAsset.status) as any}
-                          sx={{ mr: 1, textTransform: 'capitalize' }}
-                        />
-                        <Chip
-                          label={selectedAsset.condition}
-                          size="small"
-                          color={getConditionColor(selectedAsset.condition) as any}
-                          sx={{ textTransform: 'capitalize' }}
-                        />
-                      </Box>
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
-                    <Box>
-                      <Typography variant="h6" sx={{ mb: 2 }}>Asset Information</Typography>
-                      <Stack spacing={2}>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Serial Number</Typography>
-                          <Typography variant="body1" sx={{ fontFamily: 'monospace' }}>
-                            {selectedAsset.serialNumber}
-                          </Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Category</Typography>
-                          <Typography variant="body1" sx={{ textTransform: 'capitalize' }}>
-                            {selectedAsset.category}
-                          </Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Location</Typography>
-                          <Typography variant="body1">{selectedAsset.location}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Purchase Date</Typography>
-                          <Typography variant="body1">
-                            {new Date(selectedAsset.purchaseDate).toLocaleDateString()}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </Box>
-
-                    <Box>
-                      <Typography variant="h6" sx={{ mb: 2 }}>Financial Information</Typography>
-                      <Stack spacing={2}>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Purchase Price</Typography>
-                          <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                            {formatCurrency(selectedAsset.purchasePrice)}
-                          </Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Current Value</Typography>
-                          <Typography variant="body1" sx={{ fontWeight: 600, color: 'success.main' }}>
-                            {formatCurrency(selectedAsset.currentValue)}
-                          </Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Assigned To</Typography>
-                          <Typography variant="body1">
-                            {selectedAsset.assignedEmployee || 'Not assigned'}
-                          </Typography>
-                        </Box>
-                        {selectedAsset.warrantyExpiry && (
-                          <Box>
-                            <Typography variant="body2" color="text.secondary">Warranty Expiry</Typography>
-                            <Typography variant="body1">
-                              {new Date(selectedAsset.warrantyExpiry).toLocaleDateString()}
-                            </Typography>
-                          </Box>
-                        )}
-                      </Stack>
-                    </Box>
-                  </Box>
-
-                  {selectedAsset.description && (
-                    <Box sx={{ mt: 3 }}>
-                      <Typography variant="h6" sx={{ mb: 1 }}>Description</Typography>
-                      <Typography variant="body1" color="text.secondary">
-                        {selectedAsset.description}
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setShowViewDialog(false)}>Close</Button>
-            </DialogActions>
-          </Dialog>
-
-          {/* Delete Confirmation Dialog */}
-          <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)}>
-            <DialogTitle>Delete Asset</DialogTitle>
-            <DialogContent>
-              <Typography>
-                Are you sure you want to delete "{selectedAsset?.name}"? This action cannot be undone.
-              </Typography>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
-              <Button variant="contained" color="error" onClick={handleDelete}>
-                Delete
-              </Button>
-            </DialogActions>
-          </Dialog>
-
-          {/* Snackbar */}
-          <Snackbar
-            open={snackbar.open}
-            autoHideDuration={6000}
-            onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+                >
+                  <MenuItem value="excellent">Excellent</MenuItem>
+                  <MenuItem value="good">Good</MenuItem>
+                  <MenuItem value="fair">Fair</MenuItem>
+                  <MenuItem value="poor">Poor</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                fullWidth
+                label="Warranty Expiry"
+                type="date"
+                value={assetForm.warrantyExpiry}
+                onChange={(e) => setAssetForm(prev => ({ ...prev, warrantyExpiry: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                fullWidth
+                label="Description"
+                multiline
+                rows={3}
+                value={assetForm.description}
+                onChange={(e) => setAssetForm(prev => ({ ...prev, description: e.target.value }))}
+                disabled={dialogMode === 'view'}
+              />
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button 
+            onClick={handleCloseDialog}
+            variant={dialogMode === 'view' ? 'contained' : 'outlined'}
+            startIcon={dialogMode === 'view' ? <CheckCircleIcon /> : undefined}
           >
-            <Alert severity={snackbar.severity} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}>
-              {snackbar.message}
-            </Alert>
-          </Snackbar>
-        </Box>
-      </Fade>
-    </Container>
+            {dialogMode === 'view' ? 'Close' : 'Cancel'}
+          </Button>
+          {dialogMode !== 'view' && (
+            <Button
+              onClick={handleSaveAsset}
+              variant="contained"
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={20} /> : <CheckCircleIcon />}
+            >
+              {loading ? 'Saving...' : 'Save'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirm.open}
+        onClose={() => setDeleteConfirm(prev => ({ ...prev, open: false }))}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ pb: 1, borderBottom: (t) => `1px solid ${t.palette.divider}` }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DeleteIcon color="error" />
+            <Typography variant="h6">Confirm Delete</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body1" sx={{ mb: 1 }}>
+            Are you sure you want to delete the asset <strong>"{deleteConfirm.assetName}"</strong>?
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            This action cannot be undone. All asset data will be permanently removed.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button 
+            onClick={() => setDeleteConfirm(prev => ({ ...prev, open: false }))}
+            variant="outlined"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={() => {
+              if (deleteConfirm.assetId) {
+                handleDeleteAsset(deleteConfirm.assetId);
+                setDeleteConfirm(prev => ({ ...prev, open: false }));
+              }
+            }}
+            variant="contained" 
+            color="error"
+            startIcon={<DeleteIcon />}
+          >
+            Delete Asset
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   );
 };
 
