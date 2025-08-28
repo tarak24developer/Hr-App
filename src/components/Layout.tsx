@@ -33,7 +33,7 @@ import {
   Dashboard as DashboardIcon,
   People as PeopleIcon,
   Work as WorkIcon,
-  AttachMoney as MoneyIcon,
+
   Event as EventIcon,
   Notifications as NotificationsIcon,
   AccountCircle as AccountCircleIcon,
@@ -441,7 +441,7 @@ const menuGroups: MenuGroup[] = [
     title: 'Finance & Payroll',
     items: [
       { text: 'Pay Slip Generator', icon: <ReceiptIcon />, path: '/payroll', roles: ['admin', 'hr', 'finance', 'employee'] },
-      { text: 'Enhanced Payroll', icon: <MoneyIcon />, path: '/enhanced-payroll', roles: ['admin', 'hr', 'finance'] },
+
       { text: 'Expense Management', icon: <ReceiptIcon />, path: '/expense-management', roles: ['admin', 'hr', 'finance', 'employee'] },
     ]
   },

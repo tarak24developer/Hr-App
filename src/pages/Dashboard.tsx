@@ -97,7 +97,7 @@ const Dashboard: React.FC = () => {
 
       // For now, we'll use mock data for other stats since collections don't exist yet
       const mockStats: DashboardStats = {
-        totalEmployees,
+          totalEmployees,
         activeAttendance: Math.floor(totalEmployees * 0.85), // 85% attendance rate
         pendingLeaves: Math.floor(totalEmployees * 0.1), // 10% pending leaves
         monthlyPayroll: totalEmployees * 50000, // Average salary ₹50,000
@@ -113,7 +113,7 @@ const Dashboard: React.FC = () => {
       const mockActivities: RecentActivity[] = [
         {
           id: '1',
-          type: 'leave_request',
+            type: 'leave_request',
           message: 'John Doe requested sick leave',
           timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
           status: 'pending',
@@ -121,10 +121,10 @@ const Dashboard: React.FC = () => {
         },
         {
           id: '2',
-          type: 'attendance',
+            type: 'attendance',
           message: 'Jane Smith clocked in',
           timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-          status: 'success',
+            status: 'success',
           userName: 'Jane Smith'
         },
         {
@@ -152,7 +152,7 @@ const Dashboard: React.FC = () => {
           id: '2',
           title: 'Training Session',
           date: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
-          type: 'training',
+            type: 'training',
           description: 'React.js advanced concepts'
         },
         {
@@ -317,39 +317,39 @@ const Dashboard: React.FC = () => {
       {/* Stats Grid */}
       <Grid container spacing={3} sx={{ mb: 3 }}>
         {stats && [
-          {
-            name: 'Total Employees',
+            {
+              name: 'Total Employees',
             value: stats.totalEmployees.toLocaleString(),
             change: stats.employeeChange,
             changeType: stats.employeeChange.startsWith('+') ? 'positive' : 'negative',
             icon: PeopleIcon,
             color: 'primary'
-          },
-          {
-            name: 'Active Attendance',
+            },
+            {
+              name: 'Active Attendance',
             value: stats.activeAttendance.toLocaleString(),
             change: stats.attendanceChange,
             changeType: stats.attendanceChange.startsWith('+') ? 'positive' : 'negative',
             icon: AccessTimeIcon,
             color: 'success'
-          },
-          {
-            name: 'Pending Leaves',
+            },
+            {
+              name: 'Pending Leaves',
             value: stats.pendingLeaves.toLocaleString(),
             change: stats.leaveChange,
             changeType: stats.leaveChange.startsWith('+') ? 'positive' : 'negative',
             icon: EventIcon,
             color: 'warning'
-          },
-          {
-            name: 'Monthly Payroll',
+            },
+            {
+              name: 'Monthly Payroll',
             value: formatIndianCurrency(stats.monthlyPayroll),
             change: stats.payrollChange,
             changeType: stats.payrollChange.startsWith('+') ? 'positive' : 'negative',
             icon: PaymentIcon,
             color: 'secondary'
-          }
-        ].map((stat) => (
+            }
+          ].map((stat) => (
           <Grid item xs={12} sm={6} md={3} key={stat.name}>
             <Card>
               <CardContent>
@@ -382,7 +382,7 @@ const Dashboard: React.FC = () => {
                     color={stat.changeType === 'positive' ? 'success.main' : 'error.main'}
                     sx={{ fontWeight: 'medium' }}
                   >
-                    {stat.change}
+                  {stat.change}
                   </Typography>
                   <Typography variant="caption" color="textSecondary" sx={{ ml: 1 }}>
                     from last month
@@ -435,12 +435,12 @@ const Dashboard: React.FC = () => {
                 </List>
               ) : (
                 <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-                  No recent activities
+                No recent activities
                 </Box>
-              )}
+            )}
               <Box sx={{ mt: 2 }}>
                 <Button size="small" color="primary">
-                  View all activities
+                View all activities
                 </Button>
               </Box>
             </Box>
@@ -480,12 +480,12 @@ const Dashboard: React.FC = () => {
                 </List>
               ) : (
                 <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-                  No upcoming events
+                No upcoming events
                 </Box>
-              )}
+            )}
               <Box sx={{ mt: 2 }}>
                 <Button size="small" color="primary">
-                  View calendar
+                View calendar
                 </Button>
               </Box>
             </Box>

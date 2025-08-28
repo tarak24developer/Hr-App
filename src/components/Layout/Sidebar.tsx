@@ -110,11 +110,7 @@ const Sidebar: React.FC = () => {
       href: '/payroll',
       icon: CreditCard
     },
-    {
-      name: 'Enhanced Payroll',
-      href: '/enhanced-payroll',
-      icon: CreditCard
-    },
+
     {
       name: 'Expense Management',
       href: '/expense-management',
