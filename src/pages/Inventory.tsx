@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -23,20 +23,13 @@ import {
   Paper,
   Card,
   CardContent,
-  Alert,
-  Snackbar,
-  Pagination,
-  Divider,
+  CircularProgress,
   Tooltip,
-  Avatar,
-  Badge,
-  InputAdornment,
+  Pagination,
   List,
   ListItem,
-  ListItemText,
   ListItemIcon,
-  ListItemAvatar,
-  LinearProgress
+  ListItemText
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -51,11 +44,21 @@ import {
   LocationOn as LocationIcon,
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
-  Error as ErrorIcon,
   Refresh as RefreshIcon,
   Download as DownloadIcon,
-  Archive as ArchiveIcon
+  Assignment as AssignmentIcon,
+  Build as BuildIcon,
+  Schedule as ScheduleIcon
 } from '@mui/icons-material';
+import firebaseService from '../services/firebaseService';
+import { showNotification } from '../utils/notification';
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  department: string;
+}
 
 interface InventoryItem {
   id: string;
@@ -69,435 +72,495 @@ interface InventoryItem {
   unit: string;
   unitPrice: number;
   totalValue: number;
-  assignedTo: string;
-  assignedToName: string;
-  assignedToEmail: string;
+  assignedTo?: string;
   location: string;
   status: 'active' | 'inactive' | 'discontinued' | 'out_of_stock';
   condition: 'new' | 'good' | 'fair' | 'poor';
-  dateAdded: Date;
-  lastUpdated: Date;
-  lastAudit: Date;
+  dateAdded: any; // Can be Date, Firebase Timestamp, or string
+  lastUpdated: any; // Can be Date, Firebase Timestamp, or string
+  lastAudit?: any; // Can be Date, Firebase Timestamp, or string
   supplier: string;
   supplierContact: string;
-  warrantyExpiry?: Date;
+  warrantyExpiry?: any | null; // Can be Date, Firebase Timestamp, string, or null
   tags: string[];
   notes: string;
 }
 
-interface InventoryFilters {
-  search: string;
-  category: string;
-  status: string;
-  condition: string;
-  assignedTo: string;
-  location: string;
-}
-
-const initialFilters: InventoryFilters = {
-  search: '',
-  category: '',
-  status: '',
-  condition: '',
-  assignedTo: '',
-  location: ''
-};
-
-const statusColors = {
-  active: '#4caf50',
-  inactive: '#9e9e9e',
-  discontinued: '#f44336',
-  out_of_stock: '#ff9800'
-};
-
-const conditionColors = {
-  new: '#4caf50',
-  good: '#2196f3',
-  fair: '#ff9800',
-  poor: '#f44336'
-};
-
 const Inventory: React.FC = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [filteredInventory, setFilteredInventory] = useState<InventoryItem[]>([]);
-  const [filters, setFilters] = useState<InventoryFilters>(initialFilters);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [openDialog, setOpenDialog] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isViewMode, setIsViewMode] = useState(false);
-  const [isCreateMode, setIsCreateMode] = useState(false);
+  const [dialogMode, setDialogMode] = useState<'add' | 'edit' | 'view'>('add');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'info' | 'warning';
-  }>({
-    open: false,
-    message: '',
-    severity: 'info'
+  const [rowsPerPage] = useState(10);
+  const [filters, setFilters] = useState({
+    search: '',
+    category: '',
+    status: '',
+    condition: '',
+    assignedTo: '',
+    location: ''
   });
 
-  // Mock data for development
-  const mockInventory: InventoryItem[] = [
-    {
-      id: '1',
-      name: 'Laptop Dell XPS 13',
-      category: 'Electronics',
-      sku: 'LAP-DELL-XPS13-001',
-      description: '13-inch premium laptop with Intel i7 processor',
-      quantity: 15,
-      minQuantity: 5,
-      maxQuantity: 50,
-      unit: 'pieces',
-      unitPrice: 1299.99,
-      totalValue: 19499.85,
-      assignedTo: 'IT Department',
-      assignedToName: 'John Smith',
-      assignedToEmail: 'john.smith@company.com',
-      location: 'Main Office - IT Storage',
-      status: 'active',
-      condition: 'new',
-      dateAdded: new Date('2024-01-01'),
-      lastUpdated: new Date('2024-01-15'),
-      lastAudit: new Date('2024-01-10'),
-      supplier: 'Dell Technologies',
-      supplierContact: 'sales@dell.com',
-      warrantyExpiry: new Date('2027-01-01'),
-      tags: ['laptop', 'premium', 'business'],
-      notes: 'High-performance laptops for senior staff'
-    },
-    {
-      id: '2',
-      name: 'Office Chair - Ergonomic',
-      category: 'Furniture',
-      sku: 'FUR-CHAIR-ERG-001',
-      description: 'Ergonomic office chair with lumbar support',
-      quantity: 8,
-      minQuantity: 3,
-      maxQuantity: 20,
-      unit: 'pieces',
-      unitPrice: 299.99,
-      totalValue: 2399.92,
-      assignedTo: 'HR Department',
-      assignedToName: 'Sarah Johnson',
-      assignedToEmail: 'sarah.johnson@company.com',
-      location: 'Main Office - HR Storage',
-      status: 'active',
-      condition: 'good',
-      dateAdded: new Date('2023-12-01'),
-      lastUpdated: new Date('2024-01-10'),
-      lastAudit: new Date('2024-01-05'),
-      supplier: 'OfficeMax',
-      supplierContact: 'orders@officemax.com',
-      tags: ['chair', 'ergonomic', 'office'],
-      notes: 'For new employee onboarding'
-    },
-    {
-      id: '3',
-      name: 'Network Switch 24-Port',
-      category: 'Networking',
-      sku: 'NET-SWITCH-24P-001',
-      description: '24-port Gigabit Ethernet switch',
-      quantity: 2,
-      minQuantity: 1,
-      maxQuantity: 10,
-      unit: 'pieces',
-      unitPrice: 199.99,
-      totalValue: 399.98,
-      assignedTo: 'IT Department',
-      assignedToName: 'Mike Wilson',
-      assignedToEmail: 'mike.wilson@company.com',
-      location: 'Server Room',
-      status: 'active',
-      condition: 'new',
-      dateAdded: new Date('2024-01-10'),
-      lastUpdated: new Date('2024-01-10'),
-      lastAudit: new Date('2024-01-10'),
-      supplier: 'Cisco Systems',
-      supplierContact: 'sales@cisco.com',
-      warrantyExpiry: new Date('2029-01-10'),
-      tags: ['switch', 'network', 'gigabit'],
-      notes: 'Backup switch for network redundancy'
-    },
-    {
-      id: '4',
-      name: 'Coffee Machine - Commercial',
-      category: 'Appliances',
-      sku: 'APP-COFFEE-COM-001',
-      description: 'Commercial coffee machine for office use',
-      quantity: 0,
-      minQuantity: 1,
-      maxQuantity: 3,
-      unit: 'pieces',
-      unitPrice: 899.99,
-      totalValue: 0,
-      assignedTo: 'Facilities',
-      assignedToName: 'Lisa Brown',
-      assignedToEmail: 'lisa.brown@company.com',
-      location: 'Break Room',
-      status: 'out_of_stock',
-      condition: 'good',
-      dateAdded: new Date('2023-06-01'),
-      lastUpdated: new Date('2024-01-12'),
-      lastAudit: new Date('2024-01-12'),
-      supplier: 'Coffee Solutions Inc',
-      supplierContact: 'orders@coffeesolutions.com',
-      tags: ['coffee', 'commercial', 'breakroom'],
-      notes: 'Needs maintenance - out of order'
+  const [inventoryForm, setInventoryForm] = useState({
+    name: '',
+    category: '',
+    sku: '',
+    description: '',
+    quantity: '',
+    minQuantity: '',
+    maxQuantity: '',
+    unit: 'pieces',
+    unitPrice: '',
+    assignedTo: '',
+    location: '',
+    status: 'active' as InventoryItem['status'],
+    condition: 'new' as InventoryItem['condition'],
+    supplier: '',
+    supplierContact: '',
+    warrantyExpiry: '',
+    tags: '',
+    notes: ''
+  });
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    open: boolean;
+    itemId?: string;
+    itemName?: string;
+  }>({
+    open: false
+  });
+
+  // Firebase integration functions
+  const fetchInventory = async () => {
+    try {
+      setInventoryLoading(true);
+      const result = await firebaseService.getCollection('inventory');
+      if (result.success) {
+        setInventory(result.data as InventoryItem[] || []);
+      } else {
+        showNotification('Failed to fetch inventory', 'error');
+        setInventory([]);
+      }
+    } catch (error) {
+      console.error('Error fetching inventory:', error);
+      showNotification('Error fetching inventory', 'error');
+      setInventory([]);
+    } finally {
+      setInventoryLoading(false);
     }
-  ];
+  };
+
+  const fetchUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const result = await firebaseService.getCollection('users');
+      if (result.success) {
+        setUsers(result.data as User[] || []);
+      } else {
+        showNotification('Failed to fetch users', 'error');
+        setUsers([]);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      showNotification('Error fetching users', 'error');
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Load mock data
-    setInventory(mockInventory);
+    // Load data from Firebase
+    fetchInventory();
+    fetchUsers();
   }, []);
 
-  useEffect(() => {
-    applyFilters();
-  }, [inventory, filters]);
-
-  const applyFilters = useCallback(() => {
-    let filtered = [...inventory];
-
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(item =>
-        item.name.toLowerCase().includes(searchLower) ||
-        item.sku.toLowerCase().includes(searchLower) ||
-        item.description.toLowerCase().includes(searchLower) ||
-        item.category.toLowerCase().includes(searchLower) ||
-        item.assignedToName.toLowerCase().includes(searchLower)
-      );
-    }
-
-    if (filters.category) {
-      filtered = filtered.filter(item => item.category === filters.category);
-    }
-
-    if (filters.status) {
-      filtered = filtered.filter(item => item.status === filters.status);
-    }
-
-    if (filters.condition) {
-      filtered = filtered.filter(item => item.condition === filters.condition);
-    }
-
-    if (filters.assignedTo) {
-      filtered = filtered.filter(item => item.assignedTo === filters.assignedTo);
-    }
-
-    if (filters.location) {
-      filtered = filtered.filter(item => item.location === filters.location);
-    }
-
-    setFilteredInventory(filtered);
+  const handleFilterChange = (field: string, value: string) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
     setCurrentPage(1);
-  }, [inventory, filters]);
-
-  const handleFilterChange = (field: keyof InventoryFilters, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
   };
 
-  const handleCreateItem = () => {
-    setSelectedItem(null);
-    setIsViewMode(false);
-    setIsCreateMode(true);
-    setIsDialogOpen(true);
-  };
-
-  const handleEditItem = (item: InventoryItem) => {
-    setSelectedItem(item);
-    setIsViewMode(false);
-    setIsCreateMode(false);
-    setIsDialogOpen(true);
-  };
-
-  const handleViewItem = (item: InventoryItem) => {
-    setSelectedItem(item);
-    setIsViewMode(true);
-    setIsCreateMode(false);
-    setIsDialogOpen(true);
-  };
-
-  const handleDeleteItem = (itemId: string) => {
-    setInventory(prev => prev.filter(item => item.id !== itemId));
-    setSnackbar({
-      open: true,
-      message: 'Inventory item deleted successfully',
-      severity: 'success'
-    });
-  };
-
-  const handleArchiveItem = (itemId: string) => {
-    setInventory(prev => prev.map(item =>
-      item.id === itemId
-        ? { ...item, status: 'inactive', lastUpdated: new Date() }
-        : item
-    ));
-    setSnackbar({
-      open: true,
-      message: 'Inventory item archived successfully',
-      severity: 'info'
-    });
-  };
-
-  const handleSaveItem = (itemData: Partial<InventoryItem>) => {
-    if (selectedItem && !isCreateMode) {
-      // Update existing item
-      setInventory(prev => prev.map(item =>
-        item.id === selectedItem.id
-          ? { ...item, ...itemData, lastUpdated: new Date() }
-          : item
-      ));
-      setSnackbar({
-        open: true,
-        message: 'Inventory item updated successfully',
-        severity: 'success'
-      });
-    } else {
-      // Create new item
-      const newItem: InventoryItem = {
-        id: Date.now().toString(),
-        name: itemData.name || '',
-        category: itemData.category || '',
-        sku: itemData.sku || '',
-        description: itemData.description || '',
-        quantity: itemData.quantity || 0,
-        minQuantity: itemData.minQuantity || 0,
-        maxQuantity: itemData.maxQuantity || 100,
-        unit: itemData.unit || 'pieces',
-        unitPrice: itemData.unitPrice || 0,
-        totalValue: (itemData.quantity || 0) * (itemData.unitPrice || 0),
-        assignedTo: itemData.assignedTo || '',
-        assignedToName: itemData.assignedToName || '',
-        assignedToEmail: itemData.assignedToEmail || '',
-        location: itemData.location || '',
-        status: 'active',
-        condition: 'new',
-        dateAdded: new Date(),
-        lastUpdated: new Date(),
-        lastAudit: new Date(),
-        supplier: itemData.supplier || '',
-        supplierContact: itemData.supplierContact || '',
-        tags: itemData.tags || [],
-        notes: itemData.notes || ''
-      };
-      setInventory(prev => [newItem, ...prev]);
-      setSnackbar({
-        open: true,
-        message: 'Inventory item created successfully',
-        severity: 'success'
-      });
-    }
-    setIsDialogOpen(false);
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <CheckCircleIcon color="success" />;
-      case 'inactive':
-        return <ArchiveIcon color="action" />;
-      case 'discontinued':
-        return <ErrorIcon color="error" />;
-      case 'out_of_stock':
-        return <WarningIcon color="warning" />;
-      default:
-        return <CheckCircleIcon />;
-    }
-  };
-
-  const getConditionIcon = (condition: string) => {
-    switch (condition) {
-      case 'new':
-        return <CheckCircleIcon color="success" />;
-      case 'good':
-        return <CheckCircleIcon color="primary" />;
-      case 'fair':
-        return <WarningIcon color="warning" />;
-      case 'poor':
-        return <ErrorIcon color="error" />;
-      default:
-        return <CheckCircleIcon />;
-    }
-  };
-
-  const getStockLevel = (item: InventoryItem) => {
-    if (item.quantity === 0) return 'out_of_stock';
-    if (item.quantity <= item.minQuantity) return 'low';
-    if (item.quantity >= item.maxQuantity) return 'high';
-    return 'normal';
-  };
-
-  const getStockLevelColor = (level: string) => {
-    switch (level) {
-      case 'out_of_stock':
-        return '#f44336';
-      case 'low':
-        return '#ff9800';
-      case 'high':
-        return '#4caf50';
-      default:
-        return '#2196f3';
-    }
-  };
-
-  const getUniqueCategories = () => {
-    return [...new Set(inventory.map(item => item.category))];
-  };
-
-  const getUniqueLocations = () => {
-    return [...new Set(inventory.map(item => item.location))];
-  };
-
-  const getUniqueAssignedTo = () => {
-    return [...new Set(inventory.map(item => item.assignedTo))];
-  };
+  const filteredInventory = inventory.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(filters.search.toLowerCase()) ||
+                         item.sku.toLowerCase().includes(filters.search.toLowerCase()) ||
+                         item.description.toLowerCase().includes(filters.search.toLowerCase()) ||
+                         item.category.toLowerCase().includes(filters.search.toLowerCase());
+    const matchesCategory = !filters.category || item.category === filters.category;
+    const matchesStatus = !filters.status || item.status === filters.status;
+    const matchesCondition = !filters.condition || item.condition === filters.condition;
+    const matchesAssignedTo = !filters.assignedTo || item.assignedTo === filters.assignedTo;
+    const matchesLocation = !filters.location || item.location === filters.location;
+    
+    return matchesSearch && matchesCategory && matchesStatus && matchesCondition && matchesAssignedTo && matchesLocation;
+  });
 
   const paginatedInventory = filteredInventory.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
   );
 
-  const totalPages = Math.ceil(filteredInventory.length / itemsPerPage);
+  const getTotalValue = () => {
+    return inventory.reduce((total, item) => total + item.totalValue, 0);
+  };
+
+  const getActiveItems = () => {
+    return inventory.filter(item => item.status === 'active');
+  };
+
+  const getLowStockItems = () => {
+    return inventory.filter(item => item.quantity <= item.minQuantity);
+  };
+
+  const getOutOfStockItems = () => {
+    return inventory.filter(item => item.status === 'out_of_stock');
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR'
+    }).format(amount);
+  };
+
+  const getStatusColor = (status: InventoryItem['status']) => {
+    switch (status) {
+      case 'active': return 'success';
+      case 'inactive': return 'default';
+      case 'discontinued': return 'error';
+      case 'out_of_stock': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  const getConditionColor = (condition: InventoryItem['condition']) => {
+    switch (condition) {
+      case 'new': return 'success';
+      case 'good': return 'primary';
+      case 'fair': return 'warning';
+      case 'poor': return 'error';
+      default: return 'default';
+    }
+  };
+
+  // Helper function to safely convert any date type to a display string
+  const convertToDisplayDate = (dateField: any): string => {
+    if (!dateField) return 'Not specified';
+    if (dateField instanceof Date) {
+      return dateField.toLocaleDateString();
+    }
+    if (typeof dateField === 'string') {
+      try {
+        return new Date(dateField).toLocaleDateString();
+      } catch {
+        return dateField;
+      }
+    }
+    // Handle Firebase Timestamp objects
+    if (dateField && typeof dateField.toDate === 'function') {
+      return dateField.toDate().toLocaleDateString();
+    }
+    return 'Invalid date';
+  };
+
+  // Helper function to safely convert Firebase date fields to ISO date strings
+  const convertToDateString = (dateField: any): string => {
+    if (!dateField) return '';
+    if (dateField instanceof Date) {
+      return dateField.toISOString().split('T')[0];
+    }
+    if (typeof dateField === 'string') {
+      try {
+        return new Date(dateField).toISOString().split('T')[0];
+      } catch {
+        return dateField;
+      }
+    }
+    // Handle Firebase Timestamp objects
+    if (dateField && typeof dateField.toDate === 'function') {
+      return dateField.toDate().toISOString().split('T')[0];
+    }
+    return '';
+  };
+
+  const handleOpenDialog = (mode: 'add' | 'edit' | 'view', item?: InventoryItem) => {
+    setDialogMode(mode);
+    if (item) {
+      setSelectedItem(item);
+      setInventoryForm({
+        name: item.name,
+        category: item.category,
+        sku: item.sku,
+        description: item.description,
+        quantity: item.quantity.toString(),
+        minQuantity: item.minQuantity.toString(),
+        maxQuantity: item.maxQuantity.toString(),
+        unit: item.unit,
+        unitPrice: item.unitPrice.toString(),
+        assignedTo: item.assignedTo || '',
+        location: item.location || '',
+        status: item.status,
+        condition: item.condition,
+        supplier: item.supplier || '',
+        supplierContact: item.supplierContact || '',
+        warrantyExpiry: convertToDateString(item.warrantyExpiry),
+        tags: item.tags.join(', '),
+        notes: item.notes || ''
+      });
+    } else {
+      setSelectedItem(null);
+      setInventoryForm({
+        name: '',
+        category: '',
+        sku: '',
+        description: '',
+        quantity: '',
+        minQuantity: '',
+        maxQuantity: '',
+        unit: 'pieces',
+        unitPrice: '',
+        assignedTo: '',
+        location: '',
+        status: 'active',
+        condition: 'new',
+        supplier: '',
+        supplierContact: '',
+        warrantyExpiry: '',
+        tags: '',
+        notes: ''
+      });
+    }
+    setOpenDialog(true);
+  };
+
+  const handleCloseDialog = () => {
+    setOpenDialog(false);
+    setSelectedItem(null);
+    setInventoryForm({
+      name: '',
+      category: '',
+      sku: '',
+      description: '',
+      quantity: '',
+      minQuantity: '',
+      maxQuantity: '',
+      unit: 'pieces',
+      unitPrice: '',
+      assignedTo: '',
+      location: '',
+      status: 'active',
+      condition: 'new',
+      supplier: '',
+      supplierContact: '',
+      warrantyExpiry: '',
+      tags: '',
+      notes: ''
+    });
+  };
+
+  const handleSaveItem = async () => {
+    if (!inventoryForm.name || !inventoryForm.sku || !inventoryForm.category || !inventoryForm.quantity || !inventoryForm.unitPrice) {
+      showNotification('Please fill in all required fields', 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const itemData = {
+        name: inventoryForm.name,
+        category: inventoryForm.category,
+        sku: inventoryForm.sku,
+        description: inventoryForm.description,
+        quantity: parseInt(inventoryForm.quantity),
+        minQuantity: parseInt(inventoryForm.minQuantity),
+        maxQuantity: parseInt(inventoryForm.maxQuantity),
+        unit: inventoryForm.unit,
+        unitPrice: parseFloat(inventoryForm.unitPrice),
+        totalValue: parseInt(inventoryForm.quantity) * parseFloat(inventoryForm.unitPrice),
+        assignedTo: inventoryForm.assignedTo || '',
+        location: inventoryForm.location,
+        status: inventoryForm.status,
+        condition: inventoryForm.condition,
+        supplier: inventoryForm.supplier || '',
+        supplierContact: inventoryForm.supplierContact || '',
+        tags: inventoryForm.tags ? inventoryForm.tags.split(',').map(tag => tag.trim()) : [],
+        notes: inventoryForm.notes || '',
+        warrantyExpiry: inventoryForm.warrantyExpiry ? new Date(inventoryForm.warrantyExpiry) : null,
+        dateAdded: new Date(),
+        lastUpdated: new Date(),
+        lastAudit: new Date()
+      };
+
+      if (dialogMode === 'add') {
+        const result = await firebaseService.addDocument('inventory', itemData);
+        if (result.success) {
+          showNotification('Inventory item added successfully!', 'success');
+          fetchInventory();
+        } else {
+          showNotification('Failed to add inventory item', 'error');
+        }
+      } else if (dialogMode === 'edit' && selectedItem) {
+        const result = await firebaseService.updateDocument('inventory', selectedItem.id, itemData);
+        if (result.success) {
+          showNotification('Inventory item updated successfully!', 'success');
+          fetchInventory();
+        } else {
+          showNotification('Failed to update inventory item', 'error');
+        }
+      }
+
+      handleCloseDialog();
+    } catch (error) {
+      console.error('Error saving inventory item:', error);
+      showNotification('Error saving inventory item', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      const result = await firebaseService.deleteDocument('inventory', itemId);
+      if (result.success) {
+        showNotification('Inventory item deleted successfully!', 'success');
+        fetchInventory();
+      } else {
+        showNotification('Failed to delete inventory item', 'error');
+      }
+    } catch (error) {
+      console.error('Error deleting inventory item:', error);
+      showNotification('Error deleting inventory item', 'error');
+    }
+  };
+
+  const handleStatusChange = async (itemId: string, newStatus: string) => {
+    try {
+      const updateData = {
+        status: newStatus,
+        lastUpdated: new Date()
+      };
+
+      const result = await firebaseService.updateDocument('inventory', itemId, updateData);
+      if (result.success) {
+        showNotification(`Inventory item status updated to ${newStatus}`, 'success');
+        fetchInventory();
+      } else {
+        showNotification('Failed to update inventory item status', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating inventory item status:', error);
+      showNotification('Error updating inventory item status', 'error');
+    }
+  };
+
+  // CSV Export functions
+  const generateCSV = () => {
+    const headers = [
+      'Name', 'SKU', 'Category', 'Description', 'Quantity', 'Unit', 'Unit Price', 
+      'Total Value', 'Status', 'Condition', 'Location', 'Assigned To', 
+      'Supplier', 'Supplier Contact', 'Warranty Expiry', 'Tags', 'Notes', 
+      'Date Added', 'Last Updated'
+    ];
+    
+    const csvRows = [headers.join(',')];
+    
+    inventory.forEach(item => {
+      const row = [
+        `"${item.name}"`,
+        `"${item.sku}"`,
+        `"${item.category}"`,
+        `"${item.description}"`,
+        item.quantity,
+        `"${item.unit}"`,
+        item.unitPrice,
+        item.totalValue,
+        `"${item.status}"`,
+        `"${item.condition}"`,
+        `"${item.location}"`,
+        `"${item.assignedTo ? users.find(u => u.id === item.assignedTo)?.name || 'Unknown' : 'Unassigned'}"`,
+        `"${item.supplier}"`,
+        `"${item.supplierContact}"`,
+        `"${item.warrantyExpiry ? convertToDisplayDate(item.warrantyExpiry) : 'Not specified'}"`,
+        `"${item.tags.join(', ')}"`,
+        `"${item.notes}"`,
+        `"${convertToDisplayDate(item.dateAdded)}"`,
+        `"${convertToDisplayDate(item.lastUpdated)}"`
+      ];
+      csvRows.push(row.join(','));
+    });
+    
+    return csvRows.join('\n');
+  };
+
+  const downloadCSV = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (inventoryLoading || usersLoading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
+        <Typography variant="h4" component="h1">
           Inventory Management
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog('add')}
+          >
+            Add Item
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={() => {
+              fetchInventory();
+              fetchUsers();
+            }}
+          >
+            Refresh
+          </Button>
           <Button
             variant="outlined"
             startIcon={<DownloadIcon />}
             onClick={() => {
-              // Export functionality
-              setSnackbar({
-                open: true,
-                message: 'Inventory exported successfully',
-                severity: 'success'
-              });
+              // Export inventory data to CSV
+              const csvContent = generateCSV();
+              downloadCSV(csvContent, 'inventory-export.csv');
             }}
           >
             Export
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreateItem}
-            sx={{ bgcolor: 'primary.main' }}
-          >
-            Add Item
           </Button>
         </Box>
       </Box>
 
       {/* Statistics Cards */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 3, mb: 3 }}>
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+        gap: 3, 
+        mb: 3 
+      }}>
         <Card>
           <CardContent>
             <Typography color="textSecondary" gutterBottom>
@@ -505,6 +568,9 @@ const Inventory: React.FC = () => {
             </Typography>
             <Typography variant="h4" component="div">
               {inventory.length}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              {formatCurrency(getTotalValue())} total value
             </Typography>
           </CardContent>
         </Card>
@@ -514,27 +580,36 @@ const Inventory: React.FC = () => {
               Active Items
             </Typography>
             <Typography variant="h4" component="div" color="success.main">
-              {inventory.filter(item => item.status === 'active').length}
+              {getActiveItems().length}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Currently available
             </Typography>
           </CardContent>
         </Card>
         <Card>
           <CardContent>
             <Typography color="textSecondary" gutterBottom>
-              Total Value
-            </Typography>
-            <Typography variant="h4" component="div" color="primary.main">
-              ${inventory.reduce((total, item) => total + item.totalValue, 0).toLocaleString()}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Low Stock Items
+              Low Stock
             </Typography>
             <Typography variant="h4" component="div" color="warning.main">
-              {inventory.filter(item => item.quantity <= item.minQuantity).length}
+              {getLowStockItems().length}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Below minimum quantity
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Out of Stock
+            </Typography>
+            <Typography variant="h4" component="div" color="error.main">
+              {getOutOfStockItems().length}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Need restocking
             </Typography>
           </CardContent>
         </Card>
@@ -546,35 +621,26 @@ const Inventory: React.FC = () => {
           <FilterIcon sx={{ mr: 1 }} />
           <Typography variant="h6">Filters</Typography>
         </Box>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+        <Box sx={{ 
+          display: 'grid', 
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)', lg: 'repeat(6, 1fr)' },
+          gap: 2 
+        }}>
           <TextField
             fullWidth
-            label="Search Inventory"
+            label="Search"
             value={filters.search}
             onChange={(e) => handleFilterChange('search', e.target.value)}
             InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              )
+              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
             }}
           />
-          <FormControl fullWidth>
-            <InputLabel>Category</InputLabel>
-            <Select
-              value={filters.category}
-              label="Category"
-              onChange={(e) => handleFilterChange('category', e.target.value)}
-            >
-              <MenuItem value="">All Categories</MenuItem>
-              {getUniqueCategories().map(category => (
-                <MenuItem key={category} value={category}>
-                  {category}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <TextField
+            fullWidth
+            label="Category"
+            value={filters.category}
+            onChange={(e) => handleFilterChange('category', e.target.value)}
+          />
           <FormControl fullWidth>
             <InputLabel>Status</InputLabel>
             <Select
@@ -589,6 +655,41 @@ const Inventory: React.FC = () => {
               <MenuItem value="out_of_stock">Out of Stock</MenuItem>
             </Select>
           </FormControl>
+          <FormControl fullWidth>
+            <InputLabel>Condition</InputLabel>
+            <Select
+              value={filters.condition}
+              label="Condition"
+              onChange={(e) => handleFilterChange('condition', e.target.value)}
+            >
+              <MenuItem value="">All Conditions</MenuItem>
+              <MenuItem value="new">New</MenuItem>
+              <MenuItem value="good">Good</MenuItem>
+              <MenuItem value="fair">Fair</MenuItem>
+              <MenuItem value="poor">Poor</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl fullWidth>
+            <InputLabel>Assigned To</InputLabel>
+            <Select
+              value={filters.assignedTo}
+              label="Assigned To"
+              onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
+            >
+              <MenuItem value="">All Assignments</MenuItem>
+              {users.map(user => (
+                <MenuItem key={user.id} value={user.id}>
+                  {user.name} - {user.department}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <TextField
+            fullWidth
+            label="Location"
+            value={filters.location}
+            onChange={(e) => handleFilterChange('location', e.target.value)}
+          />
         </Box>
       </Paper>
 
@@ -599,381 +700,639 @@ const Inventory: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell>Item</TableCell>
-                <TableCell>Category</TableCell>
+                <TableCell>SKU</TableCell>
                 <TableCell>Quantity</TableCell>
                 <TableCell>Value</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Condition</TableCell>
                 <TableCell>Assigned To</TableCell>
                 <TableCell>Location</TableCell>
-                <TableCell>Status</TableCell>
                 <TableCell>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedInventory.map((item) => (
-                <TableRow key={item.id} hover>
-                  <TableCell>
-                    <Box>
-                      <Typography variant="subtitle2" fontWeight="bold">
-                        {item.name}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary" display="block">
-                        SKU: {item.sku}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary" noWrap sx={{ maxWidth: 200 }}>
-                        {item.description}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={item.category}
-                      size="small"
-                      variant="outlined"
-                      icon={<CategoryIcon />}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Box>
-                      <Typography variant="body2" fontWeight="medium">
-                        {item.quantity} {item.unit}
-                      </Typography>
-                      <Box sx={{ width: '100%', maxWidth: 100, mt: 0.5 }}>
-                        <LinearProgress
-                          variant="determinate"
-                          value={(item.quantity / item.maxQuantity) * 100}
-                          sx={{
-                            height: 6,
-                            borderRadius: 1,
-                            bgcolor: 'grey.200',
-                            '& .MuiLinearProgress-bar': {
-                              bgcolor: getStockLevelColor(getStockLevel(item))
-                            }
-                          }}
-                        />
+              {paginatedInventory.map((item) => {
+                const assignedUser = users.find(u => u.id === item.assignedTo);
+                return (
+                  <TableRow key={item.id} hover>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <InventoryIcon color="primary" />
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight="bold">
+                            {item.name}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            {item.category}
+                          </Typography>
+                        </Box>
                       </Box>
-                      <Typography variant="caption" color="textSecondary">
-                        {getStockLevel(item).replace('_', ' ')}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontFamily="monospace">
+                        {item.sku}
                       </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="medium">
-                      ${item.totalValue.toLocaleString()}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      ${item.unitPrice} per {item.unit}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar sx={{ width: 32, height: 32 }}>
-                        <PersonIcon />
-                      </Avatar>
+                    </TableCell>
+                    <TableCell>
                       <Box>
-                        <Typography variant="body2" fontWeight="medium">
-                          {item.assignedToName}
+                        <Typography variant="subtitle2" fontWeight="bold">
+                          {item.quantity} {item.unit}
                         </Typography>
                         <Typography variant="caption" color="textSecondary">
-                          {item.assignedTo}
+                          Min: {item.minQuantity} | Max: {item.maxQuantity}
                         </Typography>
                       </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <LocationIcon fontSize="small" color="action" />
-                      <Typography variant="body2">
-                        {item.location}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="subtitle2" fontWeight="bold">
+                        {formatCurrency(item.totalValue)}
                       </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {getStatusIcon(item.status)}
+                      <Typography variant="caption" color="textSecondary">
+                        {formatCurrency(item.unitPrice)} per {item.unit}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
                       <Chip
                         label={item.status.replace('_', ' ')}
                         size="small"
-                        sx={{
-                          bgcolor: statusColors[item.status],
-                          color: 'white',
-                          fontWeight: 'bold',
-                          textTransform: 'capitalize'
-                        }}
+                        color={getStatusColor(item.status)}
                       />
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="View Details">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleViewItem(item)}
-                          color="primary"
-                        >
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit Item">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditItem(item)}
-                          color="primary"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      {item.status !== 'inactive' && (
-                        <Tooltip title="Archive Item">
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={item.condition}
+                        size="small"
+                        color={getConditionColor(item.condition)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      {assignedUser ? (
+                        <Box>
+                          <Typography variant="body2">
+                            {assignedUser.name}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary">
+                            {assignedUser.department}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        <Typography variant="body2" color="textSecondary">
+                          Unassigned
+                        </Typography>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {item.location}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Tooltip title="View Details">
                           <IconButton
                             size="small"
-                            onClick={() => handleArchiveItem(item.id)}
-                            color="default"
+                            onClick={() => handleOpenDialog('view', item)}
+                            color="info"
                           >
-                            <ArchiveIcon />
+                            <ViewIcon />
                           </IconButton>
                         </Tooltip>
-                      )}
-                      <Tooltip title="Delete Item">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteItem(item.id)}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
+                        <Tooltip title="Edit Item">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDialog('edit', item)}
+                            color="primary"
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        </Tooltip>
+                        <FormControl size="small" sx={{ minWidth: 120 }}>
+                          <Select
+                            value={item.status}
+                            onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                            size="small"
+                          >
+                            <MenuItem value="active">Active</MenuItem>
+                            <MenuItem value="inactive">Inactive</MenuItem>
+                            <MenuItem value="discontinued">Discontinued</MenuItem>
+                            <MenuItem value="out_of_stock">Out of Stock</MenuItem>
+                          </Select>
+                        </FormControl>
+                        <Tooltip title="Delete Item">
+                          <IconButton
+                            size="small"
+                            onClick={() => setDeleteConfirm({
+                              open: true,
+                              itemId: item.id,
+                              itemName: item.name
+                            })}
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
+        
+        {filteredInventory.length === 0 && (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography color="textSecondary">
+              No inventory items found matching your criteria
+            </Typography>
+          </Box>
+        )}
       </Paper>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+      {filteredInventory.length > rowsPerPage && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
           <Pagination
-            count={totalPages}
+            count={Math.ceil(filteredInventory.length / rowsPerPage)}
             page={currentPage}
             onChange={(_, page) => setCurrentPage(page)}
             color="primary"
-            showFirstButton
-            showLastButton
           />
         </Box>
       )}
 
-      {/* Item Details Dialog */}
-      <Dialog
-        open={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
+      {/* Add/Edit/View Dialog */}
+      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ pb: 1, borderBottom: (t) => `1px solid ${t.palette.divider}` }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <InventoryIcon />
-            <Typography variant="h6">
-              {isViewMode ? 'Item Details' : isCreateMode ? 'Add New Item' : 'Edit Item'}
+            {dialogMode === 'add' ? <AddIcon color="primary" /> : 
+             dialogMode === 'edit' ? <EditIcon color="primary" /> : <ViewIcon color="primary" />}
+            <Typography variant="h6" component="span">
+              {dialogMode === 'add' ? 'Add New Item' :
+               dialogMode === 'edit' ? 'Edit Item' : 'View Item Details'}
             </Typography>
           </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            {dialogMode === 'view'
+              ? 'Viewing item details'
+              : `Fill the details below to ${dialogMode === 'edit' ? 'update the' : 'create a new'} inventory item. Fields marked with * are required.`}
+          </Typography>
         </DialogTitle>
-        <DialogContent>
-          {selectedItem && (
+        <DialogContent dividers>
+          {dialogMode === 'view' && selectedItem ? (
+            // View Mode - Display item details in structured format
             <Box sx={{ mt: 2 }}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
+                gap: 3 
+              }}>
                 <Box>
                   <Typography variant="h6" gutterBottom>Item Information</Typography>
                   <List dense>
                     <ListItem>
+                      <ListItemIcon>
+                        <InventoryIcon />
+                      </ListItemIcon>
                       <ListItemText
-                        primary="Name"
+                        primary="Item Name"
                         secondary={selectedItem.name}
                       />
                     </ListItem>
                     <ListItem>
+                      <ListItemIcon>
+                        <AssignmentIcon />
+                      </ListItemIcon>
                       <ListItemText
                         primary="SKU"
                         secondary={selectedItem.sku}
                       />
                     </ListItem>
                     <ListItem>
+                      <ListItemIcon>
+                        <CategoryIcon />
+                      </ListItemIcon>
                       <ListItemText
                         primary="Category"
                         secondary={selectedItem.category}
                       />
                     </ListItem>
                     <ListItem>
+                      <ListItemIcon>
+                        <BuildIcon />
+                      </ListItemIcon>
                       <ListItemText
                         primary="Description"
                         secondary={selectedItem.description}
                       />
                     </ListItem>
                     <ListItem>
+                      <ListItemIcon>
+                        <ScheduleIcon />
+                      </ListItemIcon>
                       <ListItemText
-                        primary="Status"
-                        secondary={
-                          <Chip
-                            label={selectedItem.status.replace('_', ' ')}
-                            size="small"
-                            sx={{
-                              bgcolor: statusColors[selectedItem.status],
-                              color: 'white',
-                              textTransform: 'capitalize'
-                            }}
-                          />
-                        }
+                        primary="Date Added"
+                        secondary={convertToDisplayDate(selectedItem.dateAdded)}
                       />
                     </ListItem>
                   </List>
                 </Box>
                 <Box>
-                  <Typography variant="h6" gutterBottom>Stock Information</Typography>
+                  <Typography variant="h6" gutterBottom>Item Details</Typography>
                   <List dense>
                     <ListItem>
+                      <ListItemIcon>
+                        <CheckCircleIcon />
+                      </ListItemIcon>
                       <ListItemText
-                        primary="Current Quantity"
-                        secondary={`${selectedItem.quantity} ${selectedItem.unit}`}
+                        primary="Status"
+                        secondary={selectedItem.status.replace('_', ' ')}
+                      />
+                      <Chip
+                        label={selectedItem.status.replace('_', ' ')}
+                        size="small"
+                        color={getStatusColor(selectedItem.status)}
                       />
                     </ListItem>
                     <ListItem>
+                      <ListItemIcon>
+                        <WarningIcon />
+                      </ListItemIcon>
                       <ListItemText
-                        primary="Min Quantity"
-                        secondary={selectedItem.minQuantity}
+                        primary="Condition"
+                        secondary={selectedItem.condition}
+                      />
+                      <Chip
+                        label={selectedItem.condition}
+                        size="small"
+                        color={getConditionColor(selectedItem.condition)}
                       />
                     </ListItem>
                     <ListItem>
-                      <ListItemText
-                        primary="Max Quantity"
-                        secondary={selectedItem.maxQuantity}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Unit Price"
-                        secondary={`$${selectedItem.unitPrice}`}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Total Value"
-                        secondary={`$${selectedItem.totalValue.toLocaleString()}`}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-                <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
-                  <Typography variant="h6" gutterBottom>Assignment Details</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemText
-                        primary="Assigned To"
-                        secondary={selectedItem.assignedToName}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Department"
-                        secondary={selectedItem.assignedTo}
-                      />
-                    </ListItem>
-                    <ListItem>
+                      <ListItemIcon>
+                        <LocationIcon />
+                      </ListItemIcon>
                       <ListItemText
                         primary="Location"
                         secondary={selectedItem.location}
                       />
                     </ListItem>
                     <ListItem>
+                      <ListItemIcon>
+                        <PersonIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Assigned To"
+                        secondary={
+                          selectedItem.assignedTo ? 
+                          users.find(u => u.id === selectedItem.assignedTo)?.name || 'Unknown User' :
+                          'Unassigned'
+                        }
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <CheckCircleIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Quantity"
+                        secondary={`${selectedItem.quantity} ${selectedItem.unit}`}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemIcon>
+                        <CheckCircleIcon />
+                      </ListItemIcon>
+                      <ListItemText
+                        primary="Total Value"
+                        secondary={formatCurrency(selectedItem.totalValue)}
+                      />
+                    </ListItem>
+                  </List>
+                </Box>
+              </Box>
+              
+              {selectedItem.supplier && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="h6" gutterBottom>Supplier Information</Typography>
+                  <List dense>
+                    <ListItem>
+                      <ListItemIcon>
+                        <PersonIcon />
+                      </ListItemIcon>
                       <ListItemText
                         primary="Supplier"
                         secondary={selectedItem.supplier}
                       />
                     </ListItem>
+                    {selectedItem.supplierContact && (
+                      <ListItem>
+                        <ListItemIcon>
+                          <PersonIcon />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary="Contact"
+                          secondary={selectedItem.supplierContact}
+                        />
+                      </ListItem>
+                    )}
                   </List>
                 </Box>
-                <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
-                  <Typography variant="h6" gutterBottom>Additional Information</Typography>
+              )}
+              
+              {selectedItem.warrantyExpiry && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="h6" gutterBottom>Warranty Information</Typography>
                   <List dense>
                     <ListItem>
+                      <ListItemIcon>
+                        <ScheduleIcon />
+                      </ListItemIcon>
                       <ListItemText
-                        primary="Date Added"
-                        secondary={selectedItem.dateAdded.toLocaleDateString()}
+                        primary="Warranty Expiry"
+                        secondary={convertToDisplayDate(selectedItem.warrantyExpiry)}
                       />
                     </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Last Updated"
-                        secondary={selectedItem.lastUpdated.toLocaleDateString()}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Last Audit"
-                        secondary={selectedItem.lastAudit.toLocaleDateString()}
-                      />
-                    </ListItem>
-                    {selectedItem.warrantyExpiry && (
-                      <ListItem>
-                        <ListItemText
-                          primary="Warranty Expiry"
-                          secondary={selectedItem.warrantyExpiry.toLocaleDateString()}
-                        />
-                      </ListItem>
-                    )}
-                    {selectedItem.tags.length > 0 && (
-                      <ListItem>
-                        <ListItemText
-                          primary="Tags"
-                          secondary={
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                              {selectedItem.tags.map((tag, index) => (
-                                <Chip
-                                  key={index}
-                                  label={tag}
-                                  size="small"
-                                  variant="outlined"
-                                />
-                              ))}
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                    )}
-                    {selectedItem.notes && (
-                      <ListItem>
-                        <ListItemText
-                          primary="Notes"
-                          secondary={selectedItem.notes}
-                        />
-                      </ListItem>
-                    )}
                   </List>
                 </Box>
-              </Box>
+              )}
+              
+              {selectedItem.tags && selectedItem.tags.length > 0 && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="h6" gutterBottom>Tags</Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {selectedItem.tags.map((tag, index) => (
+                      <Chip key={index} label={tag} size="small" variant="outlined" />
+                    ))}
+                  </Box>
+                </Box>
+              )}
+              
+              {selectedItem.notes && (
+                <Box sx={{ mt: 3 }}>
+                  <Typography variant="h6" gutterBottom>Notes</Typography>
+                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                    <Typography variant="body2">
+                      {selectedItem.notes}
+                    </Typography>
+                  </Paper>
+                </Box>
+              )}
+            </Box>
+          ) : (
+            // Edit/Add Mode - Show form fields
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3, mt: 2 }}>
+              <TextField
+                fullWidth
+                label="Item Name"
+                value={inventoryForm.name}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, name: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+                InputProps={{
+                  startAdornment: <InventoryIcon sx={{ color: 'action.active', mr: 1 }} />
+                }}
+              />
+              <TextField
+                fullWidth
+                label="SKU"
+                value={inventoryForm.sku}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, sku: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+                InputProps={{
+                  startAdornment: <AssignmentIcon sx={{ color: 'action.active', mr: 1 }} />
+                }}
+              />
+              <TextField
+                fullWidth
+                label="Category"
+                value={inventoryForm.category}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, category: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+                InputProps={{
+                  startAdornment: <CategoryIcon sx={{ color: 'action.active', mr: 1 }} />
+                }}
+              />
+              <TextField
+                fullWidth
+                label="Description"
+                value={inventoryForm.description}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, description: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+                multiline
+                rows={2}
+              />
+              <TextField
+                fullWidth
+                label="Quantity"
+                type="number"
+                value={inventoryForm.quantity}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, quantity: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Unit"
+                value={inventoryForm.unit}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, unit: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Minimum Quantity"
+                type="number"
+                value={inventoryForm.minQuantity}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, minQuantity: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Maximum Quantity"
+                type="number"
+                value={inventoryForm.maxQuantity}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, maxQuantity: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Unit Price"
+                type="number"
+                value={inventoryForm.unitPrice}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, unitPrice: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+              />
+              <FormControl fullWidth>
+                <InputLabel>Status</InputLabel>
+                <Select
+                  value={inventoryForm.status}
+                  label="Status"
+                  onChange={(e) => setInventoryForm(prev => ({ ...prev, status: e.target.value as InventoryItem['status'] }))}
+                  disabled={dialogMode === 'view'}
+                  required
+                >
+                  <MenuItem value="active">Active</MenuItem>
+                  <MenuItem value="inactive">Inactive</MenuItem>
+                  <MenuItem value="discontinued">Discontinued</MenuItem>
+                  <MenuItem value="out_of_stock">Out of Stock</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel>Condition</InputLabel>
+                <Select
+                  value={inventoryForm.condition}
+                  label="Condition"
+                  onChange={(e) => setInventoryForm(prev => ({ ...prev, condition: e.target.value as InventoryItem['condition'] }))}
+                  disabled={dialogMode === 'view'}
+                  required
+                >
+                  <MenuItem value="new">New</MenuItem>
+                  <MenuItem value="good">Good</MenuItem>
+                  <MenuItem value="fair">Fair</MenuItem>
+                  <MenuItem value="poor">Poor</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl fullWidth>
+                <InputLabel>Assigned To</InputLabel>
+                <Select
+                  value={inventoryForm.assignedTo}
+                  label="Assigned To"
+                  onChange={(e) => setInventoryForm(prev => ({ ...prev, assignedTo: e.target.value }))}
+                  disabled={dialogMode === 'view'}
+                >
+                  <MenuItem value="">Unassigned</MenuItem>
+                  {users.map(user => (
+                    <MenuItem key={user.id} value={user.id}>
+                      {user.name} - {user.department}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                fullWidth
+                label="Location"
+                value={inventoryForm.location}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, location: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                required
+                InputProps={{
+                  startAdornment: <LocationIcon sx={{ color: 'action.active', mr: 1 }} />
+                }}
+              />
+              <TextField
+                fullWidth
+                label="Supplier"
+                value={inventoryForm.supplier}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, supplier: e.target.value }))}
+                disabled={dialogMode === 'view'}
+              />
+              <TextField
+                fullWidth
+                label="Supplier Contact"
+                value={inventoryForm.supplierContact}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, supplierContact: e.target.value }))}
+                disabled={dialogMode === 'view'}
+              />
+              <TextField
+                fullWidth
+                label="Warranty Expiry"
+                type="date"
+                value={inventoryForm.warrantyExpiry}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, warrantyExpiry: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                fullWidth
+                label="Tags (comma separated)"
+                value={inventoryForm.tags}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, tags: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                placeholder="laptop, premium, business"
+              />
+              <TextField
+                fullWidth
+                label="Notes"
+                value={inventoryForm.notes}
+                onChange={(e) => setInventoryForm(prev => ({ ...prev, notes: e.target.value }))}
+                disabled={dialogMode === 'view'}
+                multiline
+                rows={3}
+              />
             </Box>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button 
+            onClick={handleCloseDialog}
+            variant={dialogMode === 'view' ? 'contained' : 'outlined'}
+            startIcon={dialogMode === 'view' ? <CheckCircleIcon /> : undefined}
+          >
+            {dialogMode === 'view' ? 'Close' : 'Cancel'}
+          </Button>
+          {dialogMode !== 'view' && (
+            <Button
+              onClick={handleSaveItem}
+              variant="contained"
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={20} /> : <CheckCircleIcon />}
+            >
+              {loading ? 'Saving...' : 'Save'}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteConfirm.open}
+        onClose={() => setDeleteConfirm(prev => ({ ...prev, open: false }))}
+        maxWidth="sm"
+        fullWidth
       >
-        <Alert
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+        <DialogTitle sx={{ pb: 1, borderBottom: (t) => `1px solid ${t.palette.divider}` }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DeleteIcon color="error" />
+            <Typography variant="h6">Confirm Delete</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography variant="body1" sx={{ mb: 1 }}>
+            Are you sure you want to delete the inventory item <strong>"{deleteConfirm.itemName}"</strong>?
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            This action cannot be undone. All item data will be permanently removed.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, gap: 1 }}>
+          <Button 
+            onClick={() => setDeleteConfirm(prev => ({ ...prev, open: false }))}
+            variant="outlined"
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={() => {
+              if (deleteConfirm.itemId) {
+                handleDeleteItem(deleteConfirm.itemId);
+                setDeleteConfirm(prev => ({ ...prev, open: false }));
+              }
+            }}
+            variant="contained" 
+            color="error"
+            startIcon={<DeleteIcon />}
+          >
+            Delete Item
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
