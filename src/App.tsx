@@ -12,7 +12,7 @@ import { authService } from './services/authService';
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Employees = React.lazy(() => import('./pages/Employees'));
 const EmployeeDirectory = React.lazy(() => import('./pages/EmployeeDirectory'));
-const EmployeePage = React.lazy(() => import('./pages/EmployeePage'));
+const EmployeeProfile = React.lazy(() => import('./pages/EmployeeProfile'));
 const ExitProcess = React.lazy(() => import('./pages/ExitProcess'));
 const Attendance = React.lazy(() => import('./pages/Attendance'));
 const Leaves = React.lazy(() => import('./pages/Leaves'));
@@ -167,7 +167,7 @@ function App() {
                       {/* Employee Management Routes */}
                       <Route path="/employees" element={<Employees />} />
                       <Route path="/employee-directory" element={<EmployeeDirectory />} />
-                      <Route path="/employee-page" element={<EmployeePage />} />
+                      <Route path="/employee-profile" element={<EmployeeProfile />} />
                       <Route path="/exit-process" element={<ExitProcess />} />
                       
                       {/* HR Operations Routes */}
