@@ -26,11 +26,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ isOpen, onClose }) 
     { name: 'Feedback Surveys', href: '/feedback-surveys', icon: MessageSquare },
     { name: 'Request Portal', href: '/request-portal', icon: ClipboardList },
     { name: 'Payroll', href: '/payroll', icon: CreditCard },
-    { name: 'Enhanced Payroll', href: '/enhanced-payroll', icon: CreditCard },
     { name: 'Expense Management', href: '/expense-management', icon: CreditCard },
-    { name: 'Asset Management', href: '/asset-management', icon: Package },
-    { name: 'Inventory', href: '/inventory', icon: Database },
     { name: 'Assets', href: '/assets', icon: Package },
+    { name: 'Inventory', href: '/inventory', icon: Database },
     { name: 'Advanced Analytics', href: '/advanced-analytics', icon: TrendingUp },
     { name: 'Reports', href: '/reports', icon: BarChart3 },
     { name: 'User Tracking', href: '/user-tracking', icon: MapPin },
@@ -69,6 +67,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ isOpen, onClose }) 
             <button
               onClick={onClose}
               className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Close navigation menu"
             >
               <X className="w-5 h-5 text-gray-600" />
             </button>
