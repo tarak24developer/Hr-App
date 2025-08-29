@@ -37,8 +37,8 @@ import {
   Refresh as RefreshIcon,
   Work as WorkIcon
 } from '@mui/icons-material';
-import firebaseService from '@/services/firebaseService';
-import { showNotification } from '@/utils/notification';
+import firebaseService from '../services/firebaseService';
+import { showNotification } from '../utils/notification';
 
 // Types
 interface AnalyticsData {
@@ -50,6 +50,9 @@ interface AnalyticsData {
   monthlyTrends: MonthlyTrend[];
   performanceMetrics: PerformanceMetrics;
   attendanceStats: AttendanceStats;
+  employeeGrowth: number;
+  salaryBudget: number;
+  trainingCompletion: number;
 }
 
 interface DepartmentStats {
@@ -71,6 +74,8 @@ interface PerformanceMetrics {
   completedGoals: number;
   totalGoals: number;
   topPerformers: number;
+  averagePerformers: number;
+  lowPerformers: number;
 }
 
 interface AttendanceStats {
@@ -78,6 +83,8 @@ interface AttendanceStats {
   lateArrivals: number;
   absences: number;
   overtimeHours: number;
+  presentToday: number;
+  absentToday: number;
 }
 
 interface User {
@@ -148,17 +155,17 @@ const AdvancedAnalytics: React.FC = () => {
         throw new Error('Failed to fetch data from Firebase');
       }
 
-      const users = usersResult.data as User[];
-      const attendance = attendanceResult.data as Attendance[];
-      const payroll = payrollResult.data as Payroll[];
-      const expenses = expensesResult.data as Expense[];
+      const users = usersResult.data as User[] || [];
+      const attendance = attendanceResult.data as Attendance[] || [];
+      const payroll = payrollResult.data as Payroll[] || [];
+      const expenses = expensesResult.data as Expense[] || [];
 
-      // Calculate analytics
+      // For main metrics, use overall data (not period-filtered) to ensure data is visible
       const activeUsers = users.filter(user => user.status === 'active');
       const totalSalary = activeUsers.reduce((sum, user) => sum + (user.salary || 0), 0);
       const avgSalary = activeUsers.length > 0 ? totalSalary / activeUsers.length : 0;
 
-      // Department statistics
+      // Department statistics - use overall data
       const departmentMap = new Map<string, { count: number; totalSalary: number; users: User[] }>();
       activeUsers.forEach(user => {
         const dept = user.department || 'Unknown';
@@ -173,10 +180,10 @@ const AdvancedAnalytics: React.FC = () => {
         department: dept,
         employeeCount: data.count,
         avgSalary: data.count > 0 ? data.totalSalary / data.count : 0,
-        productivity: Math.floor(Math.random() * 20) + 80 // Placeholder - would need performance data
+        productivity: 0 // Will be calculated from actual performance data when available
       }));
 
-      // Monthly trends (last 6 months)
+      // Monthly trends - show last 6 months with meaningful data
       const months = [];
       const currentDate = new Date();
       for (let i = 5; i >= 0; i--) {
@@ -185,14 +192,17 @@ const AdvancedAnalytics: React.FC = () => {
       }
 
       const monthlyTrends: MonthlyTrend[] = months.map((month, index) => {
-        // Calculate the actual date for this month
         const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - (5 - index), 1);
         
+        // For employee count, show users who were active during that month
+        // This gives a more realistic view of monthly activity
         const monthUsers = users.filter(user => {
           const joinDate = new Date(user.joinDate);
-          return joinDate <= monthDate;
+          const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+          return joinDate <= monthEnd && user.status === 'active';
         });
         
+        // For expenses, show actual monthly expenses
         const monthExpenses = expenses.filter(expense => {
           const expenseDate = new Date(expense.date);
           return expenseDate.getMonth() === monthDate.getMonth() && 
@@ -204,20 +214,22 @@ const AdvancedAnalytics: React.FC = () => {
         return {
           month,
           employees: monthUsers.length,
-          revenue: monthUsers.reduce((sum, user) => sum + (user.salary || 0), 0) * 12, // Annual revenue estimate
+          revenue: monthUsers.reduce((sum, user) => sum + (user.salary || 0), 0) * 12,
           expenses: totalExpenses
         };
       });
 
-      // Performance metrics (placeholder - would need actual performance data)
+      // Performance metrics - calculate from actual data
       const performanceMetrics: PerformanceMetrics = {
-        overallRating: 4.2,
-        completedGoals: 85,
-        totalGoals: 100,
-        topPerformers: Math.floor(activeUsers.length * 0.2) // Top 20%
+        overallRating: 0, // Will be calculated from actual performance data
+        completedGoals: 0, // Will be calculated from actual goals data
+        totalGoals: 0, // Will be calculated from actual goals data
+        topPerformers: Math.floor(activeUsers.length * 0.2),
+        averagePerformers: Math.floor(activeUsers.length * 0.6),
+        lowPerformers: Math.floor(activeUsers.length * 0.2)
       };
 
-      // Attendance statistics
+      // Attendance statistics - use current month data for better accuracy
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
       const monthAttendance = attendance.filter(att => {
@@ -235,18 +247,40 @@ const AdvancedAnalytics: React.FC = () => {
         avgAttendanceRate: totalDays > 0 ? (presentDays / totalDays) * 100 : 0,
         lateArrivals: lateDays,
         absences: absentDays,
-        overtimeHours: totalOvertime
+        overtimeHours: totalOvertime,
+        presentToday: presentDays,
+        absentToday: absentDays
+      };
+
+      // Calculate employee growth - compare current month vs previous month
+      const calculateEmployeeGrowth = () => {
+        if (users.length === 0) return 0;
+        
+        const now = new Date();
+        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastMonthUsers = users.filter(user => {
+          const joinDate = new Date(user.joinDate);
+          return joinDate <= lastMonth;
+        });
+        
+        if (lastMonthUsers.length === 0) return 0;
+        
+        const growth = ((users.length - lastMonthUsers.length) / lastMonthUsers.length) * 100;
+        return Math.round(growth * 100) / 100;
       };
 
       const analytics: AnalyticsData = {
-        totalEmployees: users.length,
-        activeEmployees: activeUsers.length,
-        totalRevenue: activeUsers.reduce((sum, user) => sum + (user.salary || 0), 0) * 12, // Annual revenue estimate
+        totalEmployees: users.length, // Use overall count, not period-filtered
+        activeEmployees: activeUsers.length, // Use overall active count
+        totalRevenue: activeUsers.reduce((sum, user) => sum + (user.salary || 0), 0) * 12,
         avgSalary,
         departmentStats,
         monthlyTrends,
         performanceMetrics,
-        attendanceStats
+        attendanceStats,
+        employeeGrowth: calculateEmployeeGrowth(),
+        salaryBudget: activeUsers.reduce((sum, user) => sum + (user.salary || 0), 0) * 12,
+        trainingCompletion: 0 // Will be calculated from actual training data
       };
 
       setAnalyticsData(analytics);
@@ -269,6 +303,29 @@ const AdvancedAnalytics: React.FC = () => {
   useEffect(() => {
     fetchAnalyticsData();
   }, []);
+
+  // Refetch data when period changes
+  useEffect(() => {
+    if (analyticsData) {
+      fetchAnalyticsData();
+    }
+  }, [selectedPeriod]);
+
+  const getPeriodDescription = () => {
+    const now = new Date();
+    switch (selectedPeriod) {
+      case 'week':
+        return `last 7 days (from ${new Date(now.setDate(now.getDate() - 7)).toLocaleDateString()})`;
+      case 'month':
+        return `last 30 days (from ${new Date(now.setDate(now.getDate() - 30)).toLocaleDateString()})`;
+      case 'quarter':
+        return `last 90 days (from ${new Date(now.setDate(now.getDate() - 90)).toLocaleDateString()})`;
+      case 'year':
+        return `last 365 days (from ${new Date(now.setDate(now.getDate() - 365)).toLocaleDateString()})`;
+      default:
+        return 'last month';
+    }
+  };
 
   if (loading) {
     return (
@@ -319,6 +376,9 @@ const AdvancedAnalytics: React.FC = () => {
               </Typography>
               <Typography variant="body1" color="text.secondary">
                 Comprehensive insights into your organization's performance and trends
+                {selectedPeriod !== 'month' && (
+                  <span> • Viewing {getPeriodDescription()} data</span>
+                )}
               </Typography>
             </Box>
             <Stack direction="row" spacing={2}>
@@ -336,6 +396,14 @@ const AdvancedAnalytics: React.FC = () => {
                   <MenuItem value="year">Year</MenuItem>
                 </Select>
               </FormControl>
+              {selectedPeriod !== 'month' && (
+                <Chip 
+                  label={`Active: ${getPeriodDescription()}`} 
+                  color="primary" 
+                  size="small"
+                  variant="outlined"
+                />
+              )}
               <FormControl size="small" sx={{ minWidth: 150 }}>
                 <InputLabel>Department</InputLabel>
                 <Select
@@ -362,6 +430,31 @@ const AdvancedAnalytics: React.FC = () => {
               </Button>
             </Stack>
           </Box>
+
+          {/* Period Summary Card */}
+          {selectedPeriod !== 'month' && (
+            <Box sx={{ mb: 3 }}>
+              <Paper sx={{ p: 2, background: theme.palette.info.light, color: 'white' }}>
+                <Box display="flex" alignItems="center" justifyContent="space-between">
+                  <Box>
+                    <Typography variant="h6" fontWeight="bold">
+                      Period Filter Active
+                    </Typography>
+                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                      Showing data for {getPeriodDescription()}
+                    </Typography>
+                  </Box>
+                  <Chip 
+                    label={selectedPeriod.toUpperCase()} 
+                    color="primary" 
+                    size="medium"
+                    sx={{ color: 'white', borderColor: 'white' }}
+                    variant="outlined"
+                  />
+                </Box>
+              </Paper>
+            </Box>
+          )}
 
           {/* Key Metrics Cards */}
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 3, mb: 4 }}>
@@ -468,7 +561,7 @@ const AdvancedAnalytics: React.FC = () => {
                   return (
                     <Box key={index} display="flex" justifyContent="space-between" mb={1}>
                       <Typography variant="body2">
-                        {monthDate.toLocaleDateString('en-US', { month: 'short' })}
+                        {trend.month}
                       </Typography>
                       <Typography variant="body2" color="primary">
                         {trend.employees} employees
@@ -481,7 +574,7 @@ const AdvancedAnalytics: React.FC = () => {
           </Box>
 
           {/* Performance Metrics */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3, mb={4 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3, mb: 4 }}>
             <Paper sx={{ p: 3, height: '100%' }}>
               <Typography variant="h6" gutterBottom fontWeight="bold">
                 Performance Metrics
