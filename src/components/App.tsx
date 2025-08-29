@@ -15,12 +15,30 @@ import Header from './Layout/Header';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import Employees from '../pages/Employees';
+import EmployeeDirectory from '../pages/EmployeeDirectory';
+import EmployeePage from '../pages/EmployeePage';
+import ExitProcess from '../pages/ExitProcess';
 import Attendance from '../pages/Attendance';
 import Leaves from '../pages/Leaves';
+import Holidays from '../pages/Holidays';
 import Payroll from '../pages/Payroll';
-import Assets from '../pages/Assets';
+import ExpenseManagement from '../pages/ExpenseManagement';
+import AssetManagement from '../pages/AssetManagement';
+import Inventory from '../pages/Inventory';
 import Training from '../pages/Training';
+import FeedbackSurveys from '../pages/FeedbackSurveys';
+import RequestPortal from '../pages/RequestPortal';
+import AdvancedAnalytics from '../pages/AdvancedAnalytics';
 import Reports from '../pages/Reports';
+import UserTracking from '../pages/UserTracking';
+import Users from '../pages/Users';
+import DocumentManagement from '../pages/DocumentManagement';
+import Security from '../pages/Security';
+import EnhancedAccessControl from '../pages/EnhancedAccessControl';
+import IncidentManagement from '../pages/IncidentManagement';
+import Notifications from '../pages/Notifications';
+import Announcements from '../pages/Announcements';
+import LiveTrackingMap from '../pages/LiveTrackingMap';
 import Settings from '../pages/Settings';
 import Profile from '../pages/Profile';
 
@@ -97,15 +115,51 @@ const App: React.FC = () => {
                     <Routes>
                       <Route path="/" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/dashboard" element={<Dashboard />} />
+                      
+                      {/* Employee Management Routes */}
                       <Route path="/employees" element={<Employees />} />
+                      <Route path="/employee-directory" element={<EmployeeDirectory />} />
+                      <Route path="/employee-page" element={<EmployeePage />} />
+                      <Route path="/exit-process" element={<ExitProcess />} />
+                      
+                      {/* HR Operations Routes */}
                       <Route path="/attendance" element={<Attendance />} />
                       <Route path="/leaves" element={<Leaves />} />
-                      <Route path="/payroll" element={<Payroll />} />
-                      <Route path="/assets" element={<Assets />} />
+                      <Route path="/holidays" element={<Holidays />} />
                       <Route path="/training" element={<Training />} />
+                      <Route path="/feedback-surveys" element={<FeedbackSurveys />} />
+                      <Route path="/request-portal" element={<RequestPortal />} />
+                      
+                      {/* Financial Management Routes */}
+                      <Route path="/payroll" element={<Payroll />} />
+                      <Route path="/expense-management" element={<ExpenseManagement />} />
+                      
+                      {/* Asset & Inventory Routes */}
+                      <Route path="/assets" element={<AssetManagement />} />
+                      <Route path="/inventory" element={<Inventory />} />
+                      
+                      {/* Analytics & Reports Routes */}
+                      <Route path="/advanced-analytics" element={<AdvancedAnalytics />} />
                       <Route path="/reports" element={<Reports />} />
-                      <Route path="/settings" element={<Settings />} />
+                      <Route path="/user-tracking" element={<UserTracking />} />
+                      
+                      {/* System Management Routes */}
+                      <Route path="/users" element={<Users />} />
+                      <Route path="/document-management" element={<DocumentManagement />} />
+                      <Route path="/security" element={<Security />} />
+                      <Route path="/enhanced-access-control" element={<EnhancedAccessControl />} />
+                      <Route path="/incident-management" element={<IncidentManagement />} />
+                      <Route path="/notifications" element={<Notifications />} />
+                      <Route path="/announcements" element={<Announcements />} />
+                      <Route path="/live-tracking-map" element={<LiveTrackingMap />} />
+                      
+                      {/* Profile Route */}
                       <Route path="/profile" element={<Profile />} />
+                      
+                      {/* Settings Route */}
+                      <Route path="/settings" element={<Settings />} />
+                      
+                      {/* Fallback Route */}
                       <Route path="*" element={<Navigate to="/dashboard" replace />} />
                     </Routes>
                   </main>

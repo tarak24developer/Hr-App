@@ -154,11 +154,19 @@ const Reports: React.FC = () => {
           <p className="text-gray-600">Generate and manage comprehensive HR reports</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-          <button className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2">
+          <button 
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
+            title="Generate new report"
+            aria-label="Generate new report"
+          >
             <BarChart3 className="w-4 h-4" />
             <span>Generate Report</span>
           </button>
-          <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2">
+          <button 
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2"
+            title="Export all reports"
+            aria-label="Export all reports"
+          >
             <Download className="w-4 h-4" />
             <span>Export All</span>
           </button>
@@ -252,7 +260,11 @@ const Reports: React.FC = () => {
               ))}
             </select>
 
-            <button className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2">
+            <button 
+              className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
+              title="Show additional filter options"
+              aria-label="Show additional filter options"
+            >
               <Filter className="w-4 h-4" />
               <span>More Filters</span>
             </button>
@@ -268,6 +280,8 @@ const Reports: React.FC = () => {
                   ? 'bg-primary-600 text-white' 
                   : 'bg-white text-gray-600 hover:bg-gray-50'
               )}
+              title="Switch to grid view"
+              aria-label="Switch to grid view"
             >
               Grid
             </button>
@@ -279,6 +293,8 @@ const Reports: React.FC = () => {
                   ? 'bg-primary-600 text-white' 
                   : 'bg-white text-gray-600 hover:bg-gray-50'
               )}
+              title="Switch to list view"
+              aria-label="Switch to list view"
             >
               List
             </button>
@@ -296,7 +312,12 @@ const Reports: React.FC = () => {
                 <div className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-gray-900 truncate">{report.name}</h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center">
+                          <TypeIcon className="w-4 h-4 text-gray-600" />
+                        </div>
+                        <h3 className="text-sm font-medium text-gray-900 truncate">{report.name}</h3>
+                      </div>
                       <p className="text-xs text-gray-500 capitalize">{report.type}</p>
                     </div>
                     <span className={cn(
@@ -462,7 +483,11 @@ const Reports: React.FC = () => {
           <p className="text-gray-600 mb-6">
             Try adjusting your filters or generate a new report.
           </p>
-          <button className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+          <button 
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            title="Generate your first report"
+            aria-label="Generate your first report"
+          >
             Generate First Report
           </button>
         </div>

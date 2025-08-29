@@ -117,19 +117,14 @@ const Sidebar: React.FC = () => {
       icon: CreditCard
     },
     {
-      name: 'Asset Management',
-      href: '/asset-management',
+      name: 'Assets',
+      href: '/assets',
       icon: Package
     },
     {
       name: 'Inventory',
       href: '/inventory',
       icon: Database
-    },
-    {
-      name: 'Assets',
-      href: '/assets',
-      icon: Package
     },
     {
       name: 'Advanced Analytics',

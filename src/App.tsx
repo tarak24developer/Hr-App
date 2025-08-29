@@ -23,7 +23,6 @@ const RequestPortal = React.lazy(() => import('./pages/RequestPortal'));
 const Payroll = React.lazy(() => import('./pages/Payroll'));
 
 const ExpenseManagement = React.lazy(() => import('./pages/ExpenseManagement'));
-const Assets = React.lazy(() => import('./pages/Assets'));
 const AssetManagement = React.lazy(() => import('./pages/AssetManagement'));
 const Inventory = React.lazy(() => import('./pages/Inventory'));
 const AdvancedAnalytics = React.lazy(() => import('./pages/AdvancedAnalytics'));
@@ -183,8 +182,7 @@ function App() {
                       <Route path="/expense-management" element={<ExpenseManagement />} />
                       
                       {/* Asset & Inventory Routes */}
-                      <Route path="/assets" element={<Assets />} />
-                      <Route path="/asset-management" element={<AssetManagement />} />
+                      <Route path="/assets" element={<AssetManagement />} />
                       <Route path="/inventory" element={<Inventory />} />
                       
                       {/* Analytics & Reports Routes */}

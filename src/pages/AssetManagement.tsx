@@ -50,7 +50,12 @@ import {
   Build as BuildIcon,
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon
+  Schedule as ScheduleIcon,
+  Error as ErrorIcon,
+  Refresh as RefreshIcon,
+  Download as DownloadIcon,
+  Archive as ArchiveIcon,
+  Person as PersonIcon
 } from '@mui/icons-material';
 import firebaseService from '../services/firebaseService';
 import { showNotification } from '../utils/notification';
@@ -76,10 +81,27 @@ interface Asset {
   assignedTo?: string;
   location: string;
   condition: 'excellent' | 'good' | 'fair' | 'poor';
-  warrantyExpiry?: any; // Can be Date, Firebase Timestamp, or string
+  warrantyExpiry?: any | null; // Can be Date, Firebase Timestamp, string, or null
   description?: string;
+  supplier?: string;
+  supplierContact?: string;
+  tags?: string[];
+  notes?: string;
+  imageUrl?: string; // Asset image URL
+  maintenanceHistory?: MaintenanceRecord[];
+  depreciationRate?: number; // Annual depreciation percentage
   createdAt: any; // Can be Date, Firebase Timestamp, or string
   updatedAt: any; // Can be Date, Firebase Timestamp, or string
+}
+
+interface MaintenanceRecord {
+  id: string;
+  date: any;
+  type: 'preventive' | 'repair' | 'upgrade' | 'inspection';
+  description: string;
+  cost: number;
+  performedBy: string;
+  nextMaintenanceDate?: any;
 }
 
 const AssetManagement: React.FC = () => {
@@ -113,8 +135,26 @@ const AssetManagement: React.FC = () => {
     location: '',
     condition: 'excellent' as Asset['condition'],
     warrantyExpiry: '',
-    description: ''
+    description: '',
+    supplier: '',
+    supplierContact: '',
+    tags: '',
+    notes: '',
+    imageUrl: '',
+    depreciationRate: '10'
   });
+
+  const [maintenanceForm, setMaintenanceForm] = useState({
+    type: 'preventive' as MaintenanceRecord['type'],
+    description: '',
+    cost: '',
+    performedBy: '',
+    nextMaintenanceDate: ''
+  });
+
+  const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
+  const [selectedAssetForMaintenance, setSelectedAssetForMaintenance] = useState<Asset | null>(null);
+  const [bulkSelection, setBulkSelection] = useState<string[]>([]);
 
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean;
@@ -281,7 +321,13 @@ const AssetManagement: React.FC = () => {
         location: asset.location,
         condition: asset.condition,
         warrantyExpiry: convertToDateString(asset.warrantyExpiry),
-        description: asset.description || ''
+        description: asset.description || '',
+        supplier: asset.supplier || '',
+        supplierContact: asset.supplierContact || '',
+        tags: asset.tags ? asset.tags.join(', ') : '',
+        notes: asset.notes || '',
+        imageUrl: asset.imageUrl || '',
+        depreciationRate: asset.depreciationRate ? asset.depreciationRate.toString() : '10'
       });
     } else {
       setSelectedAsset(null);
@@ -298,7 +344,13 @@ const AssetManagement: React.FC = () => {
         location: '',
         condition: 'excellent',
         warrantyExpiry: '',
-        description: ''
+        description: '',
+        supplier: '',
+        supplierContact: '',
+        tags: '',
+        notes: '',
+        imageUrl: '',
+        depreciationRate: '10'
       });
     }
     setOpenDialog(true);
@@ -320,7 +372,13 @@ const AssetManagement: React.FC = () => {
       location: '',
       condition: 'excellent',
       warrantyExpiry: '',
-      description: ''
+      description: '',
+      supplier: '',
+      supplierContact: '',
+      tags: '',
+      notes: '',
+      imageUrl: '',
+      depreciationRate: '10'
     });
   };
 
@@ -332,15 +390,28 @@ const AssetManagement: React.FC = () => {
 
     try {
       setLoading(true);
-      const assetData = {
-        ...assetForm,
-        purchasePrice: parseFloat(assetForm.purchasePrice),
-        currentValue: parseFloat(assetForm.purchasePrice), // Initially same as purchase price
-        purchaseDate: new Date(assetForm.purchaseDate),
-        warrantyExpiry: assetForm.warrantyExpiry ? new Date(assetForm.warrantyExpiry) : undefined,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
+             const assetData = {
+         name: assetForm.name,
+         category: assetForm.category,
+         serialNumber: assetForm.serialNumber,
+         model: assetForm.model,
+         manufacturer: assetForm.manufacturer,
+         purchasePrice: parseFloat(assetForm.purchasePrice),
+         currentValue: parseFloat(assetForm.purchasePrice), // Initially same as purchase price
+         purchaseDate: new Date(assetForm.purchaseDate),
+         status: assetForm.status,
+         assignedTo: assetForm.assignedTo || '',
+         location: assetForm.location,
+         condition: assetForm.condition,
+         warrantyExpiry: assetForm.warrantyExpiry ? new Date(assetForm.warrantyExpiry) : null,
+         description: assetForm.description || '',
+         supplier: assetForm.supplier || '',
+         supplierContact: assetForm.supplierContact || '',
+         tags: assetForm.tags ? assetForm.tags.split(',').map(tag => tag.trim()) : [],
+         notes: assetForm.notes || '',
+         createdAt: new Date(),
+         updatedAt: new Date()
+       };
 
       if (dialogMode === 'add') {
         const result = await firebaseService.addDocument('assets', assetData);
@@ -404,6 +475,130 @@ const AssetManagement: React.FC = () => {
     }
   };
 
+  // CSV Export functions
+  const generateCSV = () => {
+    const headers = [
+      'Name', 'Category', 'Serial Number', 'Model', 'Manufacturer', 'Purchase Date', 
+      'Purchase Price', 'Current Value', 'Status', 'Condition', 'Location', 'Assigned To', 
+      'Warranty Expiry', 'Description', 'Supplier', 'Supplier Contact', 'Tags', 'Notes', 
+      'Created At', 'Updated At'
+    ];
+    
+    const csvRows = [headers.join(',')];
+    
+    assets.forEach(asset => {
+      const row = [
+        `"${asset.name}"`,
+        `"${asset.category}"`,
+        `"${asset.serialNumber}"`,
+        `"${asset.model}"`,
+        `"${asset.manufacturer}"`,
+        `"${convertToDisplayDate(asset.purchaseDate)}"`,
+        asset.purchasePrice,
+        asset.currentValue,
+        `"${asset.status}"`,
+        `"${asset.condition}"`,
+        `"${asset.location}"`,
+        `"${asset.assignedTo ? users.find(u => u.id === asset.assignedTo)?.name || 'Unknown' : 'Unassigned'}"`,
+        `"${asset.warrantyExpiry ? convertToDisplayDate(asset.warrantyExpiry) : 'Not specified'}"`,
+        `"${asset.description || ''}"`,
+        `"${asset.supplier || ''}"`,
+        `"${asset.supplierContact || ''}"`,
+        `"${asset.tags ? asset.tags.join(', ') : ''}"`,
+        `"${asset.notes || ''}"`,
+        `"${convertToDisplayDate(asset.createdAt)}"`,
+        `"${convertToDisplayDate(asset.updatedAt)}"`
+      ];
+      csvRows.push(row.join(','));
+    });
+    
+    return csvRows.join('\n');
+  };
+
+  const downloadCSV = (content: string, filename: string) => {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Bulk operations
+  const handleBulkAssign = () => {
+    // Implementation for bulk assignment
+    showNotification('Bulk assignment feature coming soon!', 'info');
+  };
+
+  const handleBulkSelection = (assetId: string) => {
+    setBulkSelection(prev => 
+      prev.includes(assetId) 
+        ? prev.filter(id => id !== assetId)
+        : [...prev, assetId]
+    );
+  };
+
+  // Maintenance functions
+  const handleAddMaintenance = async () => {
+    if (!selectedAssetForMaintenance || !maintenanceForm.description || !maintenanceForm.cost) {
+      showNotification('Please fill in all required maintenance fields', 'error');
+      return;
+    }
+
+    try {
+      const maintenanceRecord: MaintenanceRecord = {
+        id: Date.now().toString(),
+        date: new Date(),
+        type: maintenanceForm.type,
+        description: maintenanceForm.description,
+        cost: parseFloat(maintenanceForm.cost),
+        performedBy: maintenanceForm.performedBy,
+        nextMaintenanceDate: maintenanceForm.nextMaintenanceDate ? new Date(maintenanceForm.nextMaintenanceDate) : undefined
+      };
+
+      const updatedMaintenanceHistory = [
+        ...(selectedAssetForMaintenance.maintenanceHistory || []),
+        maintenanceRecord
+      ];
+
+      const result = await firebaseService.updateDocument('assets', selectedAssetForMaintenance.id, {
+        maintenanceHistory: updatedMaintenanceHistory,
+        updatedAt: new Date()
+      });
+
+      if (result.success) {
+        showNotification('Maintenance record added successfully!', 'success');
+        setShowMaintenanceDialog(false);
+        setMaintenanceForm({
+          type: 'preventive',
+          description: '',
+          cost: '',
+          performedBy: '',
+          nextMaintenanceDate: ''
+        });
+        fetchAssets();
+      } else {
+        showNotification('Failed to add maintenance record', 'error');
+      }
+    } catch (error) {
+      console.error('Error adding maintenance record:', error);
+      showNotification('Error adding maintenance record', 'error');
+    }
+  };
+
+  // Calculate depreciation
+  const calculateDepreciation = (asset: Asset) => {
+    if (!asset.depreciationRate || !asset.purchaseDate) return asset.currentValue;
+    
+    const purchaseDate = new Date(asset.purchaseDate);
+    const yearsSincePurchase = (new Date().getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
+    const depreciationAmount = asset.purchasePrice * (asset.depreciationRate / 100) * yearsSincePurchase;
+    return Math.max(asset.purchasePrice - depreciationAmount, 0);
+  };
+
   if (assetsLoading || usersLoading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
@@ -418,13 +613,46 @@ const AssetManagement: React.FC = () => {
         <Typography variant="h4" component="h1">
           Asset Management
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog('add')}
-        >
-          Add Asset
-        </Button>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog('add')}
+          >
+            Add Asset
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={() => {
+              fetchAssets();
+              fetchUsers();
+            }}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={() => {
+              // Export assets data to CSV
+              const csvContent = generateCSV();
+              downloadCSV(csvContent, 'assets-export.csv');
+            }}
+          >
+            Export
+          </Button>
+          {bulkSelection.length > 0 && (
+            <Button
+              variant="outlined"
+              color="secondary"
+              startIcon={<AssignmentIcon />}
+              onClick={() => handleBulkAssign()}
+            >
+              Bulk Assign ({bulkSelection.length})
+            </Button>
+          )}
+        </Box>
         
       </Box>
 
@@ -681,19 +909,31 @@ const AssetManagement: React.FC = () => {
                             <MenuItem value="lost">Lost</MenuItem>
                           </Select>
                         </FormControl>
-                        <Tooltip title="Delete Asset">
-                          <IconButton
-                            size="small"
-                            onClick={() => setDeleteConfirm({
-                              open: true,
-                              assetId: asset.id,
-                              assetName: asset.name
-                            })}
-                            color="error"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
+                                                 <Tooltip title="Add Maintenance">
+                           <IconButton
+                             size="small"
+                             onClick={() => {
+                               setSelectedAssetForMaintenance(asset);
+                               setShowMaintenanceDialog(true);
+                             }}
+                             color="secondary"
+                           >
+                             <BuildIcon />
+                           </IconButton>
+                         </Tooltip>
+                         <Tooltip title="Delete Asset">
+                           <IconButton
+                             size="small"
+                             onClick={() => setDeleteConfirm({
+                               open: true,
+                               assetId: asset.id,
+                               assetName: asset.name
+                             })}
+                             color="error"
+                           >
+                             <DeleteIcon />
+                           </IconButton>
+                         </Tooltip>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -909,16 +1149,66 @@ const AssetManagement: React.FC = () => {
                 </Box>
               )}
               
-              {selectedAsset.description && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="h6" gutterBottom>Description</Typography>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="body2">
-                      {selectedAsset.description}
-                    </Typography>
-                  </Paper>
-                </Box>
-              )}
+                             {selectedAsset.supplier && (
+                 <Box sx={{ mt: 3 }}>
+                   <Typography variant="h6" gutterBottom>Supplier Information</Typography>
+                   <List dense>
+                     <ListItem>
+                       <ListItemIcon>
+                         <PersonIcon />
+                       </ListItemIcon>
+                       <ListItemText
+                         primary="Supplier"
+                         secondary={selectedAsset.supplier}
+                       />
+                     </ListItem>
+                     {selectedAsset.supplierContact && (
+                       <ListItem>
+                         <ListItemIcon>
+                           <PersonIcon />
+                         </ListItemIcon>
+                         <ListItemText
+                           primary="Contact"
+                           secondary={selectedAsset.supplierContact}
+                         />
+                       </ListItem>
+                     )}
+                   </List>
+                 </Box>
+               )}
+               
+               {selectedAsset.tags && selectedAsset.tags.length > 0 && (
+                 <Box sx={{ mt: 3 }}>
+                   <Typography variant="h6" gutterBottom>Tags</Typography>
+                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                     {selectedAsset.tags.map((tag, index) => (
+                       <Chip key={index} label={tag} size="small" variant="outlined" />
+                     ))}
+                   </Box>
+                 </Box>
+               )}
+               
+               {selectedAsset.description && (
+                 <Box sx={{ mt: 3 }}>
+                   <Typography variant="h6" gutterBottom>Description</Typography>
+                   <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                     <Typography variant="body2">
+                       {selectedAsset.description}
+                     </Typography>
+                   </Paper>
+                 </Box>
+               )}
+               
+               {selectedAsset.notes && (
+                 <Box sx={{ mt: 3 }}>
+                   <Typography variant="h6" gutterBottom>Notes</Typography>
+                   <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                     <Typography variant="body2">
+                       {selectedAsset.notes}
+                     </Typography>
+                   </Paper>
+                 </Box>
+               )}
             </Box>
           ) : (
             // Edit/Add Mode - Show form fields
@@ -1064,15 +1354,46 @@ const AssetManagement: React.FC = () => {
                 disabled={dialogMode === 'view'}
                 InputLabelProps={{ shrink: true }}
               />
-              <TextField
-                fullWidth
-                label="Description"
-                multiline
-                rows={3}
-                value={assetForm.description}
-                onChange={(e) => setAssetForm(prev => ({ ...prev, description: e.target.value }))}
-                disabled={dialogMode === 'view'}
-              />
+                             <TextField
+                 fullWidth
+                 label="Description"
+                 multiline
+                 rows={3}
+                 value={assetForm.description}
+                 onChange={(e) => setAssetForm(prev => ({ ...prev, description: e.target.value }))}
+                 disabled={dialogMode === 'view'}
+               />
+               <TextField
+                 fullWidth
+                 label="Supplier"
+                 value={assetForm.supplier}
+                 onChange={(e) => setAssetForm(prev => ({ ...prev, supplier: e.target.value }))}
+                 disabled={dialogMode === 'view'}
+               />
+               <TextField
+                 fullWidth
+                 label="Supplier Contact"
+                 value={assetForm.supplierContact}
+                 onChange={(e) => setAssetForm(prev => ({ ...prev, supplierContact: e.target.value }))}
+                 disabled={dialogMode === 'view'}
+               />
+               <TextField
+                 fullWidth
+                 label="Tags (comma separated)"
+                 value={assetForm.tags}
+                 onChange={(e) => setAssetForm(prev => ({ ...prev, tags: e.target.value }))}
+                 disabled={dialogMode === 'view'}
+                 placeholder="computer, office, business"
+               />
+               <TextField
+                 fullWidth
+                 label="Notes"
+                 value={assetForm.notes}
+                 onChange={(e) => setAssetForm(prev => ({ ...prev, notes: e.target.value }))}
+                 disabled={dialogMode === 'view'}
+                 multiline
+                 rows={3}
+               />
             </Box>
           )}
         </DialogContent>
@@ -1138,10 +1459,80 @@ const AssetManagement: React.FC = () => {
           >
             Delete Asset
           </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
-  );
-};
+                 </DialogActions>
+       </Dialog>
+
+       {/* Maintenance Dialog */}
+       <Dialog open={showMaintenanceDialog} onClose={() => setShowMaintenanceDialog(false)} maxWidth="md" fullWidth>
+         <DialogTitle>
+           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+             <BuildIcon />
+             <Typography variant="h6">Add Maintenance Record</Typography>
+           </Box>
+         </DialogTitle>
+         <DialogContent dividers>
+           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3, mt: 2 }}>
+             <FormControl fullWidth>
+               <InputLabel>Maintenance Type</InputLabel>
+               <Select
+                 value={maintenanceForm.type}
+                 label="Maintenance Type"
+                 onChange={(e) => setMaintenanceForm(prev => ({ ...prev, type: e.target.value as MaintenanceRecord['type'] }))}
+               >
+                 <MenuItem value="preventive">Preventive</MenuItem>
+                 <MenuItem value="repair">Repair</MenuItem>
+                 <MenuItem value="upgrade">Upgrade</MenuItem>
+                 <MenuItem value="inspection">Inspection</MenuItem>
+               </Select>
+             </FormControl>
+             <TextField
+               fullWidth
+               label="Cost"
+               type="number"
+               value={maintenanceForm.cost}
+               onChange={(e) => setMaintenanceForm(prev => ({ ...prev, cost: e.target.value }))}
+               InputProps={{
+                 startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
+               }}
+             />
+             <TextField
+               fullWidth
+               label="Performed By"
+               value={maintenanceForm.performedBy}
+               onChange={(e) => setMaintenanceForm(prev => ({ ...prev, performedBy: e.target.value }))}
+               placeholder="Technician name or company"
+             />
+             <TextField
+               fullWidth
+               label="Next Maintenance Date"
+               type="date"
+               value={maintenanceForm.nextMaintenanceDate}
+               onChange={(e) => setMaintenanceForm(prev => ({ ...prev, nextMaintenanceDate: e.target.value }))}
+               InputLabelProps={{ shrink: true }}
+             />
+             <TextField
+               fullWidth
+               label="Description"
+               multiline
+               rows={3}
+               value={maintenanceForm.description}
+               onChange={(e) => setMaintenanceForm(prev => ({ ...prev, description: e.target.value }))}
+               placeholder="Describe the maintenance work performed"
+               sx={{ gridColumn: 'span 2' }}
+             />
+           </Box>
+         </DialogContent>
+         <DialogActions sx={{ p: 2, gap: 1 }}>
+           <Button onClick={() => setShowMaintenanceDialog(false)} variant="outlined">
+             Cancel
+           </Button>
+           <Button onClick={handleAddMaintenance} variant="contained" startIcon={<BuildIcon />}>
+             Add Maintenance
+           </Button>
+         </DialogActions>
+       </Dialog>
+     </Box>
+   );
+ };
 
 export default AssetManagement;
