@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
 import { cn } from '@/utils/cn';
-import { useUser } from '@/stores/authStore';
-import { useThemeActions } from '@/stores/themeStore';
+import { useUser, useAuthActions } from '@/stores/authStore';
+import { useThemeActions, useThemeStore } from '@/stores/themeStore';
 import {
   Home,
   Users,
@@ -43,6 +43,17 @@ const Sidebar: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const user = useUser();
   const { setTheme } = useThemeActions();
+  const { logout } = useAuthActions();
+  const currentTheme = useThemeStore((state) => state.theme);
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   // Update body class when sidebar state changes
   React.useEffect(() => {
@@ -541,47 +552,63 @@ const Sidebar: React.FC = () => {
           <div className="mb-4">
             <p className="text-xs font-medium text-gray-500 mb-2">Theme</p>
             <div className="flex space-x-1">
+              {/* Light/Dark Toggle Switch */}
               <button
-                onClick={() => setTheme('light')}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                title="Light theme"
+                onClick={() => setTheme(currentTheme === 'light' ? 'dark' : 'light')}
+                className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                title="Toggle between Light and Dark themes"
               >
-                <Sun className="w-4 h-4 text-gray-600" />
+                {currentTheme === 'light' ? (
+                  <Sun className="w-3.5 h-3.5 text-gray-600" />
+                ) : (
+                  <Moon className="w-3.5 h-3.5 text-gray-600" />
+                )}
               </button>
-              <button
-                onClick={() => setTheme('dark')}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                title="Dark theme"
-              >
-                <Moon className="w-4 h-4 text-gray-600" />
-              </button>
+              {/* System Theme Button */}
               <button
                 onClick={() => setTheme('auto')}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                 title="System theme"
               >
-                <Monitor className="w-4 h-4 text-gray-600" />
+                <Monitor className="w-3.5 h-3.5 text-gray-600" />
               </button>
             </div>
           </div>
         )}
 
-        {/* Profile Link */}
-        <NavLink
-          to="/profile"
-          className={({ isActive }) =>
-            cn(
+        {/* Profile and Logout Buttons */}
+        <div className="flex space-x-2">
+          {/* Profile Link */}
+          <NavLink
+            to="/profile"
+            className={({ isActive }) =>
+              cn(
+                'flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors flex-1',
+                'hover:bg-gray-100 hover:text-gray-900',
+                isActive
+                  ? 'bg-primary-50 text-primary-700'
+                  : 'text-gray-600'
+              )
+            }
+          >
+            <UserCircle className="w-5 h-5 mr-3 flex-shrink-0" />
+            {!isCollapsed && <span>Profile</span>}
+          </NavLink>
+
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className={cn(
               'flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors',
-              'hover:bg-gray-100 hover:text-gray-900',
-              isActive
-                ? 'bg-primary-50 text-primary-700'
-                : 'text-gray-600'
-            )
-          }
-        >
-                          <UserCircle className="w-5 h-5 mr-3 flex-shrink-0" />
-          {!isCollapsed && <span>Profile</span>}
-        </NavLink>
+              'hover:bg-red-50 hover:text-red-700 text-gray-600',
+              'border border-transparent hover:border-red-200'
+            )}
+            title="Logout"
+          >
+            <LogOut className="w-5 h-5 mr-3 flex-shrink-0" />
+            {!isCollapsed && <span>Logout</span>}
+          </button>
+        </div>
       </div>
     </div>
   );

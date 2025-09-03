@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { X, Menu, Home, Users, Clock, Calendar, CreditCard, Package, GraduationCap, BarChart3, Settings, UserCircle, FileText, Shield, MapPin, Bell, MessageSquare, ClipboardList, AlertTriangle, Database, TrendingUp } from 'lucide-react';
+import { X, Home, Users, Clock, Calendar, CreditCard, Package, GraduationCap, BarChart3, Settings, UserCircle, FileText, Shield, MapPin, Bell, MessageSquare, ClipboardList, AlertTriangle, Database, TrendingUp, LogOut } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { useUser } from '@/stores/authStore';
+import { useUser, useAuthActions } from '@/stores/authStore';
 import { useThemeActions } from '@/stores/themeStore';
 
 interface MobileNavigationProps {
@@ -13,6 +13,17 @@ interface MobileNavigationProps {
 const MobileNavigation: React.FC<MobileNavigationProps> = ({ isOpen, onClose }) => {
   const user = useUser();
   const { setTheme } = useThemeActions();
+  const { logout } = useAuthActions();
+
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      await logout();
+      onClose(); // Close mobile navigation after logout
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -123,32 +134,65 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ isOpen, onClose }) 
             {/* Theme Toggle */}
             <div className="mb-4">
               <p className="text-xs font-medium text-gray-500 mb-2">Theme</p>
-                             <div className="flex space-x-1">
-                 <button
-                   onClick={() => setTheme('light')}
-                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                   title="Light theme"
-                   aria-label="Light theme"
-                 >
-                   <Home className="w-4 h-4 text-gray-600" />
-                 </button>
-                 <button
-                   onClick={() => setTheme('dark')}
-                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                   title="Dark theme"
-                   aria-label="Dark theme"
-                 >
-                   <Settings className="w-4 h-4 text-gray-600" />
-                 </button>
-                 <button
-                   onClick={() => setTheme('auto')}
-                   className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                   title="System theme"
-                   aria-label="System theme"
-                 >
-                   <UserCircle className="w-4 h-4 text-gray-600" />
-                 </button>
-               </div>
+              <div className="flex space-x-1">
+                <button
+                  onClick={() => setTheme('light')}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Light theme"
+                  aria-label="Light theme"
+                >
+                  <Home className="w-4 h-4 text-gray-600" />
+                </button>
+                <button
+                  onClick={() => setTheme('dark')}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Dark theme"
+                  aria-label="Dark theme"
+                >
+                  <Settings className="w-4 h-4 text-gray-600" />
+                </button>
+                <button
+                  onClick={() => setTheme('auto')}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="System theme"
+                  aria-label="System theme"
+                >
+                  <UserCircle className="w-4 h-4 text-gray-600" />
+                </button>
+              </div>
+            </div>
+
+            {/* Profile and Logout Buttons */}
+            <div className="flex space-x-2">
+              <NavLink
+                to="/profile"
+                onClick={onClose}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors flex-1',
+                    'hover:bg-gray-100 hover:text-gray-900',
+                    isActive
+                      ? 'bg-primary-50 text-primary-700'
+                      : 'text-gray-600'
+                  )
+                }
+              >
+                <UserCircle className="w-5 h-5 mr-3 flex-shrink-0" />
+                <span>Profile</span>
+              </NavLink>
+
+              <button
+                onClick={handleLogout}
+                className={cn(
+                  'flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors',
+                  'hover:bg-red-50 hover:text-red-700 text-gray-600',
+                  'border border-transparent hover:border-red-200'
+                )}
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5 mr-3 flex-shrink-0" />
+                <span>Logout</span>
+              </button>
             </div>
           </div>
         </div>

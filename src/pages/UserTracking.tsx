@@ -21,7 +21,6 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Grid,
   Card,
   CardContent,
   Alert,
@@ -29,23 +28,14 @@ import {
   Pagination,
   FormControlLabel,
   Switch,
-  Divider,
   Tooltip,
   Avatar,
-  Badge,
   List,
   ListItem,
   ListItemText,
-  ListItemAvatar,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  LinearProgress
+  ListItemAvatar
 } from '@mui/material';
 import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
   Visibility as ViewIcon,
   Search as SearchIcon,
   FilterList as FilterIcon,
@@ -55,19 +45,19 @@ import {
   Computer as ComputerIcon,
   Smartphone as MobileIcon,
   Tablet as TabletIcon,
-  ExpandMore as ExpandMoreIcon,
   Map as MapIcon,
-  Timeline as TimelineIcon,
   Settings as SettingsIcon,
-  PlayArrow as PlayIcon,
-  Stop as StopIcon,
   Refresh as RefreshIcon,
   Wifi as WifiIcon,
   WifiOff as WifiOffIcon
 } from '@mui/icons-material';
+import realtimeTrackingService from '../services/realtimeTracking';
+import locationTrackingService from '../services/locationTracking';
+import trackingDataService from '../services/trackingDataService';
+import authService from '../services/authService';
 
 interface UserTrackingData {
-  id: string;
+  id?: string;
   userId: string;
   userName: string;
   userEmail: string;
@@ -77,39 +67,41 @@ interface UserTrackingData {
   lastSeen: Date;
   currentLocation: Location;
   deviceInfo: DeviceInfo;
-  activity: Activity[];
-  trackingEnabled: boolean;
-  consentGiven: boolean;
-  lastUpdated: Date;
+  status: 'online' | 'offline' | 'idle' | 'away';
+  totalDistance?: number;
+  lastActivity?: Date;
+  loginTime?: Date;
+  sessionId: string;
+  trackingEnabled?: boolean;
+  consentGiven?: boolean;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 interface Location {
   latitude: number;
   longitude: number;
   accuracy: number;
-  timestamp: Date;
+  timestamp: number;
   address?: string;
   city?: string;
+  state?: string;
   country?: string;
+  postalCode?: string;
 }
 
 interface DeviceInfo {
-  deviceId: string;
-  deviceType: 'desktop' | 'mobile' | 'tablet' | 'unknown';
+  userAgent: string;
+  platform: string;
+  language: string;
+  timezone: string;
   browser: string;
   browserVersion: string;
-  operatingSystem: string;
+  os: string;
   osVersion: string;
+  deviceType: string;
   screenResolution: string;
-  timezone: string;
-}
-
-interface Activity {
-  id: string;
-  type: 'login' | 'logout' | 'page_view' | 'action' | 'idle';
-  description: string;
-  timestamp: Date;
-  metadata?: Record<string, any>;
+  deviceId: string;
 }
 
 interface UserTrackingFilters {
@@ -147,7 +139,7 @@ const UserTracking: React.FC = () => {
   const [filters, setFilters] = useState<UserTrackingFilters>(initialFilters);
   const [selectedUser, setSelectedUser] = useState<UserTrackingData | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isViewMode, setIsViewMode] = useState(false);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [snackbar, setSnackbar] = useState<{
@@ -160,143 +152,45 @@ const UserTracking: React.FC = () => {
     severity: 'info'
   });
 
-  // Mock data for development
-  const mockTrackingData: UserTrackingData[] = [
-    {
-      id: '1',
-      userId: 'user1',
-      userName: 'John Doe',
-      userEmail: 'john.doe@company.com',
-      userRole: 'Software Engineer',
-      userDepartment: 'Engineering',
-      isOnline: true,
-      lastSeen: new Date(),
-      currentLocation: {
-        latitude: 40.7128,
-        longitude: -74.0060,
-        accuracy: 10,
-        timestamp: new Date(),
-        address: '123 Main St',
-        city: 'New York',
-        country: 'USA'
-      },
-      deviceInfo: {
-        deviceId: 'dev1',
-        deviceType: 'desktop',
-        browser: 'Chrome',
-        browserVersion: '120.0.0.0',
-        operatingSystem: 'Windows',
-        osVersion: '11',
-        screenResolution: '1920x1080',
-        timezone: 'America/New_York'
-      },
-      activity: [
-        {
-          id: 'act1',
-          type: 'login',
-          description: 'User logged in',
-          timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-          metadata: { ip: '192.168.1.100' }
-        },
-        {
-          id: 'act2',
-          type: 'page_view',
-          description: 'Viewed Dashboard',
-          timestamp: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
-          metadata: { page: '/dashboard' }
-        }
-      ],
-      trackingEnabled: true,
-      consentGiven: true,
-      lastUpdated: new Date()
-    },
-    {
-      id: '2',
-      userId: 'user2',
-      userName: 'Jane Smith',
-      userEmail: 'jane.smith@company.com',
-      userRole: 'Product Manager',
-      userDepartment: 'Product',
-      isOnline: false,
-      lastSeen: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      currentLocation: {
-        latitude: 37.7749,
-        longitude: -122.4194,
-        accuracy: 15,
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-        address: '456 Market St',
-        city: 'San Francisco',
-        country: 'USA'
-      },
-      deviceInfo: {
-        deviceId: 'dev2',
-        deviceType: 'mobile',
-        browser: 'Safari',
-        browserVersion: '17.0',
-        operatingSystem: 'iOS',
-        osVersion: '17.0',
-        screenResolution: '390x844',
-        timezone: 'America/Los_Angeles'
-      },
-      activity: [
-        {
-          id: 'act3',
-          type: 'logout',
-          description: 'User logged out',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-          metadata: { reason: 'session_timeout' }
-        }
-      ],
-      trackingEnabled: true,
-      consentGiven: true,
-      lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 2)
-    },
-    {
-      id: '3',
-      userId: 'user3',
-      userName: 'Mike Johnson',
-      userEmail: 'mike.johnson@company.com',
-      userRole: 'Designer',
-      userDepartment: 'Design',
-      isOnline: true,
-      lastSeen: new Date(),
-      currentLocation: {
-        latitude: 51.5074,
-        longitude: -0.1278,
-        accuracy: 20,
-        timestamp: new Date(),
-        address: '789 Oxford St',
-        city: 'London',
-        country: 'UK'
-      },
-      deviceInfo: {
-        deviceId: 'dev3',
-        deviceType: 'tablet',
-        browser: 'Firefox',
-        browserVersion: '121.0',
-        operatingSystem: 'Android',
-        osVersion: '13',
-        screenResolution: '1024x768',
-        timezone: 'Europe/London'
-      },
-      activity: [
-        {
-          id: 'act4',
-          type: 'action',
-          description: 'Created new design mockup',
-          timestamp: new Date(Date.now() - 1000 * 60 * 5), // 5 minutes ago
-          metadata: { tool: 'Figma', project: 'New App Design' }
-        }
-      ],
-      trackingEnabled: true,
-      consentGiven: true,
-      lastUpdated: new Date()
-    }
-  ];
+  // Firebase integration - no mock data
 
+  // Initialize tracking data from Firebase
   useEffect(() => {
-    // Load mock data
-    setTrackingData(mockTrackingData);
+    const initializeTracking = async () => {
+      try {
+        // Load initial tracking data
+        const data = await realtimeTrackingService.getAllUserTrackingData();
+        setTrackingData(data);
+
+        // Set up real-time listener
+        const unsubscribe = realtimeTrackingService.onAllTrackingUpdates((data: UserTrackingData[]) => {
+          setTrackingData(data);
+        });
+
+        // Store unsubscribe function for cleanup
+        return unsubscribe;
+      } catch (error) {
+        console.error('Error loading tracking data:', error);
+        setSnackbar({
+          open: true,
+          message: 'Failed to load tracking data',
+          severity: 'error'
+        });
+        return null;
+      }
+    };
+
+    let unsubscribe: (() => void) | null = null;
+    
+    initializeTracking().then((unsub) => {
+      unsubscribe = unsub;
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -325,6 +219,10 @@ const UserTracking: React.FC = () => {
         filtered = filtered.filter(user => user.isOnline);
       } else if (filters.status === 'offline') {
         filtered = filtered.filter(user => !user.isOnline);
+      } else if (filters.status === 'idle') {
+        filtered = filtered.filter(user => user.status === 'idle');
+      } else if (filters.status === 'away') {
+        filtered = filtered.filter(user => user.status === 'away');
       }
     }
 
@@ -334,6 +232,7 @@ const UserTracking: React.FC = () => {
 
     if (filters.location) {
       filtered = filtered.filter(user => 
+        user.currentLocation.address?.toLowerCase().includes(filters.location.toLowerCase()) ||
         user.currentLocation.city?.toLowerCase().includes(filters.location.toLowerCase()) ||
         user.currentLocation.country?.toLowerCase().includes(filters.location.toLowerCase())
       );
@@ -352,42 +251,73 @@ const UserTracking: React.FC = () => {
 
   const handleViewUser = (user: UserTrackingData) => {
     setSelectedUser(user);
-    setIsViewMode(true);
     setIsDialogOpen(true);
   };
 
-  const handleToggleTracking = (userId: string) => {
-    setTrackingData(prev => prev.map(user =>
-      user.id === userId
-        ? { ...user, trackingEnabled: !user.trackingEnabled }
-        : user
-    ));
-    setSnackbar({
-      open: true,
-      message: 'Tracking status updated successfully',
-      severity: 'success'
-    });
+  const handleToggleTracking = async (userId: string) => {
+    try {
+      // Find the user to toggle
+      const user = trackingData.find(u => u.userId === userId);
+      if (!user) return;
+
+      // Update tracking status in Firebase
+      const updatedUser = {
+        ...user,
+        trackingEnabled: !user.trackingEnabled,
+        updatedAt: new Date()
+      };
+
+      // Save to Firebase
+      await trackingDataService.saveUserTrackingRecord(updatedUser);
+      
+      setSnackbar({
+        open: true,
+        message: 'Tracking status updated successfully',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error updating tracking status:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to update tracking status',
+        severity: 'error'
+      });
+    }
   };
 
-  const handleRefreshLocation = (userId: string) => {
-    // Simulate location refresh
-    setTrackingData(prev => prev.map(user =>
-      user.id === userId
-        ? { 
-            ...user, 
-            lastUpdated: new Date(),
-            currentLocation: {
-              ...user.currentLocation,
-              timestamp: new Date()
-            }
-          }
-        : user
-    ));
-    setSnackbar({
-      open: true,
-      message: 'Location refreshed successfully',
-      severity: 'success'
-    });
+  const handleRefreshLocation = async (userId: string) => {
+    try {
+      // Find the user to refresh
+      const user = trackingData.find(u => u.userId === userId);
+      if (!user) return;
+
+      // Force location update for this user
+      if (user.userId === (await authService.getCurrentUser())?.id) {
+        // If it's the current user, force a location update
+        await locationTrackingService.forceLocationUpdate();
+      } else {
+        // For other users, we can't force their location update
+        setSnackbar({
+          open: true,
+          message: 'Cannot refresh location for other users',
+          severity: 'warning'
+        });
+        return;
+      }
+      
+      setSnackbar({
+        open: true,
+        message: 'Location refreshed successfully',
+        severity: 'success'
+      });
+    } catch (error) {
+      console.error('Error refreshing location:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to refresh location',
+        severity: 'error'
+      });
+    }
   };
 
   const getStatusColor = (isOnline: boolean) => {
@@ -433,14 +363,7 @@ const UserTracking: React.FC = () => {
     return [...new Set(trackingData.map(user => user.userDepartment))];
   };
 
-  const getDeviceTypeDistribution = () => {
-    const distribution: Record<string, number> = {};
-    trackingData.forEach(user => {
-      const deviceType = user.deviceInfo.deviceType;
-      distribution[deviceType] = (distribution[deviceType] || 0) + 1;
-    });
-    return distribution;
-  };
+
 
   const paginatedData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
@@ -474,56 +397,53 @@ const UserTracking: React.FC = () => {
       </Box>
 
       {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Total Users
-              </Typography>
-              <Typography variant="h4" component="div">
-                {getTotalUsersCount()}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Online Users
-              </Typography>
-              <Typography variant="h4" component="div" color="success.main">
-                {getOnlineUsersCount()}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Active Departments
-              </Typography>
-              <Typography variant="h4" component="div" color="primary.main">
-                {getActiveDepartments().length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Tracking Enabled
-              </Typography>
-              <Typography variant="h4" component="div" color="info.main">
-                {trackingData.filter(user => user.trackingEnabled).length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, 
+        gap: 3, 
+        mb: 3 
+      }}>
+        <Card>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Total Users
+            </Typography>
+            <Typography variant="h4" component="div">
+              {getTotalUsersCount()}
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Online Users
+            </Typography>
+            <Typography variant="h4" component="div" color="success.main">
+              {getOnlineUsersCount()}
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Active Departments
+            </Typography>
+            <Typography variant="h4" component="div" color="primary.main">
+              {getActiveDepartments().length}
+            </Typography>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <Typography color="textSecondary" gutterBottom>
+              Tracking Enabled
+            </Typography>
+            <Typography variant="h4" component="div" color="info.main">
+              {trackingData.filter(user => user.trackingEnabled !== false).length}
+            </Typography>
+          </CardContent>
+        </Card>
+      </Box>
 
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 3 }}>
@@ -531,67 +451,65 @@ const UserTracking: React.FC = () => {
           <FilterIcon sx={{ mr: 1 }} />
           <Typography variant="h6">Filters</Typography>
         </Box>
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={3}>
-            <TextField
-              fullWidth
-              label="Search Users"
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                )
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth>
-              <InputLabel>Department</InputLabel>
-              <Select
-                value={filters.department}
-                label="Department"
-                onChange={(e) => handleFilterChange('department', e.target.value)}
-              >
-                <MenuItem value="">All Departments</MenuItem>
-                {getActiveDepartments().map(dept => (
-                  <MenuItem key={dept} value={dept}>
-                    {dept}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={filters.status}
-                label="Status"
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-              >
-                <MenuItem value="">All Statuses</MenuItem>
-                <MenuItem value="online">Online</MenuItem>
-                <MenuItem value="offline">Offline</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth>
-              <InputLabel>Device Type</InputLabel>
-              <Select
-                value={filters.deviceType}
-                label="Device Type"
-                onChange={(e) => handleFilterChange('deviceType', e.target.value)}
-              >
-                <MenuItem value="">All Devices</MenuItem>
-                <MenuItem value="desktop">Desktop</MenuItem>
-                <MenuItem value="mobile">Mobile</MenuItem>
-                <MenuItem value="tablet">Tablet</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
+        <Box sx={{ 
+          display: 'grid', 
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, 
+          gap: 2 
+        }}>
+          <TextField
+            fullWidth
+            label="Search Users"
+            value={filters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+              )
+            }}
+          />
+          <FormControl fullWidth>
+            <InputLabel>Department</InputLabel>
+            <Select
+              value={filters.department}
+              label="Department"
+              onChange={(e) => handleFilterChange('department', e.target.value)}
+            >
+              <MenuItem value="">All Departments</MenuItem>
+              {getActiveDepartments().map(dept => (
+                <MenuItem key={dept} value={dept}>
+                  {dept}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={filters.status}
+              label="Status"
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+            >
+              <MenuItem value="">All Statuses</MenuItem>
+              <MenuItem value="online">Online</MenuItem>
+              <MenuItem value="offline">Offline</MenuItem>
+              <MenuItem value="idle">Idle</MenuItem>
+              <MenuItem value="away">Away</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl fullWidth>
+            <InputLabel>Device Type</InputLabel>
+            <Select
+              value={filters.deviceType}
+              label="Device Type"
+              onChange={(e) => handleFilterChange('deviceType', e.target.value)}
+            >
+              <MenuItem value="">All Devices</MenuItem>
+              <MenuItem value="desktop">Desktop</MenuItem>
+              <MenuItem value="mobile">Mobile</MenuItem>
+              <MenuItem value="tablet">Tablet</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
       </Paper>
 
       {/* User Tracking Table */}
@@ -610,7 +528,25 @@ const UserTracking: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedData.map((user) => (
+              {paginatedData.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} sx={{ textAlign: 'center', py: 6 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <PersonIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+                      <Typography variant="h6" color="text.secondary" gutterBottom>
+                        No Tracking Data
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 400 }}>
+                        {trackingData.length === 0 
+                          ? "No users are currently being tracked. Start location tracking to see data here."
+                          : "No users match the current filter criteria."
+                        }
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedData.map((user) => (
                 <TableRow key={user.id} hover>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -655,7 +591,7 @@ const UserTracking: React.FC = () => {
                           {user.deviceInfo.deviceType.charAt(0).toUpperCase() + user.deviceInfo.deviceType.slice(1)}
                         </Typography>
                         <Typography variant="caption" color="textSecondary">
-                          {user.deviceInfo.operatingSystem} {user.deviceInfo.osVersion}
+                          {user.deviceInfo.os} {user.deviceInfo.osVersion}
                         </Typography>
                       </Box>
                     </Box>
@@ -665,7 +601,7 @@ const UserTracking: React.FC = () => {
                       <LocationIcon fontSize="small" color="action" />
                       <Box>
                         <Typography variant="body2">
-                          {user.currentLocation.city}, {user.currentLocation.country}
+                          {user.currentLocation.address || `${user.currentLocation.latitude.toFixed(4)}, ${user.currentLocation.longitude.toFixed(4)}`}
                         </Typography>
                         <Typography variant="caption" color="textSecondary">
                           {user.currentLocation.accuracy}m accuracy
@@ -686,17 +622,17 @@ const UserTracking: React.FC = () => {
                       <FormControlLabel
                         control={
                           <Switch
-                            checked={user.trackingEnabled}
-                            onChange={() => handleToggleTracking(user.id)}
+                            checked={user.trackingEnabled !== false}
+                            onChange={() => handleToggleTracking(user.userId)}
                             color="primary"
                           />
                         }
                         label=""
                       />
                       <Chip
-                        label={user.trackingEnabled ? 'Enabled' : 'Disabled'}
+                        label={user.trackingEnabled !== false ? 'Enabled' : 'Disabled'}
                         size="small"
-                        color={user.trackingEnabled ? 'success' : 'default'}
+                        color={user.trackingEnabled !== false ? 'success' : 'default'}
                         variant="outlined"
                       />
                     </Box>
@@ -715,7 +651,7 @@ const UserTracking: React.FC = () => {
                       <Tooltip title="Refresh Location">
                         <IconButton
                           size="small"
-                          onClick={() => handleRefreshLocation(user.id)}
+                          onClick={() => handleRefreshLocation(user.userId)}
                           color="info"
                         >
                           <RefreshIcon />
@@ -732,7 +668,8 @@ const UserTracking: React.FC = () => {
                     </Box>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -770,8 +707,13 @@ const UserTracking: React.FC = () => {
         <DialogContent>
           {selectedUser && (
             <Box sx={{ mt: 2 }}>
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, 
+                gap: 3, 
+                mb: 3 
+              }}>
+                <Box>
                   <Typography variant="h6" gutterBottom>User Information</Typography>
                   <List dense>
                     <ListItem>
@@ -819,8 +761,8 @@ const UserTracking: React.FC = () => {
                       />
                     </ListItem>
                   </List>
-                </Grid>
-                <Grid item xs={12} md={6}>
+                </Box>
+                <Box>
                   <Typography variant="h6" gutterBottom>Device Information</Typography>
                   <List dense>
                     <ListItem>
@@ -842,7 +784,7 @@ const UserTracking: React.FC = () => {
                       </ListItemAvatar>
                       <ListItemText
                         primary="Operating System"
-                        secondary={`${selectedUser.deviceInfo.operatingSystem} ${selectedUser.deviceInfo.osVersion}`}
+                        secondary={`${selectedUser.deviceInfo.os} ${selectedUser.deviceInfo.osVersion}`}
                       />
                     </ListItem>
                     <ListItem>
@@ -868,72 +810,57 @@ const UserTracking: React.FC = () => {
                       />
                     </ListItem>
                   </List>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="h6" gutterBottom>Current Location</Typography>
-                  <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} sm={6}>
-                        <Typography variant="body2">
-                          <strong>Coordinates:</strong> {selectedUser.currentLocation.latitude.toFixed(4)}, {selectedUser.currentLocation.longitude.toFixed(4)}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Typography variant="body2">
-                          <strong>Accuracy:</strong> {selectedUser.currentLocation.accuracy}m
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Typography variant="body2">
-                          <strong>Address:</strong> {selectedUser.currentLocation.address}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12} sm={6}>
-                        <Typography variant="body2">
-                          <strong>City/Country:</strong> {selectedUser.currentLocation.city}, {selectedUser.currentLocation.country}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={12}>
-                        <Typography variant="body2">
-                          <strong>Last Updated:</strong> {selectedUser.currentLocation.timestamp.toLocaleString()}
-                        </Typography>
-                      </Grid>
-                    </Grid>
+                </Box>
+              </Box>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" gutterBottom>Current Location</Typography>
+                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, 
+                    gap: 2 
+                  }}>
+                    <Typography variant="body2">
+                      <strong>Coordinates:</strong> {selectedUser.currentLocation.latitude.toFixed(4)}, {selectedUser.currentLocation.longitude.toFixed(4)}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Accuracy:</strong> {selectedUser.currentLocation.accuracy}m
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Address:</strong> {selectedUser.currentLocation.address || 'Not available'}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>City/Country:</strong> {selectedUser.currentLocation.city || 'Unknown'}, {selectedUser.currentLocation.country || 'Unknown'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ gridColumn: { xs: '1', sm: '1 / -1' } }}>
+                      <strong>Last Updated:</strong> {new Date(selectedUser.currentLocation.timestamp).toLocaleString()}
+                    </Typography>
                   </Box>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="h6" gutterBottom>Recent Activity</Typography>
-                  <List>
-                    {selectedUser.activity.map((activity) => (
-                      <ListItem key={activity.id} divider>
-                        <ListItemAvatar>
-                          <Avatar sx={{ bgcolor: 'primary.main' }}>
-                            <TimelineIcon />
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={activity.description}
-                          secondary={
-                            <Box>
-                              <Typography variant="caption" display="block">
-                                Type: {activity.type.replace('_', ' ')}
-                              </Typography>
-                              <Typography variant="caption" display="block">
-                                Time: {activity.timestamp.toLocaleString()}
-                              </Typography>
-                              {activity.metadata && Object.keys(activity.metadata).length > 0 && (
-                                <Typography variant="caption" display="block">
-                                  Details: {JSON.stringify(activity.metadata)}
-                                </Typography>
-                              )}
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
+              <Box>
+                <Typography variant="h6" gutterBottom>Session Information</Typography>
+                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Box sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, 
+                    gap: 2 
+                  }}>
+                    <Typography variant="body2">
+                      <strong>Session ID:</strong> {selectedUser.sessionId}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Login Time:</strong> {selectedUser.loginTime ? selectedUser.loginTime.toLocaleString() : 'Not available'}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Last Activity:</strong> {selectedUser.lastActivity ? selectedUser.lastActivity.toLocaleString() : 'Not available'}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Total Distance:</strong> {selectedUser.totalDistance ? `${selectedUser.totalDistance.toFixed(2)} km` : 'Not tracked'}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Box>
             </Box>
           )}
         </DialogContent>
