@@ -1,530 +1,745 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Grid,
+  Button,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  CircularProgress,
+  Tabs,
+  Tab,
+  LinearProgress
+} from '@mui/material';
 import { 
-  BarChart3, 
-  Download, 
-  Filter, 
-  Calendar, 
-  Users, 
-  TrendingUp, 
-  DollarSign, 
-  Clock,
-  FileText,
-  PieChart,
-  LineChart,
-  Activity,
-  Eye,
-  Share2
-} from 'lucide-react';
-import { cn } from '@/utils/cn';
+  Assessment as AssessmentIcon,
+  People as PeopleIcon,
+  AttachMoney as MoneyIcon,
+  Schedule as ScheduleIcon,
+  Refresh as RefreshIcon,
+  Visibility as ViewIcon,
+  GetApp as ExportIcon,
+  BarChart as BarChartIcon,
+  Business as BusinessIcon,
+  CalendarToday as CalendarIcon,
+  CheckCircle as CheckCircleIcon,
+  Warning as WarningIcon,
+  Error as ErrorIcon
+} from '@mui/icons-material';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import firebaseService from '@/services/firebaseService';
+import { showNotification } from '@/utils/notification';
+import type { User, Attendance, Payroll, Asset, Training, Incident } from '@/types';
 
-interface Report {
+// Report Types
+interface ReportData {
   id: string;
-  name: string;
-  type: 'attendance' | 'payroll' | 'performance' | 'recruitment' | 'turnover' | 'training';
-  lastGenerated: string;
-  status: 'ready' | 'generating' | 'error';
-  size: string;
-  format: 'pdf' | 'excel' | 'csv';
+  title: string;
+  type: 'attendance' | 'payroll' | 'performance' | 'assets' | 'training' | 'incidents' | 'custom';
+  description: string;
+  generatedAt: string;
+  generatedBy: string;
+  data: any[];
+  filters: ReportFilters;
+  status: 'generating' | 'completed' | 'failed';
+  downloadUrl?: string;
 }
 
+interface ReportFilters {
+  dateRange: {
+    start: string;
+    end: string;
+  };
+  departments: string[];
+  employees: string[];
+  status?: string;
+  type?: string;
+}
+
+interface AnalyticsData {
+  totalEmployees: number;
+  activeEmployees: number;
+  totalDepartments: number;
+  attendanceRate: number;
+  averageSalary: number;
+  totalAssets: number;
+  activeTrainings: number;
+  pendingIncidents: number;
+  monthlyTrends: MonthlyTrend[];
+  departmentStats: DepartmentStat[];
+  performanceMetrics: PerformanceMetric[];
+}
+
+interface MonthlyTrend {
+  month: string;
+  employees: number;
+  attendance: number;
+  revenue: number;
+  expenses: number;
+}
+
+interface DepartmentStat {
+  department: string;
+  employeeCount: number;
+  avgSalary: number;
+  attendanceRate: number;
+  performance: number;
+}
+
+interface PerformanceMetric {
+  category: string;
+  value: number;
+  target: number;
+  status: 'excellent' | 'good' | 'average' | 'poor';
+}
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+
 const Reports: React.FC = () => {
-  const [selectedReportType, setSelectedReportType] = useState<string>('all');
-  const [dateRange, setDateRange] = useState<string>('month');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
-  // Mock data - in real app this would come from Firebase
-  const reports: Report[] = [
-    {
-      id: '1',
-      name: 'Monthly Attendance Summary',
-      type: 'attendance',
-      lastGenerated: '2024-02-01',
-      status: 'ready',
-      size: '2.4 MB',
-      format: 'pdf'
+  const [loading, setLoading] = useState(true);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [reports, setReports] = useState<ReportData[]>([]);
+  const [selectedTab, setSelectedTab] = useState(0);
+  const [selectedReportType, setSelectedReportType] = useState<string>('');
+  const [reportFilters, setReportFilters] = useState<ReportFilters>({
+    dateRange: {
+      start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      end: new Date().toISOString().split('T')[0]
     },
-    {
-      id: '2',
-      name: 'Q4 Payroll Report',
-      type: 'payroll',
-      lastGenerated: '2024-01-15',
-      status: 'ready',
-      size: '5.1 MB',
-      format: 'excel'
-    },
-    {
-      id: '3',
-      name: 'Employee Performance Review',
-      type: 'performance',
-      lastGenerated: '2024-01-20',
-      status: 'ready',
-      size: '3.2 MB',
-      format: 'pdf'
-    },
-    {
-      id: '4',
-      name: 'Recruitment Pipeline',
-      type: 'recruitment',
-      lastGenerated: '2024-02-05',
-      status: 'generating',
-      size: '1.8 MB',
-      format: 'csv'
-    },
-    {
-      id: '5',
-      name: 'Annual Turnover Analysis',
-      type: 'turnover',
-      lastGenerated: '2024-01-10',
-      status: 'ready',
-      size: '4.7 MB',
-      format: 'excel'
-    },
-    {
-      id: '6',
-      name: 'Training Completion Report',
-      type: 'training',
-      lastGenerated: '2024-01-25',
-      status: 'ready',
-      size: '2.9 MB',
-      format: 'pdf'
-    }
-  ];
-
-  const filteredReports = reports.filter(report => {
-    if (selectedReportType !== 'all' && report.type !== selectedReportType) {
-      return false;
-    }
-    return true;
+    departments: [],
+    employees: []
   });
+
+  useEffect(() => {
+    fetchAnalyticsData();
+    fetchReports();
+  }, []);
+
+  // Update progress bar widths when analytics data changes
+  useEffect(() => {
+    if (analyticsData) {
+      const progressBars = document.querySelectorAll('[data-width]');
+      progressBars.forEach((bar) => {
+        const width = bar.getAttribute('data-width');
+        if (width) {
+          (bar as HTMLElement).style.setProperty('--data-width', width);
+          bar.setAttribute('aria-valuenow', Math.round(parseFloat(width)).toString());
+        }
+      });
+    }
+  }, [analyticsData]);
+
+  const fetchAnalyticsData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch all data from Firebase
+      const [usersResponse, attendanceResponse, payrollResponse, assetsResponse, trainingsResponse, incidentsResponse] = await Promise.all([
+        firebaseService.getCollection<User>('users'),
+        firebaseService.getCollection<Attendance>('attendance'),
+        firebaseService.getCollection<Payroll>('payroll'),
+        firebaseService.getCollection<Asset>('assets'),
+        firebaseService.getCollection<Training>('trainings'),
+        firebaseService.getCollection<Incident>('incidents')
+      ]);
+
+      const users = usersResponse.success ? usersResponse.data || [] : [];
+      const attendance = attendanceResponse.success ? attendanceResponse.data || [] : [];
+      const payroll = payrollResponse.success ? payrollResponse.data || [] : [];
+      const assets = assetsResponse.success ? assetsResponse.data || [] : [];
+      const trainings = trainingsResponse.success ? trainingsResponse.data || [] : [];
+      const incidents = incidentsResponse.success ? incidentsResponse.data || [] : [];
+
+      // Calculate analytics
+      const activeUsers = users.filter(user => user.status === 'active');
+      const departments = [...new Set(users.map(user => user.department))];
+      
+      // Calculate attendance rate
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      const monthAttendance = attendance.filter(att => {
+        const attDate = new Date(att.date);
+        return attDate.getMonth() === currentMonth && attDate.getFullYear() === currentYear;
+      });
+      const attendanceRate = monthAttendance.length > 0 ? 
+        (monthAttendance.filter(att => att.status === 'present').length / monthAttendance.length) * 100 : 0;
+
+      // Calculate average salary
+      const totalSalary = activeUsers.reduce((sum, user) => sum + (user.salary || 0), 0);
+      const averageSalary = activeUsers.length > 0 ? totalSalary / activeUsers.length : 0;
+
+      // Generate monthly trends
+      const monthlyTrends: MonthlyTrend[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const month = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+        
+        const monthUsers = users.filter(user => {
+          const joinDate = new Date(user.hireDate);
+          return joinDate <= date;
+        });
+        
+        const monthAttendance = attendance.filter(att => {
+          const attDate = new Date(att.date);
+          return attDate.getMonth() === date.getMonth() && attDate.getFullYear() === date.getFullYear();
+        });
+        
+        const monthPayroll = payroll.filter(pay => {
+          return pay.month === date.getMonth() + 1 && pay.year === date.getFullYear();
+        });
+
+        monthlyTrends.push({
+          month,
+          employees: monthUsers.length,
+          attendance: monthAttendance.length > 0 ? 
+            (monthAttendance.filter(att => att.status === 'present').length / monthAttendance.length) * 100 : 0,
+          revenue: monthPayroll.reduce((sum, pay) => sum + pay.grossSalary, 0),
+          expenses: monthPayroll.reduce((sum, pay) => sum + pay.netSalary, 0)
+        });
+      }
+
+      // Department statistics
+      const departmentStats: DepartmentStat[] = departments.map(dept => {
+        const deptUsers = users.filter(user => user.department === dept);
+        const deptAttendance = attendance.filter(att => {
+          const user = users.find(u => u.id === att.employeeId);
+          return user?.department === dept;
+        });
+        
+        return {
+          department: dept,
+          employeeCount: deptUsers.length,
+          avgSalary: deptUsers.length > 0 ? 
+            deptUsers.reduce((sum, user) => sum + (user.salary || 0), 0) / deptUsers.length : 0,
+          attendanceRate: deptAttendance.length > 0 ? 
+            (deptAttendance.filter(att => att.status === 'present').length / deptAttendance.length) * 100 : 0,
+          performance: Math.random() * 100 // Placeholder - would be calculated from actual performance data
+        };
+      });
+
+      // Performance metrics
+      const performanceMetrics: PerformanceMetric[] = [
+        {
+          category: 'Attendance',
+          value: attendanceRate,
+          target: 95,
+          status: attendanceRate >= 95 ? 'excellent' : attendanceRate >= 85 ? 'good' : attendanceRate >= 75 ? 'average' : 'poor'
+        },
+        {
+          category: 'Training Completion',
+          value: 78,
+          target: 80,
+          status: 'good'
+        },
+        {
+          category: 'Asset Utilization',
+          value: 85,
+          target: 90,
+          status: 'good'
+        },
+        {
+          category: 'Incident Resolution',
+          value: 92,
+          target: 95,
+          status: 'excellent'
+        }
+      ];
+
+      setAnalyticsData({
+        totalEmployees: users.length,
+        activeEmployees: activeUsers.length,
+        totalDepartments: departments.length,
+        attendanceRate,
+        averageSalary,
+        totalAssets: assets.length,
+        activeTrainings: trainings.filter(t => t.status === 'in-progress').length,
+        pendingIncidents: incidents.filter(i => i.status === 'open').length,
+        monthlyTrends,
+        departmentStats,
+        performanceMetrics
+      });
+
+    } catch (error) {
+      console.error('Error fetching analytics data:', error);
+      showNotification('Failed to fetch analytics data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchReports = async () => {
+    try {
+      const response = await firebaseService.getCollection<ReportData>('reports', {
+        orderBy: [{ field: 'generatedAt', direction: 'desc' }],
+        limit: 10
+      });
+      
+      if (response.success) {
+        setReports(response.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+    }
+  };
+
+  const generateReport = async () => {
+    try {
+      setLoading(true);
+      
+      const newReport: Omit<ReportData, 'id'> = {
+        title: `${selectedReportType} Report`,
+        type: selectedReportType as any,
+        description: `Generated report for ${selectedReportType}`,
+        generatedAt: new Date().toISOString(),
+        generatedBy: 'current-user', // Would be actual user ID
+        data: [], // Would contain actual report data
+        filters: reportFilters,
+        status: 'generating'
+      };
+
+      const response = await firebaseService.addDocument('reports', newReport);
+      
+      if (response.success) {
+        showNotification('Report generation started', 'success');
+        fetchReports();
+      } else {
+        showNotification('Failed to generate report', 'error');
+      }
+    } catch (error) {
+      console.error('Error generating report:', error);
+      showNotification('Failed to generate report', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const exportReport = (reportId: string) => {
+    showNotification('Export functionality coming soon', 'info');
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ready': return 'bg-green-100 text-green-800';
-      case 'generating': return 'bg-yellow-100 text-yellow-800';
-      case 'error': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'excellent': return 'success';
+      case 'good': return 'info';
+      case 'average': return 'warning';
+      case 'poor': return 'error';
+      default: return 'default';
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'attendance': return Clock;
-      case 'payroll': return DollarSign;
-      case 'performance': return TrendingUp;
-      case 'recruitment': return Users;
-      case 'turnover': return Activity;
-      case 'training': return FileText;
-      default: return FileText;
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'excellent': return <CheckCircleIcon />;
+      case 'good': return <CheckCircleIcon />;
+      case 'average': return <WarningIcon />;
+      case 'poor': return <ErrorIcon />;
+      default: return <WarningIcon />;
     }
   };
 
-  const getFormatColor = (format: string) => {
-    switch (format) {
-      case 'pdf': return 'bg-red-100 text-red-800';
-      case 'excel': return 'bg-green-100 text-green-800';
-      case 'csv': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const reportTypes = [
-    { value: 'all', label: 'All Reports' },
-    { value: 'attendance', label: 'Attendance' },
-    { value: 'payroll', label: 'Payroll' },
-    { value: 'performance', label: 'Performance' },
-    { value: 'recruitment', label: 'Recruitment' },
-    { value: 'turnover', label: 'Turnover' },
-    { value: 'training', label: 'Training' }
-  ];
-
-  const dateRanges = [
-    { value: 'week', label: 'This Week' },
-    { value: 'month', label: 'This Month' },
-    { value: 'quarter', label: 'This Quarter' },
-    { value: 'year', label: 'This Year' },
-    { value: 'custom', label: 'Custom Range' }
-  ];
+  if (loading && !analyticsData) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6">
+    <div className="space-y-6">
+      {/* Custom CSS for progress bars */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          [data-width] {
+            width: calc(var(--data-width, 0) * 1%);
+            transition: width 0.3s ease-in-out;
+          }
+        `
+      }} />
+      
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-gray-600">Generate and manage comprehensive HR reports</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-          <button 
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
-            title="Generate new report"
-            aria-label="Generate new report"
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Generate Report</span>
-          </button>
-          <button 
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2"
-            title="Export all reports"
-            aria-label="Export all reports"
-          >
-            <Download className="w-4 h-4" />
-            <span>Export All</span>
-          </button>
-        </div>
+        <p className="text-gray-600">Comprehensive insights and reporting for your organization</p>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <FileText className="w-5 h-5 text-blue-600" />
+      {/* Tabs */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={selectedTab} onChange={(e, newValue) => setSelectedTab(newValue)}>
+          <Tab label="Analytics Dashboard" icon={<BarChartIcon />} />
+          <Tab label="Generated Reports" icon={<AssessmentIcon />} />
+          <Tab label="Create Report" icon={<AssessmentIcon />} />
+        </Tabs>
+      </Box>
+
+      {/* Analytics Dashboard */}
+      {selectedTab === 0 && analyticsData && (
+        <div className="space-y-6">
+          {/* Key Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Employees</p>
+                  <p className="text-3xl font-bold text-gray-900">{analyticsData.totalEmployees}</p>
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Total Reports</p>
-              <p className="text-2xl font-bold text-gray-900">{reports.length}</p>
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <PeopleIcon className="h-6 w-6 text-blue-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Download className="w-5 h-5 text-green-600" />
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Active Employees</p>
+                  <p className="text-3xl font-bold text-green-600">{analyticsData.activeEmployees}</p>
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Ready to Download</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {reports.filter(r => r.status === 'ready').length}
-              </p>
+                <div className="p-3 bg-green-100 rounded-full">
+                  <CheckCircleIcon className="h-6 w-6 text-green-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <Clock className="w-5 h-5 text-yellow-600" />
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Attendance Rate</p>
+                  <p className="text-3xl font-bold text-blue-600">{analyticsData.attendanceRate.toFixed(1)}%</p>
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">In Progress</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {reports.filter(r => r.status === 'generating').length}
-              </p>
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <ScheduleIcon className="h-6 w-6 text-blue-600" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <BarChart3 className="w-5 h-5 text-purple-600" />
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Avg Salary</p>
+                  <p className="text-3xl font-bold text-yellow-600">₹{analyticsData.averageSalary.toLocaleString()}</p>
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">This Month</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {reports.filter(r => new Date(r.lastGenerated).getMonth() === new Date().getMonth()).length}
-              </p>
+                <div className="p-3 bg-yellow-100 rounded-full">
+                  <MoneyIcon className="h-6 w-6 text-yellow-600" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Filters and Controls */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-            <select
-              value={selectedReportType}
-              onChange={(e) => setSelectedReportType(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              aria-label="Filter by report type"
-            >
-              {reportTypes.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              aria-label="Filter by date range"
-            >
-              {dateRanges.map((range) => (
-                <option key={range.value} value={range.value}>
-                  {range.label}
-                </option>
-              ))}
-            </select>
-
-            <button 
-              className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
-              title="Show additional filter options"
-              aria-label="Show additional filter options"
-            >
-              <Filter className="w-4 h-4" />
-              <span>More Filters</span>
-            </button>
+          {/* Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Trends</h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={analyticsData.monthlyTrends}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis 
+                      dataKey="month" 
+                      tick={{ fontSize: 12 }}
+                      axisLine={{ stroke: '#e5e7eb' }}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12 }}
+                      axisLine={{ stroke: '#e5e7eb' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="employees" 
+                      stroke="#3b82f6" 
+                      strokeWidth={3}
+                      dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="attendance" 
+                      stroke="#10b981" 
+                      strokeWidth={3}
+                      dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
           </div>
 
-          {/* View Mode Toggle */}
-          <div className="flex border border-gray-300 rounded-lg">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={cn(
-                'px-3 py-2 text-sm font-medium transition-colors',
-                viewMode === 'grid' 
-                  ? 'bg-primary-600 text-white' 
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              )}
-              title="Switch to grid view"
-              aria-label="Switch to grid view"
-            >
-              Grid
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={cn(
-                'px-3 py-2 text-sm font-medium transition-colors',
-                viewMode === 'list' 
-                  ? 'bg-primary-600 text-white' 
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              )}
-              title="Switch to list view"
-              aria-label="Switch to list view"
-            >
-              List
-            </button>
+            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Department Distribution</h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={analyticsData.departmentStats}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ department, employeeCount }) => `${department}: ${employeeCount}`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="employeeCount"
+                    >
+                      {analyticsData.departmentStats.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'white',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* Reports Grid/List */}
-      {viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredReports.map((report) => {
-            const TypeIcon = getTypeIcon(report.type);
-            return (
-              <div key={report.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-6 h-6 bg-gray-100 rounded-lg flex items-center justify-center">
-                          <TypeIcon className="w-4 h-4 text-gray-600" />
-                        </div>
-                        <h3 className="text-sm font-medium text-gray-900 truncate">{report.name}</h3>
-                      </div>
-                      <p className="text-xs text-gray-500 capitalize">{report.type}</p>
-                    </div>
-                    <span className={cn(
-                      'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                      getStatusColor(report.status)
-                    )}>
-                      {report.status}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center text-gray-600">
-                      <Calendar className="w-3 h-3 mr-2" />
-                      <span>Generated: {report.lastGenerated}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <FileText className="w-3 h-3 mr-2" />
-                      <span>Size: {report.size}</span>
-                    </div>
+          {/* Performance Metrics */}
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Performance Metrics</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {analyticsData.performanceMetrics.map((metric, index) => {
+                const roundedValue = Math.round(metric.value);
+                const progressWidth = Math.min(metric.value, 100);
+                return (
+                  <div key={index} className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className={cn(
-                        'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                        getFormatColor(report.format)
-                      )}>
-                        {report.format.toUpperCase()}
+                      <p className="text-sm font-medium text-gray-600">{metric.category}</p>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        metric.status === 'excellent' ? 'bg-green-100 text-green-800' :
+                        metric.status === 'good' ? 'bg-blue-100 text-blue-800' :
+                        metric.status === 'average' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {metric.status}
                       </span>
                     </div>
+                    <p className="text-2xl font-bold text-gray-900">{metric.value.toFixed(1)}%</p>
+                    <div className="w-full bg-gray-200 rounded-full h-2 relative">
+                      <div 
+                        className={`h-2 rounded-full absolute top-0 left-0 ${
+                          metric.value >= 90 ? 'bg-green-500' :
+                          metric.value >= 75 ? 'bg-blue-500' :
+                          metric.value >= 60 ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}
+                        role="progressbar"
+                        aria-valuenow="0"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-label={`${metric.category} progress: ${roundedValue}%`}
+                        data-width={progressWidth}
+                      ></div>
+                    </div>
+                    <p className="text-xs text-gray-500">Target: {metric.target}%</p>
                   </div>
-
-                  <div className="mt-4 flex space-x-2">
-                    <button 
-                      className="flex-1 px-3 py-2 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors flex items-center justify-center"
-                      title="View report details"
-                      aria-label="View report details"
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      View
-                    </button>
-                    <button 
-                      className="flex-1 px-3 py-2 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors flex items-center justify-center"
-                      title="Download report"
-                      aria-label="Download report"
-                    >
-                      <Download className="w-3 h-3 mr-1" />
-                      Download
-                    </button>
-                  </div>
-                </div>
+                );
+              })}
               </div>
-            );
-          })}
         </div>
-      ) : (
+
+          {/* Department Statistics */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Department Statistics</h3>
+            </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Report
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Last Generated
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Size
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Format
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Employees</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Salary</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Attendance Rate</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Performance</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredReports.map((report) => {
-                  const TypeIcon = getTypeIcon(report.type);
-                  return (
-                    <tr key={report.id} className="hover:bg-gray-50">
+                  {analyticsData.departmentStats.map((dept, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-8 w-8">
-                            <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center">
-                              <TypeIcon className="w-4 h-4 text-gray-600" />
+                            <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                              <BusinessIcon className="h-4 w-4 text-blue-600" />
                             </div>
                           </div>
                           <div className="ml-3">
-                            <div className="text-sm font-medium text-gray-900">{report.name}</div>
+                            <div className="text-sm font-medium text-gray-900">{dept.department}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900 capitalize">{report.type}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={cn(
-                          'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                          getStatusColor(report.status)
-                        )}>
-                          {report.status}
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{dept.employeeCount}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">₹{dept.avgSalary.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">{dept.attendanceRate.toFixed(1)}%</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          dept.performance >= 80 ? 'bg-green-100 text-green-800' :
+                          dept.performance >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {dept.performance.toFixed(1)}%
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {report.lastGenerated}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {report.size}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={cn(
-                          'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium',
-                          getFormatColor(report.format)
-                        )}>
-                          {report.format.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <button 
-                            className="text-blue-600 hover:text-blue-900"
-                            title="View report details"
-                            aria-label="View report details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button 
-                            className="text-green-600 hover:text-green-900"
-                            title="Download report"
-                            aria-label="Download report"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
-                          <button 
-                            className="text-gray-600 hover:text-gray-900"
-                            title="Share report"
-                            aria-label="Share report"
-                          >
-                            <Share2 className="w-4 h-4" />
-                          </button>
-                        </div>
                       </td>
                     </tr>
-                  );
-                })}
+                  ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Empty State */}
-      {filteredReports.length === 0 && (
-        <div className="text-center py-12">
-          <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No reports found</h3>
-          <p className="text-gray-600 mb-6">
-            Try adjusting your filters or generate a new report.
-          </p>
-          <button 
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-            title="Generate your first report"
-            aria-label="Generate your first report"
-          >
-            Generate First Report
+      {/* Generated Reports */}
+      {selectedTab === 1 && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-900">Generated Reports</h2>
+            <button
+              onClick={fetchReports}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <RefreshIcon className="h-4 w-4 mr-2" />
+              Refresh
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {reports.map((report) => (
+              <div key={report.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-medium text-gray-900 truncate">{report.title}</h3>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    report.status === 'completed' ? 'bg-green-100 text-green-800' :
+                    report.status === 'generating' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {report.status}
+                  </span>
+                </div>
+                
+                <p className="text-sm text-gray-600 mb-4">{report.description}</p>
+                
+                <div className="flex items-center mb-4">
+                  <CalendarIcon className="h-4 w-4 mr-2 text-gray-400" />
+                  <span className="text-xs text-gray-500">
+                    {new Date(report.generatedAt).toLocaleDateString()}
+                  </span>
+                </div>
+                
+                <div className="flex gap-2">
+                  <button
+                    disabled={report.status !== 'completed'}
+                    className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ViewIcon className="h-4 w-4 mr-1" />
+                    View
+                  </button>
+                  <button
+                    disabled={report.status !== 'completed'}
+                    onClick={() => exportReport(report.id)}
+                    className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ExportIcon className="h-4 w-4 mr-1" />
+                    Export
           </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Analytics Preview */}
+      {/* Create Report */}
+      {selectedTab === 2 && (
       <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Analytics Overview</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <PieChart className="w-8 h-8 text-blue-600" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Generate New Report</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="report-type" className="block text-sm font-medium text-gray-700 mb-2">Report Type</label>
+              <select
+                id="report-type"
+                value={selectedReportType}
+                onChange={(e) => setSelectedReportType(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                aria-label="Select report type"
+              >
+                <option value="">Select report type</option>
+                <option value="attendance">Attendance Report</option>
+                <option value="payroll">Payroll Report</option>
+                <option value="performance">Performance Report</option>
+                <option value="assets">Asset Report</option>
+                <option value="training">Training Report</option>
+                <option value="incidents">Incident Report</option>
+              </select>
             </div>
-            <h4 className="text-sm font-medium text-gray-900 mb-1">Report Distribution</h4>
-            <p className="text-2xl font-bold text-blue-600">6 Types</p>
-            <p className="text-xs text-gray-500">Covering all HR areas</p>
+            
+            <div>
+              <label htmlFor="date-start" className="block text-sm font-medium text-gray-700 mb-2">Date Range Start</label>
+              <input
+                id="date-start"
+                type="date"
+                value={reportFilters.dateRange.start}
+                onChange={(e) => setReportFilters(prev => ({
+                  ...prev,
+                  dateRange: { ...prev.dateRange, start: e.target.value }
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                aria-label="Select start date for report"
+              />
           </div>
           
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <LineChart className="w-8 h-8 text-green-600" />
-            </div>
-            <h4 className="text-sm font-medium text-gray-900 mb-1">Generation Trend</h4>
-            <p className="text-2xl font-bold text-green-600">+15%</p>
-            <p className="text-xs text-gray-500">This month vs last</p>
+            <div>
+              <label htmlFor="date-end" className="block text-sm font-medium text-gray-700 mb-2">Date Range End</label>
+              <input
+                id="date-end"
+                type="date"
+                value={reportFilters.dateRange.end}
+                onChange={(e) => setReportFilters(prev => ({
+                  ...prev,
+                  dateRange: { ...prev.dateRange, end: e.target.value }
+                }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                aria-label="Select end date for report"
+              />
       </div>
       
-          <div className="text-center">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Activity className="w-8 h-8 text-purple-600" />
+            <div className="md:col-span-2">
+              <button
+                onClick={generateReport}
+                disabled={!selectedReportType || loading}
+                className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <AssessmentIcon className="h-4 w-4 mr-2" />
+                {loading ? 'Generating...' : 'Generate Report'}
+              </button>
             </div>
-            <h4 className="text-sm font-medium text-gray-900 mb-1">Active Reports</h4>
-            <p className="text-2xl font-bold text-purple-600">5</p>
-            <p className="text-xs text-gray-500">Ready for download</p>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
