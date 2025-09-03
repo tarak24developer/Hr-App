@@ -6,6 +6,7 @@ import {
   updateProfile,
   sendPasswordResetEmail,
   confirmPasswordReset,
+  updatePassword,
   User as FirebaseUser,
   UserCredential
 } from 'firebase/auth';
@@ -339,6 +340,27 @@ class AuthService {
 
     try {
       await confirmPasswordReset(auth, data.oobCode, data.newPassword);
+    } catch (error: any) {
+      throw this.handleAuthError(error);
+    }
+  }
+
+  public async changePassword(newPassword: string): Promise<void> {
+    if (!auth) {
+      throw new Error('Firebase Auth not available. Please check your Firebase configuration.');
+    }
+
+    try {
+      if (!auth.currentUser) {
+        throw new Error('No authenticated user');
+      }
+      await updatePassword(auth.currentUser, newPassword);
+      // Persist last password change timestamp in Firestore if possible
+      if (db && this.currentUser) {
+        await updateDoc(doc(db, 'users', this.currentUser.id), {
+          lastPasswordChangeAt: serverTimestamp(),
+        });
+      }
     } catch (error: any) {
       throw this.handleAuthError(error);
     }

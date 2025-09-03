@@ -1,393 +1,311 @@
-import { useEffect, useRef, useState } from 'react';
-import { Box, Typography, Alert, CircularProgress, Paper } from '@mui/material';
-import { LocationOn as LocationIcon } from '@mui/icons-material';
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import { Box, Typography, Chip, Avatar } from '@mui/material';
+import { Person as PersonIcon } from '@mui/icons-material';
+import 'leaflet/dist/leaflet.css';
 
-interface LiveMapProps {
-  userLocation: any;
-  otherUsers?: any[];
-  height?: number;
-  showUserInfo?: boolean;
-  onLocationClick?: ((location: any) => void) | null;
-  loading?: boolean;
-  error?: string | null;
-}
-
-const LiveMap: React.FC<LiveMapProps> = ({ 
-  userLocation, 
-  otherUsers = [], 
-  height = 500, 
-  showUserInfo = true,
-  onLocationClick = null,
-  loading = false,
-  error = null
-}) => {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<any>(null);
-  const [markers, setMarkers] = useState<Record<string, any>>({});
-  const [mapReady, setMapReady] = useState(false);
-  const initializedRef = useRef(false); // Track if map has been initialized
-  const mapInstanceRef = useRef<any>(null); // Store the actual map instance
-
-  useEffect(() => {
-    // Initialize map when component mounts
-    if (!mapRef.current) {
-      console.log('Map ref not available');
-      return;
-    }
-
-    // Check if already initialized
-    if (initializedRef.current || mapInstanceRef.current) {
-      console.log('Map already initialized, skipping');
-      return;
-    }
-
-    // Check if container already has a map
-    if (mapInstanceRef.current && (mapInstanceRef.current as any)._leaflet_id) {
-      console.log('Container already has a map, skipping initialization');
-      return;
-    }
-
-    // Additional check for any existing map instance
-    if (mapRef.current.querySelector('.leaflet-container')) {
-      console.log('Container has existing leaflet elements, skipping initialization');
-      return;
-    }
-
-    // Check if container has proper dimensions
-    const container = mapRef.current;
-    const rect = container.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) {
-      console.log('Container has no dimensions, waiting...');
-              setTimeout(() => {
-          // Retry initialization after a short delay
-          if (mapRef.current) {
-            const newRect = mapRef.current.getBoundingClientRect();
-            if (newRect.width > 0 && newRect.height > 0) {
-              console.log('Container now has dimensions, retrying initialization');
-              // Force re-render to trigger useEffect again
-              setMap((prev: any) => prev);
-            }
-          }
-        }, 200);
-      return;
-    }
-
-    console.log('Map container ready for initialization');
-
-    // Dynamically import Leaflet to avoid SSR issues
-    const initMap = async () => {
-      try {
-        console.log('Starting map initialization...');
-        
-        // Small delay to ensure container is ready
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        const L = await import('leaflet');
-        
-        // Fix for default markers
-        (L.Icon.Default.prototype as any)._getIconUrl = () => {};
+// Fix for default markers in react-leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
         L.Icon.Default.mergeOptions({
           iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
           iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
           shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
         });
 
-        // Final check before creating map
-        if (mapInstanceRef.current && (mapInstanceRef.current as any)._leaflet_id) {
-          console.log('Map already exists, aborting initialization');
-          return;
-        }
+interface UserLocation {
+  id?: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userRole: string;
+  userDepartment: string;
+  deviceInfo: {
+    deviceType: string;
+    browser: string;
+    browserVersion: string;
+    os: string;
+    osVersion: string;
+  };
+  currentLocation: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    timestamp: number;
+    address?: string;
+  };
+  lastSeen: Date;
+  isOnline: boolean;
+  status: 'online' | 'offline' | 'idle' | 'away';
+}
 
-        // Set initial view to a default location (you can change this)
-        const mapInstance = L.map(mapRef.current).setView([17.4771, 78.5724], 13);
-        
-        // Add OpenStreetMap tiles with fallback
-        const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors',
-          maxZoom: 18,
-          minZoom: 1
-        }).addTo(mapInstance);
+interface LiveMapProps {
+  users: UserLocation[];
+  mapView: 'all-users' | 'my-location' | 'selected-users';
+  selectedUsers?: string[];
+  onUserSelect?: (userId: string) => void;
+}
 
-        // Fallback to CartoDB if OpenStreetMap fails
-        tileLayer.on('tileerror', () => {
-          console.log('OpenStreetMap failed, trying CartoDB...');
-          L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '© CartoDB',
-            maxZoom: 18,
-            minZoom: 1
-          }).addTo(mapInstance);
-        });
+// Custom marker icons based on user status
+const createCustomIcon = (status: string, isOnline: boolean) => {
+  const colors = {
+    online: '#4caf50',
+    offline: '#9e9e9e',
+    idle: '#ff9800',
+    away: '#f44336'
+  };
 
-        // Force a map refresh to ensure tiles load
-        setTimeout(() => {
-          try {
-            if (mapInstance && mapInstance.invalidateSize) {
-              mapInstance.invalidateSize();
-            }
-                  } catch (error: any) {
-          console.error('Error invalidating map size:', error);
-        }
-        }, 100);
+  const color = colors[status as keyof typeof colors] || '#9e9e9e';
+  
+  return L.divIcon({
+    className: 'custom-marker',
+    html: `
+      <div style="
+        width: 20px;
+        height: 20px;
+        background-color: ${color};
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 10px;
+        font-weight: bold;
+      ">
+        ${isOnline ? '●' : '○'}
+      </div>
+    `,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+    popupAnchor: [0, -10]
+  });
+};
 
-        mapInstanceRef.current = mapInstance;
-        setMap(mapInstance);
-        initializedRef.current = true;
-        setMapReady(true);
-        console.log('Map initialized successfully');
-        
-        // Debug: Check if tiles are loading
-        mapInstance.on('load', () => {
-          console.log('Map tiles loaded successfully');
-          (mapInstance as any)._loaded = true;
-        });
-        
-        mapInstance.on('tileloadstart', () => {
-          console.log('Tile loading started');
-        });
-        
-        mapInstance.on('tileerror', (error) => {
-          console.error('Tile loading error:', error);
-        });
+// Component to handle map updates
+const MapUpdater: React.FC<{ users: UserLocation[]; mapView: string }> = ({ users, mapView }) => {
+  const map = useMap();
 
-        // Set map as loaded after a short delay
-        setTimeout(() => {
-          (mapInstance as any)._loaded = true;
-          console.log('Map marked as loaded');
-        }, 1000);
-      } catch (error) {
-        console.error('Error initializing map:', error);
-        initializedRef.current = false;
-      }
-    };
-
-    initMap();
-
-    return () => {
-      console.log('Cleaning up map...');
-      try {
-        if (mapInstanceRef.current) {
-          // Check if map is still valid before removing
-          if ((mapInstanceRef.current as any)._loaded && mapInstanceRef.current.remove) {
-            mapInstanceRef.current.remove();
-          }
-          mapInstanceRef.current = null;
-        }
-        if (map) {
-          // Check if map is still valid before removing
-          if ((map as any)._loaded && map.remove) {
-            map.remove();
-          }
-          setMap(null);
-        }
-        initializedRef.current = false;
-        setMapReady(false);
-      } catch (error) {
-        console.error('Error cleaning up map:', error);
-      }
-    };
-  }, []); // Remove mapKey dependency to prevent re-initialization
-
-  // Update user location marker
   useEffect(() => {
-    if (!map || !userLocation || !mapReady) return;
+    if (users.length === 0) return;
 
-    const updateUserMarker = async () => {
-      try {
-        const L = await import('leaflet');
-        
-        // Check if map is ready
-        if (!map._loaded || !mapReady) {
-          console.log('Map not ready for user marker, waiting...');
-          setTimeout(() => updateUserMarker(), 500);
-          return;
-        }
-        
-        // Remove existing user marker
-        if (markers['user'] && map.hasLayer) {
-          try {
-            map.removeLayer(markers['user']);
-          } catch (error) {
-            console.log('Error removing user marker:', error);
-          }
-        }
-
-        // Create new user marker with location icon
-        const userMarker = L.marker([userLocation.latitude, userLocation.longitude], {
-          icon: L.divIcon({
-            className: 'custom-user-marker',
-            html: '<div style="background-color: #1976d2; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>',
-            iconSize: [32, 32],
-            iconAnchor: [16, 32]
-          })
-        });
-
-        // Check if map is still valid before adding marker
-        if (map && map.addLayer) {
-          userMarker.addTo(map);
-
-          // Add popup with user info
-          if (showUserInfo && userLocation.userInfo) {
-            userMarker.bindPopup(`
-              <div style="min-width: 220px; padding: 8px;">
-                <div style="display: flex; align-items: center; margin-bottom: 12px;">
-                  <div style="width: 12px; height: 12px; background-color: #1976d2; border-radius: 50%; margin-right: 8px;"></div>
-                  <h4 style="margin: 0; color: #1976d2; font-size: 16px;">Your Location</h4>
-                </div>
-                <div style="font-size: 13px; line-height: 1.4;">
-                  <p style="margin: 4px 0;"><strong>Accuracy:</strong> ${userLocation.accuracy ? `${Math.round(userLocation.accuracy)}m` : 'Unknown'}</p>
-                  <p style="margin: 4px 0;"><strong>Last Updated:</strong> ${new Date(userLocation.timestamp).toLocaleTimeString()}</p>
-                  <p style="margin: 4px 0;"><strong>Device:</strong> ${userLocation.userInfo.deviceType || 'Unknown'}</p>
-                </div>
-              </div>
-            `);
-          }
-
-          // Center map on user location
-          map.setView([userLocation.latitude, userLocation.longitude], 15);
-
-          setMarkers(prev => ({ ...prev, user: userMarker }));
-
-          // Handle marker click
-          if (onLocationClick) {
-            userMarker.on('click', () => onLocationClick(userLocation));
-          }
-        }
-      } catch (error) {
-        console.error('Error updating user marker:', error);
+    if (mapView === 'all-users') {
+      // Fit map to show all users
+      const bounds = L.latLngBounds(
+        users.map(user => [user.currentLocation.latitude, user.currentLocation.longitude])
+      );
+      map.fitBounds(bounds, { padding: [20, 20] });
+    } else if (mapView === 'my-location') {
+      // Center on current user's location (first online user)
+      const currentUser = users.find(user => user.isOnline);
+      if (currentUser) {
+        map.setView([currentUser.currentLocation.latitude, currentUser.currentLocation.longitude], 15);
       }
-    };
+    }
+  }, [users, mapView, map]);
 
-    updateUserMarker();
-  }, [map, userLocation, showUserInfo, onLocationClick, mapReady]);
+  return null;
+};
 
-  // Update other users markers
+const LiveMap: React.FC<LiveMapProps> = ({ 
+  users, 
+  mapView, 
+  selectedUsers = [], 
+  onUserSelect 
+}) => {
+  // Filter users based on selection if in selected-users mode
+  const displayUsers = mapView === 'selected-users' 
+    ? users.filter(user => selectedUsers.includes(user.userId))
+    : users;
+  const [mapCenter, setMapCenter] = useState<[number, number]>([37.7749, -122.4194]); // Default to San Francisco
+
+  // Update map center based on users
   useEffect(() => {
-    if (!map || !otherUsers.length || !mapReady) return;
-
-    const updateOtherUsersMarkers = async () => {
-      try {
-        const L = await import('leaflet');
-        
-        // Check if map is ready
-        if (!map._loaded || !mapReady) {
-          console.log('Map not ready, waiting...');
-          setTimeout(() => updateOtherUsersMarkers(), 500);
-          return;
-        }
-        
-        // Remove existing other user markers
-        Object.values(markers).forEach(marker => {
-          if (marker !== markers.user && marker && map.hasLayer) {
-            try {
-              map.removeLayer(marker);
-            } catch (error) {
-              console.log('Error removing marker:', error);
-            }
-          }
-        });
-
-        const newMarkers = { user: markers.user };
-
-        // Add markers for other users
-        otherUsers.forEach((user, index) => {
-          if (user.lastLocation && user.lastLocation.latitude && user.lastLocation.longitude) {
-            try {
-              const userMarker = L.marker([user.lastLocation.latitude, user.lastLocation.longitude], {
-                icon: L.divIcon({
-                  className: 'custom-other-user-marker',
-                  html: `<div style="background-color: #f57c00; width: 28px; height: 28px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>`,
-                  iconSize: [28, 28],
-                  iconAnchor: [14, 28]
-                })
-              });
-
-              // Check if map is still valid before adding marker
-              if (map && map.addLayer) {
-                userMarker.addTo(map);
-
-                // Add popup with user info
-                userMarker.bindPopup(`
-                  <div style="min-width: 220px; padding: 8px;">
-                    <div style="display: flex; align-items: center; margin-bottom: 12px;">
-                      <div style="width: 12px; height: 12px; background-color: #f57c00; border-radius: 50%; margin-right: 8px;"></div>
-                      <h4 style="margin: 0; color: #f57c00; font-size: 16px;">${(user as any)['userId']?.firstName || 'Unknown'} ${(user as any)['userId']?.lastName || 'User'}</h4>
-                    </div>
-                    <div style="font-size: 13px; line-height: 1.4;">
-                      <p style="margin: 4px 0;"><strong>Status:</strong> ${(user as any).currentStatus || 'Unknown'}</p>
-                      <p style="margin: 4px 0;"><strong>Device:</strong> ${(user as any).deviceInfo?.deviceType || 'Unknown'}</p>
-                      <p style="margin: 4px 0;"><strong>Last Activity:</strong> ${(user as any).lastActivity ? new Date((user as any).lastActivity).toLocaleTimeString() : 'Unknown'}</p>
-                      <p style="margin: 4px 0;"><strong>Distance:</strong> ${(user as any).totalDistance ? `${((user as any).totalDistance / 1000).toFixed(2)}km` : '0km'}</p>
-                    </div>
-                  </div>
-                `);
-
-                (newMarkers as any)[`user_${index}`] = userMarker;
-              }
-            } catch (error) {
-              console.error('Error creating marker for user:', user, error);
-            }
-          }
-        });
-
-        setMarkers(newMarkers);
-      } catch (error) {
-        console.error('Error updating other users markers:', error);
+    if (displayUsers.length > 0) {
+      const onlineUsers = displayUsers.filter(user => user.isOnline);
+      if (onlineUsers.length > 0) {
+        const avgLat = onlineUsers.reduce((sum, user) => sum + user.currentLocation.latitude, 0) / onlineUsers.length;
+        const avgLng = onlineUsers.reduce((sum, user) => sum + user.currentLocation.longitude, 0) / onlineUsers.length;
+        setMapCenter([avgLat, avgLng]);
       }
+    }
+  }, [displayUsers]);
+
+  const getDeviceIcon = (deviceType: string) => {
+    const icons = {
+      desktop: '🖥️',
+      laptop: '💻',
+      tablet: '📱',
+      mobile: '📱',
+      smartwatch: '⌚'
     };
+    return icons[deviceType as keyof typeof icons] || '💻';
+  };
 
-    updateOtherUsersMarkers();
-  }, [map, otherUsers, mapReady]);
+  const formatLastSeen = (lastSeen: Date) => {
+    const now = new Date();
+    const diff = now.getTime() - lastSeen.getTime();
+    const minutes = Math.floor(diff / 60000);
+    
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
 
-  if (loading) {
+  // Show message if no users to display
+  if (displayUsers.length === 0) {
     return (
-      <Box sx={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Alert severity="error">{error}</Alert>
+      <Box sx={{ 
+        height: '100%', 
+        width: '100%', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        bgcolor: 'grey.100',
+        borderRadius: 1
+      }}>
+        <Typography variant="h6" color="textSecondary">
+          {mapView === 'selected-users' ? 'No users selected' : 'No users to display'}
+        </Typography>
       </Box>
     );
   }
 
   return (
-    <Paper sx={{ height, position: 'relative', overflow: 'hidden' }}>
-      <div 
-        ref={mapRef} 
-        style={{ 
-          width: '100%', 
-          height: '100%',
-          zIndex: 1,
-          minHeight: '400px', // Ensure minimum height
-          position: 'relative',
-          display: 'block'
-        }} 
-      />
-      {!userLocation && (
+    <Box sx={{ height: '100%', width: '100%', position: 'relative' }}>
+      <MapContainer
+        center={mapCenter}
+        zoom={13}
+        style={{ height: '100%', width: '100%' }}
+        zoomControl={true}
+        scrollWheelZoom={true}
+        key={`map-${displayUsers.length}`} // Force re-render when users change
+      >
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        
+        <MapUpdater users={displayUsers} mapView={mapView} />
+        
+        {displayUsers.map((user) => {
+          if (!user.currentLocation.latitude || !user.currentLocation.longitude) return null;
+          
+          return (
+            <Marker
+              key={user.id || user.userId}
+              position={[user.currentLocation.latitude, user.currentLocation.longitude]}
+              icon={createCustomIcon(user.status, user.isOnline)}
+              eventHandlers={{
+                click: () => {
+                  if (onUserSelect) {
+                    onUserSelect(user.userId);
+                  }
+                }
+              }}
+            >
+              <Popup>
+                <Box sx={{ minWidth: 250, p: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Avatar sx={{ width: 32, height: 32 }}>
+                      <PersonIcon />
+                    </Avatar>
+                    <Box>
+                      <Typography variant="subtitle2" fontWeight="bold">
+                        {user.userName}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        {user.userEmail}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  
+                  <Box sx={{ mb: 1 }}>
+                    <Chip
+                      label={user.userRole}
+                      size="small"
+                      variant="outlined"
+                      sx={{ mr: 1 }}
+                    />
+                    <Chip
+                      label={user.status}
+                      size="small"
+                      sx={{
+                        bgcolor: user.isOnline ? '#4caf50' : '#9e9e9e',
+                        color: 'white',
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  </Box>
+                  
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="body2" color="textSecondary">
+                      <strong>Device:</strong> {getDeviceIcon(user.deviceInfo.deviceType)} {user.deviceInfo.browser} {user.deviceInfo.browserVersion}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      <strong>OS:</strong> {user.deviceInfo.os} {user.deviceInfo.osVersion}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ mb: 1 }}>
+                    <Typography variant="body2" color="textSecondary">
+                      <strong>Location:</strong> {user.currentLocation.latitude.toFixed(4)}, {user.currentLocation.longitude.toFixed(4)}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      <strong>Accuracy:</strong> {user.currentLocation.accuracy}m
+                    </Typography>
+      </Box>
+                  
+                  <Typography variant="body2" color="textSecondary">
+                    <strong>Last seen:</strong> {formatLastSeen(user.lastSeen)}
+                  </Typography>
+      </Box>
+              </Popup>
+            </Marker>
+          );
+        })}
+      </MapContainer>
+      
+      {/* Map Legend */}
         <Box
           sx={{
             position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            textAlign: 'center',
-            zIndex: 2,
-            bgcolor: 'rgba(255,255,255,0.9)',
-            p: 2,
-            borderRadius: 1
-          }}
-        >
-          <LocationIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-          <Typography variant="h6" color="text.secondary">
-            Waiting for location data...
+          top: 10,
+          right: 10,
+          bgcolor: 'white',
+          p: 2,
+          borderRadius: 1,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          zIndex: 1000
+        }}
+      >
+        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+          Status Legend
           </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 12, height: 12, bgcolor: '#4caf50', borderRadius: '50%' }} />
+            <Typography variant="caption">Online</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 12, height: 12, bgcolor: '#ff9800', borderRadius: '50%' }} />
+            <Typography variant="caption">Idle</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 12, height: 12, bgcolor: '#f44336', borderRadius: '50%' }} />
+            <Typography variant="caption">Away</Typography>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 12, height: 12, bgcolor: '#9e9e9e', borderRadius: '50%' }} />
+            <Typography variant="caption">Offline</Typography>
+          </Box>
         </Box>
-      )}
-    </Paper>
+      </Box>
+    </Box>
   );
 };
 

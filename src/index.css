@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 /* Test styles to verify Tailwind is working */
 .test-tailwind {
@@ -597,5 +598,32 @@
   .text-2xl {
     font-size: 1.5rem !important;
     line-height: 2rem !important;
+  }
+
+  /* Leaflet map customizations */
+  .leaflet-container {
+    font-family: inherit;
+  }
+
+  .leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .leaflet-popup-content {
+    margin: 0;
+    padding: 0;
+  }
+
+  .custom-marker {
+    background: transparent !important;
+    border: none !important;
+  }
+
+  /* Map legend styling */
+  .leaflet-control {
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
 }
