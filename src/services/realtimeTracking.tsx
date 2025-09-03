@@ -1,3 +1,6 @@
+// Firebase imports are now handled by trackingDataService
+import trackingDataService, { UserTrackingRecord } from './trackingDataService';
+
 interface TrackingData {
   userId: string;
   location: {
@@ -16,13 +19,49 @@ interface EventData {
   data: any;
 }
 
+// UserTrackingRecord interface is now imported from trackingDataService
+
 class RealtimeTrackingService {
   private trackingData: Map<string, TrackingData> = new Map();
   private listeners: Map<string, Function> = new Map();
+  private firebaseUnsubscribe: (() => void) | null = null;
 
   constructor() {
-    // Initialize with mock data for demo
-    console.log('RealtimeTrackingService initialized in demo mode');
+    console.log('RealtimeTrackingService initialized');
+    this.initializeFirebaseListener();
+  }
+
+  // Initialize Firebase real-time listener
+  private initializeFirebaseListener() {
+    // Use tracking data service for real-time listener
+    this.firebaseUnsubscribe = trackingDataService.setupUserTrackingListener((trackingData: UserTrackingRecord[]) => {
+      // Update local tracking data
+      this.updateLocalTrackingData(trackingData);
+      
+      // Emit update to all listeners
+      this.emit('all_tracking_updates', trackingData);
+    });
+  }
+
+  // Update local tracking data from Firebase
+  private updateLocalTrackingData(firebaseData: UserTrackingRecord[]) {
+    this.trackingData.clear();
+    
+    firebaseData.forEach(record => {
+      const trackingData: TrackingData = {
+        userId: record.userId,
+        location: {
+          latitude: record.currentLocation.latitude,
+          longitude: record.currentLocation.longitude,
+          accuracy: record.currentLocation.accuracy,
+          timestamp: record.currentLocation.timestamp
+        },
+        isActive: record.isOnline,
+        status: record.status
+      };
+      
+      this.trackingData.set(record.userId, trackingData);
+    });
   }
 
   // Start tracking for a user
@@ -117,8 +156,22 @@ class RealtimeTrackingService {
 
   // Get tracking history for a user
   async getUserTrackingHistory(userId: string, limit: number = 100) {
-    // Mock implementation - return empty array for demo
-    return [];
+    try {
+      return await trackingDataService.getUserLocationHistory(userId, limit);
+    } catch (error) {
+      console.error('Error getting user tracking history:', error);
+      return [];
+    }
+  }
+
+  // Get all user tracking data from Firebase
+  async getAllUserTrackingData(): Promise<UserTrackingRecord[]> {
+    try {
+      return await trackingDataService.getAllUserTrackingRecords();
+    } catch (error) {
+      console.error('Error getting all user tracking data:', error);
+      return [];
+    }
   }
 
   // Add tracking event
@@ -160,6 +213,12 @@ class RealtimeTrackingService {
   cleanup() {
     this.removeAllListeners();
     this.trackingData.clear();
+    
+    // Unsubscribe from Firebase listener
+    if (this.firebaseUnsubscribe) {
+      this.firebaseUnsubscribe();
+      this.firebaseUnsubscribe = null;
+    }
   }
 
   // Emit events to listeners

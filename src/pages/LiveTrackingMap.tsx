@@ -1,19 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
   Button,
-  TextField,
   Paper,
   Card,
   CardContent,
   Alert,
-  Snackbar,
   Pagination,
-  Tooltip,
   Avatar,
   Badge,
-  Chip
+  Chip,
+  CircularProgress
 } from '@mui/material';
 import {
   Map as MapIcon,
@@ -29,9 +27,15 @@ import {
   Analytics as AnalyticsIcon,
   History as HistoryIcon
 } from '@mui/icons-material';
+import realtimeTrackingService from '../services/realtimeTracking';
+import locationTrackingService from '../services/locationTracking';
+import authService from '../services/authService';
+import LocationConsentModal from '../components/LocationConsentModal';
+import LiveMap from '../components/LiveMap';
+import trackingDataService from '../services/trackingDataService';
 
 interface UserTrackingData {
-  id: string;
+  id?: string;
   userId: string;
   userName: string;
   userEmail: string;
@@ -45,31 +49,29 @@ interface UserTrackingData {
   totalDistance?: number;
   lastActivity?: Date;
   loginTime?: Date;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 interface DeviceInfo {
-  id: string;
-  type: 'desktop' | 'laptop' | 'tablet' | 'mobile' | 'smartwatch';
-  name: string;
-  model: string;
+  userAgent: string;
+  platform: string;
+  language: string;
+  timezone: string;
+  browser: string;
+  browserVersion: string;
   os: string;
-  browser?: string;
-  ipAddress: string;
-  lastSync: Date;
-  isTrusted: boolean;
+  osVersion: string;
+  deviceType: string;
+  screenResolution: string;
 }
 
 interface Location {
   latitude: number;
   longitude: number;
   accuracy: number;
-  address: string;
-  city: string;
-  state: string;
-  country: string;
-  postalCode: string;
-  timestamp: Date;
-  source: 'gps' | 'network' | 'manual' | 'estimated';
+  timestamp: number;
+  address?: string;
 }
 
 const statusColors = {
@@ -87,91 +89,72 @@ const deviceTypeIcons = {
   smartwatch: <WatchIcon />
 };
 
+const getDeviceIcon = (deviceType: string) => {
+  return deviceTypeIcons[deviceType as keyof typeof deviceTypeIcons] || <ComputerIcon />;
+};
+
 const LiveTrackingMap: React.FC = () => {
   const [trackingData, setTrackingData] = useState<UserTrackingData[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [mapView, setMapView] = useState<'all-users' | 'my-location' | 'selected-users'>('all-users');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [, setCurrentUser] = useState<any>(null);
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
-  // Mock data for development
-  const mockTrackingData: UserTrackingData[] = [
-    {
-      id: '1',
-      userId: '1',
-      userName: 'John Doe',
-      userEmail: 'john@example.com',
-      userRole: 'Manager',
-      userDepartment: 'IT',
-      deviceInfo: {
-        id: 'dev1',
-        type: 'laptop',
-        name: 'John\'s MacBook',
-        model: 'MacBook Pro 16"',
-        os: 'macOS 14.0',
-        browser: 'Chrome 120.0',
-        ipAddress: '192.168.1.100',
-        lastSync: new Date(),
-        isTrusted: true
-      },
-      currentLocation: {
-        latitude: 37.7749,
-        longitude: -122.4194,
-        accuracy: 10,
-        address: '123 Main St',
-        city: 'San Francisco',
-        state: 'CA',
-        country: 'USA',
-        postalCode: '94102',
-        timestamp: new Date(),
-        source: 'gps'
-      },
-      lastSeen: new Date(),
-      isOnline: true,
-      status: 'online',
-      totalDistance: 15.5,
-      lastActivity: new Date(),
-      loginTime: new Date(Date.now() - 1000 * 60 * 60 * 8)
-    },
-    {
-      id: '2',
-      userId: '2',
-      userName: 'Jane Smith',
-      userEmail: 'jane@example.com',
-      userRole: 'Employee',
-      userDepartment: 'Marketing',
-      deviceInfo: {
-        id: 'dev2',
-        type: 'mobile',
-        name: 'Jane\'s iPhone',
-        model: 'iPhone 15 Pro',
-        os: 'iOS 17.0',
-        ipAddress: '192.168.1.101',
-        lastSync: new Date(),
-        isTrusted: true
-      },
-      currentLocation: {
-        latitude: 37.7849,
-        longitude: -122.4094,
-        accuracy: 15,
-        address: '456 Oak Ave',
-        city: 'San Francisco',
-        state: 'CA',
-        country: 'USA',
-        postalCode: '94103',
-        timestamp: new Date(),
-        source: 'gps'
-      },
-      lastSeen: new Date(Date.now() - 1000 * 60 * 15),
-      isOnline: false,
-      status: 'idle',
-      totalDistance: 8.2,
-      lastActivity: new Date(Date.now() - 1000 * 60 * 20),
-      loginTime: new Date(Date.now() - 1000 * 60 * 60 * 6)
-    }
-  ];
-
+  // Initialize tracking data from Firebase
   useEffect(() => {
-    setTrackingData(mockTrackingData);
+    const initializeTracking = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Get current user
+        const user = await authService.getCurrentUser();
+        setCurrentUser(user);
+
+        // Initialize tracking data service
+        await trackingDataService.initializeTrackingCollections();
+
+        // Set current user in location tracking service
+        if (user) {
+          locationTrackingService.setCurrentUser(user);
+        }
+
+        // Load initial tracking data
+        const data = await realtimeTrackingService.getAllUserTrackingData();
+        setTrackingData(data);
+
+        // Set up real-time listener
+        const unsubscribe = realtimeTrackingService.onAllTrackingUpdates((data: UserTrackingData[]) => {
+          setTrackingData(data);
+        });
+
+        setLoading(false);
+
+        // Store unsubscribe function for cleanup
+        return unsubscribe;
+      } catch (err: any) {
+        console.error('Error initializing tracking:', err);
+        setError(err.message || 'Failed to load tracking data');
+        setLoading(false);
+        return null;
+      }
+    };
+
+    let unsubscribe: (() => void) | null = null;
+    
+    initializeTracking().then((unsub) => {
+      unsubscribe = unsub;
+    });
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
   }, []);
 
   const getStatusIcon = (status: string) => {
@@ -189,41 +172,126 @@ const LiveTrackingMap: React.FC = () => {
     }
   };
 
-  const getDeviceIcon = (deviceType: string) => {
-    return deviceTypeIcons[deviceType as keyof typeof deviceTypeIcons] || <ComputerIcon />;
-  };
-
-  const formatDistance = (distance: number) => {
-    if (distance < 1) {
-      return `${Math.round(distance * 1000)}m`;
+  // Filter data based on map view
+  const filteredData = React.useMemo(() => {
+    if (mapView === 'selected-users') {
+      return trackingData.filter(user => selectedUsers.includes(user.userId));
     }
-    return `${distance.toFixed(1)}km`;
-  };
+    return trackingData;
+  }, [trackingData, mapView, selectedUsers]);
 
   const getOnlineUsersCount = () => {
-    return trackingData.filter(user => user.isOnline).length;
+    return filteredData.filter(user => user.isOnline).length;
   };
 
   const getActiveUsersCount = () => {
-    return trackingData.filter(user => user.status === 'online').length;
+    return filteredData.filter(user => user.status === 'online').length;
   };
 
   const getTotalDevicesCount = () => {
-    return trackingData.length;
+    return filteredData.length;
   };
 
   const getLocationDistribution = () => {
-    const locations = trackingData.map(user => user.currentLocation.city);
-    const uniqueLocations = [...new Set(locations)];
-    return uniqueLocations.length;
+    // Since we don't have city data in the new structure, we'll use a different approach
+    const uniqueLocations = new Set();
+    filteredData.forEach(user => {
+      const key = `${user.currentLocation.latitude.toFixed(2)},${user.currentLocation.longitude.toFixed(2)}`;
+      uniqueLocations.add(key);
+    });
+    return uniqueLocations.size;
   };
 
-  const paginatedData = trackingData.slice(
+  // Handle location consent request
+  const handleRequestLocationConsent = () => {
+    setShowConsentModal(true);
+  };
+
+  // Handle consent acceptance
+  const handleConsentAccept = async () => {
+    try {
+      const result = await locationTrackingService.requestConsent();
+      if (result.success) {
+        console.log('Location consent granted');
+        setError(null);
+      }
+    } catch (error) {
+      console.error('Error requesting location consent:', error);
+      setError('Failed to get location permission');
+    }
+  };
+
+  // Handle consent decline
+  const handleConsentDecline = () => {
+    console.log('Location consent declined');
+    setError(null);
+  };
+
+  // Handle user selection on map
+  const handleUserSelect = (userId: string) => {
+    setSelectedUsers(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+
+  const handleForceLocationUpdate = async () => {
+    try {
+      console.log('🔄 Forcing location update...');
+      const location = await locationTrackingService.forceLocationUpdate();
+      if (location) {
+        console.log('✅ Location updated successfully:', location);
+        // Refresh the data
+        const data = await realtimeTrackingService.getAllUserTrackingData();
+        setTrackingData(data);
+      } else {
+        console.error('❌ Failed to update location');
+      }
+    } catch (error) {
+      console.error('Error forcing location update:', error);
+    }
+  };
+
+  const paginatedData = filteredData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
 
-  const totalPages = Math.ceil(trackingData.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={60} />
+          <Typography variant="h6" sx={{ mt: 2 }}>
+            Loading tracking data...
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+        <Button
+          variant="contained"
+          onClick={() => window.location.reload()}
+        >
+          Retry
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ p: 3 }}>
@@ -249,8 +317,9 @@ const LiveTrackingMap: React.FC = () => {
           <Button
             variant="contained"
             startIcon={<MapIcon />}
+            onClick={handleRequestLocationConsent}
           >
-            Full Screen Map
+            Enable Location Tracking
           </Button>
         </Box>
       </Box>
@@ -311,61 +380,107 @@ const LiveTrackingMap: React.FC = () => {
           </Card>
         </Box>
 
-      {/* Map View Controls */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Typography variant="h6">Map View Controls</Typography>
-          <Box>
-            <Button
-              variant={mapView === 'all-users' ? 'contained' : 'outlined'}
-              onClick={() => setMapView('all-users')}
-              sx={{ mr: 1 }}
-            >
-              All Users
-            </Button>
-            <Button
-              variant={mapView === 'my-location' ? 'contained' : 'outlined'}
-              onClick={() => setMapView('my-location')}
-              sx={{ mr: 1 }}
-            >
-              My Location
-            </Button>
-            <Button
-              variant={mapView === 'selected-users' ? 'contained' : 'outlined'}
-              onClick={() => setMapView('selected-users')}
-            >
-              Selected Users (0)
-            </Button>
-          </Box>
-        </Box>
+             {/* Map View Controls */}
+       <Paper sx={{ p: 2, mb: 3 }}>
+         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+           <Typography variant="h6">Live Tracking Map</Typography>
+           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+             <Button
+               variant={mapView === 'all-users' ? 'contained' : 'outlined'}
+               onClick={() => setMapView('all-users')}
+               size="small"
+             >
+               All Users ({trackingData.length})
+             </Button>
+             <Button
+               variant={mapView === 'my-location' ? 'contained' : 'outlined'}
+               onClick={() => setMapView('my-location')}
+               size="small"
+             >
+               My Location
+             </Button>
+             <Button
+               variant={mapView === 'selected-users' ? 'contained' : 'outlined'}
+               onClick={() => setMapView('selected-users')}
+               size="small"
+               disabled={selectedUsers.length === 0}
+             >
+               Selected ({selectedUsers.length})
+             </Button>
+             {selectedUsers.length > 0 && (
+               <Button
+                 variant="outlined"
+                 onClick={() => setSelectedUsers([])}
+                 size="small"
+                 color="secondary"
+               >
+                 Clear Selection
+               </Button>
+             )}
+             <Button
+               variant="outlined"
+               onClick={handleForceLocationUpdate}
+               size="small"
+               startIcon={<MyLocationIcon />}
+               color="primary"
+             >
+               Update My Location
+             </Button>
+           </Box>
+         </Box>
         
-        {/* Map Placeholder */}
+        {/* Live Map */}
         <Box
           sx={{
             height: 400,
-            bgcolor: 'grey.100',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             borderRadius: 1,
-            border: '2px dashed',
-            borderColor: 'grey.300'
+            overflow: 'hidden',
+            border: '1px solid',
+            borderColor: 'grey.300',
+            position: 'relative'
           }}
         >
-          <Box sx={{ textAlign: 'center' }}>
-            <MapIcon sx={{ fontSize: 64, color: 'grey.400', mb: 2 }} />
-            <Typography variant="h6" color="grey.600">
-              Interactive Map View
-            </Typography>
-            <Typography variant="body2" color="grey.500">
-              {mapView === 'all-users' && `${trackingData.length} users displayed`}
-              {mapView === 'my-location' && 'Centered on your current location'}
-              {mapView === 'selected-users' && '0 selected users displayed'}
-            </Typography>
-            <Typography variant="caption" color="grey.400">
-              Map integration would be implemented here
-            </Typography>
-          </Box>
+          {filteredData.length === 0 ? (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: '100%',
+                backgroundColor: 'grey.50',
+                color: 'text.secondary'
+              }}
+            >
+              <MyLocationIcon sx={{ fontSize: 64, mb: 2, opacity: 0.5 }} />
+              <Typography variant="h6" gutterBottom>
+                No Location Data Available
+              </Typography>
+              <Typography variant="body2" textAlign="center" sx={{ maxWidth: 400 }}>
+                {trackingData.length === 0 
+                  ? "No users are currently being tracked. Grant location permission to start tracking your location."
+                  : "No users match the current filter. Try selecting 'All Users' or adjust your selection."
+                }
+              </Typography>
+              {trackingData.length === 0 && (
+                <Button
+                  variant="contained"
+                  startIcon={<MyLocationIcon />}
+                  onClick={handleRequestLocationConsent}
+                  sx={{ mt: 2 }}
+                >
+                  Start Location Tracking
+                </Button>
+              )}
+            </Box>
+          ) : (
+            <LiveMap
+              users={filteredData}
+              mapView={mapView}
+              selectedUsers={selectedUsers}
+              onUserSelect={handleUserSelect}
+            />
+          )}
         </Box>
       </Paper>
 
@@ -375,7 +490,28 @@ const LiveTrackingMap: React.FC = () => {
           <Typography variant="h6">User Tracking Data</Typography>
         </Box>
         <Box sx={{ p: 2 }}>
-          {paginatedData.map((user) => (
+          {paginatedData.length === 0 ? (
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              py: 6,
+              textAlign: 'center'
+            }}>
+              <LocationIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                No Tracking Data
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 400 }}>
+                {trackingData.length === 0 
+                  ? "No users are currently being tracked. Start location tracking to see data here."
+                  : "No users match the current filter or page."
+                }
+              </Typography>
+            </Box>
+          ) : (
+            paginatedData.map((user) => (
             <Card key={user.id} sx={{ mb: 2 }}>
               <CardContent>
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(4, 1fr)' }, gap: 2, alignItems: 'center' }}>
@@ -399,13 +535,13 @@ const LiveTrackingMap: React.FC = () => {
                     </Box>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {getDeviceIcon(user.deviceInfo.type)}
+                    {getDeviceIcon(user.deviceInfo.deviceType)}
                     <Box>
                       <Typography variant="body2" fontWeight="medium">
-                        {user.deviceInfo.name}
+                        {user.deviceInfo.browser} {user.deviceInfo.browserVersion}
                       </Typography>
                       <Typography variant="caption" color="textSecondary">
-                        {user.deviceInfo.os}
+                        {user.deviceInfo.os} {user.deviceInfo.osVersion}
                       </Typography>
                     </Box>
                   </Box>
@@ -413,10 +549,10 @@ const LiveTrackingMap: React.FC = () => {
                     <LocationIcon fontSize="small" color="action" />
                     <Box>
                       <Typography variant="body2">
-                        {user.currentLocation.city}, {user.currentLocation.state}
+                        {user.currentLocation.latitude.toFixed(4)}, {user.currentLocation.longitude.toFixed(4)}
                       </Typography>
                       <Typography variant="caption" color="textSecondary">
-                        {user.currentLocation.address}
+                        Accuracy: {user.currentLocation.accuracy}m
                       </Typography>
                     </Box>
                   </Box>
@@ -442,7 +578,8 @@ const LiveTrackingMap: React.FC = () => {
                 </Box>
               </CardContent>
             </Card>
-          ))}
+            ))
+          )}
         </Box>
       </Paper>
 
@@ -459,8 +596,18 @@ const LiveTrackingMap: React.FC = () => {
           />
         </Box>
       )}
+
+      {/* Location Consent Modal */}
+      <LocationConsentModal
+        open={showConsentModal}
+        onClose={() => setShowConsentModal(false)}
+        onAccept={handleConsentAccept}
+        onDecline={handleConsentDecline}
+      />
     </Box>
   );
 };
 
 export default LiveTrackingMap;
+
+
