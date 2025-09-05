@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   Button,
   TextField,
@@ -28,36 +27,24 @@ import {
   Snackbar,
   Tooltip,
   Stack,
-  Divider,
-  Container,
   Fade,
-  Tabs,
-  Tab,
-  TablePagination,
-  Switch,
-  FormControlLabel,
-  useTheme,
-  alpha
+  TablePagination
 } from '@mui/material';
 import {
-  Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
   Download as DownloadIcon,
   Upload as UploadIcon,
   Search as SearchIcon,
-  FilterList as FilterIcon,
   Visibility as ViewIcon,
   Description as DocumentIcon,
   Folder as FolderIcon,
-  Share as ShareIcon,
   Security as SecurityIcon,
   Schedule as ScheduleIcon,
-  Close as CloseIcon,
   CloudUpload as CloudUploadIcon,
-  AttachFile as AttachFileIcon,
   Assignment as AssignmentIcon
 } from '@mui/icons-material';
+import firebaseService from '../services/firebaseService';
 
 // Types
 interface Document {
@@ -90,36 +77,15 @@ interface DocumentFormData {
   expiryDate: string;
 }
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
 
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`document-tabpanel-${index}`}
-      aria-labelledby={`document-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  );
-}
 
 const DocumentManagement: React.FC = () => {
-  const theme = useTheme();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<DocumentType | 'all'>('all');
   const [accessFilter, setAccessFilter] = useState<'all' | 'public' | 'private' | 'restricted'>('all');
-  const [tabValue, setTabValue] = useState(0);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -137,76 +103,52 @@ const DocumentManagement: React.FC = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [processing, setProcessing] = useState(false);
 
-  // Sample data
-  const sampleDocuments: Document[] = [
-    {
-      id: '1',
-      title: 'Employee Handbook 2024',
-      type: 'policy',
-      category: 'HR Policies',
-      uploadedBy: 'John Doe',
-      uploadedAt: '2024-01-15T10:30:00Z',
-      fileSize: 2048576,
-      fileType: 'pdf',
-      url: '/documents/handbook-2024.pdf',
-      tags: ['handbook', 'policy', 'employees'],
-      accessLevel: 'public',
-      description: 'Updated employee handbook for 2024',
-      version: 2,
-      isActive: true
-    },
-    {
-      id: '2',
-      title: 'Q4 Financial Report',
-      type: 'report',
-      category: 'Finance',
-      uploadedBy: 'Jane Smith',
-      uploadedAt: '2024-01-10T14:20:00Z',
-      fileSize: 1536000,
-      fileType: 'pdf',
-      url: '/documents/q4-report.pdf',
-      tags: ['finance', 'quarterly', 'report'],
-      accessLevel: 'restricted',
-      description: 'Quarterly financial performance report',
-      version: 1,
-      isActive: true
-    },
-    {
-      id: '3',
-      title: 'Safety Training Certificate',
-      type: 'certificate',
-      category: 'Training',
-      uploadedBy: 'Mike Johnson',
-      uploadedAt: '2024-01-08T09:15:00Z',
-      fileSize: 512000,
-      fileType: 'pdf',
-      url: '/documents/safety-cert.pdf',
-      tags: ['safety', 'training', 'certificate'],
-      accessLevel: 'private',
-      expiryDate: '2024-12-31T23:59:59Z',
-      description: 'Annual safety training certification',
-      version: 1,
-      isActive: true
-    }
-  ];
+
 
   useEffect(() => {
     loadDocuments();
   }, []);
 
-  const loadDocuments = async () => {
+  const loadDocuments = useCallback(async () => {
     try {
       setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setDocuments(sampleDocuments);
-    } catch (err) {
-      setError('Failed to load documents');
+      setError('');
+      
+      const result = await firebaseService.getCollection('documents');
+      
+      if (result?.success && result.data) {
+        // Transform Firebase data to match Document interface
+        const transformedDocuments: Document[] = result.data.map((doc: any) => ({
+          id: doc.id,
+          title: doc.title || '',
+          type: doc.type || 'other',
+          category: doc.category || '',
+          uploadedBy: doc.uploadedBy || doc.uploadedBy || 'Unknown',
+          uploadedAt: doc.uploadedAt || doc.createdAt || new Date().toISOString(),
+          fileSize: doc.fileSize || 0,
+          fileType: doc.fileType || doc.fileExtension || 'unknown',
+          url: doc.url || doc.downloadUrl || '',
+          tags: doc.tags || [],
+          accessLevel: doc.accessLevel || 'private',
+          expiryDate: doc.expiryDate || undefined,
+          description: doc.description || '',
+          version: doc.version || 1,
+          isActive: doc.isActive !== false
+        }));
+        
+        setDocuments(transformedDocuments);
+      } else {
+        setDocuments([]);
+      }
+    } catch (err: any) {
+      console.error('Error loading documents:', err);
+      setError(err.message || 'Failed to load documents');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -217,9 +159,7 @@ const DocumentManagement: React.FC = () => {
     return matchesSearch && matchesType && matchesAccess;
   });
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
+
 
   const handleUploadClick = () => {
     setFormData({
@@ -259,66 +199,98 @@ const DocumentManagement: React.FC = () => {
     if (file) {
       setUploadFile(file);
       if (!formData.title) {
-        setFormData(prev => ({ ...prev, title: file.name.split('.')[0] }));
+        const fileName = file.name.split('.')[0];
+        setFormData(prev => ({ ...prev, title: fileName || 'Untitled Document' }));
       }
     }
   };
 
   const handleFormSubmit = async () => {
     try {
+      setProcessing(true);
+      
       if (showUploadDialog) {
         if (!uploadFile) {
           setSnackbar({ open: true, message: 'Please select a file to upload', severity: 'error' });
           return;
         }
         
-        // Simulate upload
-        const newDocument: Document = {
-          id: Date.now().toString(),
+        const documentData = {
           title: formData.title,
           type: formData.type,
           category: formData.category,
-          uploadedBy: 'Current User',
+          uploadedBy: 'Current User', // TODO: Get from auth context
           uploadedAt: new Date().toISOString(),
           fileSize: uploadFile.size,
           fileType: uploadFile.name.split('.').pop() || 'unknown',
-          url: `/documents/${uploadFile.name}`,
+          url: `/documents/${uploadFile.name}`, // TODO: Implement actual file upload
           tags: formData.tags,
           accessLevel: formData.accessLevel,
           expiryDate: formData.expiryDate || undefined,
           description: formData.description,
           version: 1,
-          isActive: true
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         };
         
-        setDocuments(prev => [newDocument, ...prev]);
+        const result = await firebaseService.addDocument('documents', documentData);
+        
+        if (result?.success) {
         setSnackbar({ open: true, message: 'Document uploaded successfully', severity: 'success' });
         setShowUploadDialog(false);
+          loadDocuments(); // Reload documents from Firebase
+        } else {
+          throw new Error(result?.error || 'Failed to upload document');
+        }
       } else if (showEditDialog && selectedDocument) {
-        // Simulate update
-        setDocuments(prev => prev.map(doc => 
-          doc.id === selectedDocument.id 
-            ? { ...doc, ...formData, version: doc.version + 1 }
-            : doc
-        ));
+        const documentData = {
+          title: formData.title,
+          type: formData.type,
+          category: formData.category,
+          tags: formData.tags,
+          accessLevel: formData.accessLevel,
+          expiryDate: formData.expiryDate || undefined,
+          description: formData.description,
+          version: selectedDocument.version + 1,
+          updatedAt: new Date().toISOString()
+        };
+        
+        const result = await firebaseService.updateDocument('documents', selectedDocument.id, documentData);
+        
+        if (result?.success) {
         setSnackbar({ open: true, message: 'Document updated successfully', severity: 'success' });
         setShowEditDialog(false);
+          loadDocuments(); // Reload documents from Firebase
+        } else {
+          throw new Error(result?.error || 'Failed to update document');
+        }
       }
-    } catch (err) {
-      setSnackbar({ open: true, message: 'Operation failed', severity: 'error' });
+    } catch (err: any) {
+      console.error('Error in form submission:', err);
+      setSnackbar({ open: true, message: err.message || 'Operation failed', severity: 'error' });
+    } finally {
+      setProcessing(false);
     }
   };
 
   const handleDelete = async () => {
     try {
       if (selectedDocument) {
-        setDocuments(prev => prev.filter(doc => doc.id !== selectedDocument.id));
+        const result = await firebaseService.deleteDocument('documents', selectedDocument.id);
+        
+        if (result?.success) {
         setSnackbar({ open: true, message: 'Document deleted successfully', severity: 'success' });
         setShowDeleteDialog(false);
         setSelectedDocument(null);
+          loadDocuments(); // Reload documents from Firebase
+        } else {
+          throw new Error(result?.error || 'Failed to delete document');
+        }
       }
-    } catch (err) {
-      setSnackbar({ open: true, message: 'Failed to delete document', severity: 'error' });
+    } catch (err: any) {
+      console.error('Error deleting document:', err);
+      setSnackbar({ open: true, message: err.message || 'Failed to delete document', severity: 'error' });
     }
   };
 
@@ -366,30 +338,54 @@ const DocumentManagement: React.FC = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center' }}>
-        <CircularProgress />
-      </Container>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '50vh',
+        bgcolor: 'grey.50'
+      }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={60} sx={{ mb: 2 }} />
+          <Typography variant="h6" sx={{ color: 'text.secondary' }}>
+            Loading Documents...
+          </Typography>
+        </Box>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+    <Box sx={{ p: 3, bgcolor: 'grey.50', minHeight: '100vh' }}>
       <Fade in timeout={300}>
         <Box>
           {/* Header */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+            <Box>
+              <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
               Document Management
             </Typography>
+              <Typography variant="body1" color="textSecondary">
+                Manage and organize your documents securely
+              </Typography>
+            </Box>
             <Button
               variant="contained"
               startIcon={<UploadIcon />}
               onClick={handleUploadClick}
               sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: 2,
+                px: 3,
+                py: 1.5,
+                textTransform: 'none',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+                boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)'
                 },
+                transition: 'all 0.3s ease'
               }}
             >
               Upload Document
@@ -402,67 +398,260 @@ const DocumentManagement: React.FC = () => {
             </Alert>
           )}
 
-          {/* Stats Cards */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 2, mb: 3 }}>
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <DocumentIcon sx={{ mr: 2, color: 'primary.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {documents.length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
+          {/* Statistics Cards */}
+          <Box sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, 
+            gap: 3, 
+            mb: 4 
+          }}>
+            <Card sx={{ 
+              p: 2.5, 
+              bgcolor: 'white', 
+              height: '100%', 
+              minHeight: 120,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'grey.100',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.12)',
+                borderColor: 'primary.200'
+              }
+            }}>
+              <CardContent sx={{ p: 0 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  mb: 1.5
+                }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      color="textSecondary" 
+                      sx={{ 
+                        fontWeight: '600',
+                        fontSize: '0.75rem',
+                        mb: 0.5
+                      }}
+                    >
                       Total Documents
                     </Typography>
+                    <Typography 
+                      variant="h4" 
+                      component="div" 
+                      sx={{ 
+                        fontWeight: '700', 
+                        color: 'primary.main',
+                        lineHeight: 1.1
+                      }}
+                    >
+                      {documents.length}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    p: 1, 
+                    borderRadius: 2, 
+                    bgcolor: 'primary.50',
+                    color: 'primary.main',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <DocumentIcon sx={{ fontSize: 24 }} />
                   </Box>
                 </Box>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <FolderIcon sx={{ mr: 2, color: 'success.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {new Set(documents.map(d => d.category)).size}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
+            <Card sx={{ 
+              p: 2.5, 
+              bgcolor: 'white', 
+              height: '100%', 
+              minHeight: 120,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'grey.100',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.12)',
+                borderColor: 'success.200'
+              }
+            }}>
+              <CardContent sx={{ p: 0 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  mb: 1.5
+                }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      color="textSecondary" 
+                      sx={{ 
+                        fontWeight: '600',
+                        fontSize: '0.75rem',
+                        mb: 0.5
+                      }}
+                    >
                       Categories
                     </Typography>
+                    <Typography 
+                      variant="h4" 
+                      component="div" 
+                      sx={{ 
+                        fontWeight: '700', 
+                        color: 'success.main',
+                        lineHeight: 1.1
+                      }}
+                    >
+                      {new Set(documents.map(d => d.category)).size}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    p: 1, 
+                    borderRadius: 2, 
+                    bgcolor: 'success.50',
+                    color: 'success.main',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <FolderIcon sx={{ fontSize: 24 }} />
                   </Box>
                 </Box>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <SecurityIcon sx={{ mr: 2, color: 'warning.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {documents.filter(d => d.accessLevel === 'restricted').length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
+            <Card sx={{ 
+              p: 2.5, 
+              bgcolor: 'white', 
+              height: '100%', 
+              minHeight: 120,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'grey.100',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.12)',
+                borderColor: 'warning.200'
+              }
+            }}>
+              <CardContent sx={{ p: 0 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  mb: 1.5
+                }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      color="textSecondary" 
+                      sx={{ 
+                        fontWeight: '600',
+                        fontSize: '0.75rem',
+                        mb: 0.5
+                      }}
+                    >
                       Restricted
                     </Typography>
+                    <Typography 
+                      variant="h4" 
+                      component="div" 
+                      sx={{ 
+                        fontWeight: '700', 
+                        color: 'warning.main',
+                        lineHeight: 1.1
+                      }}
+                    >
+                      {documents.filter(d => d.accessLevel === 'restricted').length}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    p: 1, 
+                    borderRadius: 2, 
+                    bgcolor: 'warning.50',
+                    color: 'warning.main',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <SecurityIcon sx={{ fontSize: 24 }} />
                   </Box>
                 </Box>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ScheduleIcon sx={{ mr: 2, color: 'error.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {documents.filter(d => d.expiryDate && new Date(d.expiryDate) < new Date()).length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
+            <Card sx={{ 
+              p: 2.5, 
+              bgcolor: 'white', 
+              height: '100%', 
+              minHeight: 120,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'grey.100',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.12)',
+                borderColor: 'error.200'
+              }
+            }}>
+              <CardContent sx={{ p: 0 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  mb: 1.5
+                }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      color="textSecondary" 
+                      sx={{ 
+                        fontWeight: '600',
+                        fontSize: '0.75rem',
+                        mb: 0.5
+                      }}
+                    >
                       Expired
                     </Typography>
+                    <Typography 
+                      variant="h4" 
+                      component="div" 
+                      sx={{ 
+                        fontWeight: '700', 
+                        color: 'error.main',
+                        lineHeight: 1.1
+                      }}
+                    >
+                      {documents.filter(d => d.expiryDate && new Date(d.expiryDate) < new Date()).length}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    p: 1, 
+                    borderRadius: 2, 
+                    bgcolor: 'error.50',
+                    color: 'error.main',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <ScheduleIcon sx={{ fontSize: 24 }} />
                   </Box>
                 </Box>
               </CardContent>
@@ -470,8 +659,24 @@ const DocumentManagement: React.FC = () => {
           </Box>
 
           {/* Filters */}
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Card sx={{ 
+            bgcolor: 'white', 
+            boxShadow: 2,
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: 'grey.200',
+            mb: 3
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: 'text.primary' }}>
+                Filters & Search
+              </Typography>
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, 
+                gap: 2, 
+                alignItems: 'center' 
+              }}>
               <TextField
                 placeholder="Search documents..."
                 value={searchTerm}
@@ -479,16 +684,29 @@ const DocumentManagement: React.FC = () => {
                 InputProps={{
                   startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
                 }}
-                size="small"
-                sx={{ minWidth: 300 }}
-              />
-              
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+                  size="medium"
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main'
+                      }
+                    }
+                  }}
+                />
+                
+                <FormControl size="medium">
                 <InputLabel>Type</InputLabel>
                 <Select
                   value={typeFilter}
                   label="Type"
                   onChange={(e) => setTypeFilter(e.target.value as DocumentType | 'all')}
+                    sx={{
+                      borderRadius: 2,
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'grey.300'
+                      }
+                    }}
                 >
                   <MenuItem value="all">All Types</MenuItem>
                   <MenuItem value="policy">Policy</MenuItem>
@@ -500,12 +718,18 @@ const DocumentManagement: React.FC = () => {
                 </Select>
               </FormControl>
 
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <FormControl size="medium">
                 <InputLabel>Access Level</InputLabel>
                 <Select
                   value={accessFilter}
                   label="Access Level"
                   onChange={(e) => setAccessFilter(e.target.value as 'all' | 'public' | 'private' | 'restricted')}
+                    sx={{
+                      borderRadius: 2,
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'grey.300'
+                      }
+                    }}
                 >
                   <MenuItem value="all">All Levels</MenuItem>
                   <MenuItem value="public">Public</MenuItem>
@@ -514,29 +738,48 @@ const DocumentManagement: React.FC = () => {
                 </Select>
               </FormControl>
             </Box>
-          </Paper>
+            </CardContent>
+          </Card>
 
           {/* Document Table */}
-          <Paper>
+          <Card sx={{ 
+            bgcolor: 'white', 
+            boxShadow: 2,
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: 'grey.200',
+            overflow: 'hidden'
+          }}>
             <TableContainer>
               <Table>
                 <TableHead>
-                  <TableRow>
-                    <TableCell>Document</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Category</TableCell>
-                    <TableCell>Access Level</TableCell>
-                    <TableCell>Uploaded By</TableCell>
-                    <TableCell>Upload Date</TableCell>
-                    <TableCell>Size</TableCell>
-                    <TableCell align="center">Actions</TableCell>
+                  <TableRow sx={{ bgcolor: 'grey.50' }}>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Document</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Type</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Category</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Access Level</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Uploaded By</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Upload Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Size</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.primary' }}>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredDocuments
                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((document) => (
-                      <TableRow key={document.id} hover>
+                      <TableRow 
+                        key={document.id} 
+                        hover
+                        sx={{ 
+                          '&:hover': { 
+                            bgcolor: 'primary.50' 
+                          },
+                          '&:nth-of-type(even)': {
+                            bgcolor: 'grey.25'
+                          }
+                        }}
+                      >
                         <TableCell>
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                             {getDocumentIcon(document.type)}
@@ -581,22 +824,66 @@ const DocumentManagement: React.FC = () => {
                         <TableCell align="center">
                           <Stack direction="row" spacing={1} justifyContent="center">
                             <Tooltip title="View">
-                              <IconButton size="small" onClick={() => handleDownload(document)}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleDownload(document)}
+                                sx={{ 
+                                  color: 'primary.main',
+                                  '&:hover': { 
+                                    bgcolor: 'primary.50',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
                                 <ViewIcon />
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Download">
-                              <IconButton size="small" onClick={() => handleDownload(document)}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleDownload(document)}
+                                sx={{ 
+                                  color: 'success.main',
+                                  '&:hover': { 
+                                    bgcolor: 'success.50',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
                                 <DownloadIcon />
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Edit">
-                              <IconButton size="small" onClick={() => handleEditClick(document)}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleEditClick(document)}
+                                sx={{ 
+                                  color: 'info.main',
+                                  '&:hover': { 
+                                    bgcolor: 'info.50',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
                                 <EditIcon />
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Delete">
-                              <IconButton size="small" onClick={() => handleDeleteClick(document)}>
+                              <IconButton 
+                                size="small" 
+                                onClick={() => handleDeleteClick(document)}
+                                sx={{ 
+                                  color: 'error.main',
+                                  '&:hover': { 
+                                    bgcolor: 'error.50',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
                                 <DeleteIcon />
                               </IconButton>
                             </Tooltip>
@@ -616,21 +903,47 @@ const DocumentManagement: React.FC = () => {
               page={page}
               onPageChange={handleChangePage}
               onRowsPerPageChange={handleChangeRowsPerPage}
+              sx={{
+                borderTop: '1px solid',
+                borderColor: 'grey.200',
+                bgcolor: 'grey.50'
+              }}
             />
-          </Paper>
+          </Card>
 
           {/* Upload Dialog */}
-          <Dialog open={showUploadDialog} onClose={() => setShowUploadDialog(false)} maxWidth="md" fullWidth>
-            <DialogTitle>Upload Document</DialogTitle>
-            <DialogContent>
+          <Dialog 
+            open={showUploadDialog} 
+            onClose={() => setShowUploadDialog(false)} 
+            maxWidth="md" 
+            fullWidth
+            PaperProps={{
+              sx: {
+                borderRadius: 3,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+                border: '1px solid',
+                borderColor: 'grey.200'
+              }
+            }}
+          >
+            <DialogTitle sx={{ 
+              bgcolor: 'primary.main', 
+              color: 'white',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              fontSize: '1.25rem'
+            }}>
+              Upload Document
+            </DialogTitle>
+            <DialogContent sx={{ p: 3 }}>
               <Stack spacing={3} sx={{ mt: 1 }}>
                 <Box sx={{ 
                   border: '2px dashed',
-                  borderColor: 'divider',
+                  borderColor: 'primary.main',
                   borderRadius: 2,
                   p: 3,
                   textAlign: 'center',
-                  bgcolor: alpha(theme.palette.primary.main, 0.02)
+                  bgcolor: 'primary.50'
                 }}>
                   <input
                     accept="*/*"
@@ -719,16 +1032,79 @@ const DocumentManagement: React.FC = () => {
                 />
               </Stack>
             </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setShowUploadDialog(false)}>Cancel</Button>
-              <Button variant="contained" onClick={handleFormSubmit}>Upload</Button>
+            <DialogActions sx={{ p: 3, gap: 2 }}>
+              <Button 
+                onClick={() => setShowUploadDialog(false)}
+                sx={{ 
+                  px: 3, 
+                  py: 1.5,
+                  borderRadius: 2,
+                  borderColor: 'grey.400',
+                  color: 'text.secondary',
+                  fontWeight: '600',
+                  '&:hover': {
+                    borderColor: 'grey.600',
+                    bgcolor: 'grey.50',
+                    transform: 'translateY(-1px)'
+                  },
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="contained" 
+                onClick={handleFormSubmit}
+                disabled={processing || !uploadFile || !formData.title}
+                sx={{ 
+                  px: 3, 
+                  py: 1.5,
+                  borderRadius: 2,
+                  fontWeight: '600',
+                  bgcolor: 'primary.main',
+                  boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+                  '&:hover': {
+                    bgcolor: 'primary.dark',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)'
+                  },
+                  transition: 'all 0.3s ease',
+                  '&:disabled': {
+                    bgcolor: 'grey.400',
+                    boxShadow: 'none'
+                  }
+                }}
+              >
+                {processing ? <CircularProgress size={20} /> : 'Upload'}
+              </Button>
             </DialogActions>
           </Dialog>
 
           {/* Edit Dialog */}
-          <Dialog open={showEditDialog} onClose={() => setShowEditDialog(false)} maxWidth="md" fullWidth>
-            <DialogTitle>Edit Document</DialogTitle>
-            <DialogContent>
+          <Dialog 
+            open={showEditDialog} 
+            onClose={() => setShowEditDialog(false)} 
+            maxWidth="md" 
+            fullWidth
+            PaperProps={{
+              sx: {
+                borderRadius: 3,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+                border: '1px solid',
+                borderColor: 'grey.200'
+              }
+            }}
+          >
+            <DialogTitle sx={{ 
+              bgcolor: 'primary.main', 
+              color: 'white',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              fontSize: '1.25rem'
+            }}>
+              Edit Document
+            </DialogTitle>
+            <DialogContent sx={{ p: 3 }}>
               <Stack spacing={3} sx={{ mt: 1 }}>
                 <TextField
                   label="Title"
@@ -793,23 +1169,122 @@ const DocumentManagement: React.FC = () => {
                 />
               </Stack>
             </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setShowEditDialog(false)}>Cancel</Button>
-              <Button variant="contained" onClick={handleFormSubmit}>Update</Button>
+            <DialogActions sx={{ p: 3, gap: 2 }}>
+              <Button 
+                onClick={() => setShowEditDialog(false)}
+                sx={{ 
+                  px: 3, 
+                  py: 1.5,
+                  borderRadius: 2,
+                  borderColor: 'grey.400',
+                  color: 'text.secondary',
+                  fontWeight: '600',
+                  '&:hover': {
+                    borderColor: 'grey.600',
+                    bgcolor: 'grey.50',
+                    transform: 'translateY(-1px)'
+                  },
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="contained" 
+                onClick={handleFormSubmit}
+                disabled={processing || !formData.title}
+                sx={{ 
+                  px: 3, 
+                  py: 1.5,
+                  borderRadius: 2,
+                  fontWeight: '600',
+                  bgcolor: 'primary.main',
+                  boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+                  '&:hover': {
+                    bgcolor: 'primary.dark',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)'
+                  },
+                  transition: 'all 0.3s ease',
+                  '&:disabled': {
+                    bgcolor: 'grey.400',
+                    boxShadow: 'none'
+                  }
+                }}
+              >
+                {processing ? <CircularProgress size={20} /> : 'Update'}
+              </Button>
             </DialogActions>
           </Dialog>
 
           {/* Delete Confirmation Dialog */}
-          <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)}>
-            <DialogTitle>Delete Document</DialogTitle>
-            <DialogContent>
-              <Typography>
-                Are you sure you want to delete "{selectedDocument?.title}"? This action cannot be undone.
+          <Dialog 
+            open={showDeleteDialog} 
+            onClose={() => setShowDeleteDialog(false)}
+            PaperProps={{
+              sx: {
+                borderRadius: 3,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+                border: '1px solid',
+                borderColor: 'grey.200'
+              }
+            }}
+          >
+            <DialogTitle sx={{ 
+              bgcolor: 'error.main', 
+              color: 'white',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              fontSize: '1.25rem'
+            }}>
+              Delete Document
+            </DialogTitle>
+            <DialogContent sx={{ p: 3 }}>
+              <Typography variant="body1" sx={{ textAlign: 'center', py: 2 }}>
+                Are you sure you want to delete <strong>&quot;{selectedDocument?.title}&quot;</strong>? 
+                <br />
+                <Typography variant="body2" color="error" sx={{ mt: 1 }}>
+                  This action cannot be undone.
+                </Typography>
               </Typography>
             </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
-              <Button variant="contained" color="error" onClick={handleDelete}>
+            <DialogActions sx={{ p: 3, gap: 2 }}>
+              <Button 
+                onClick={() => setShowDeleteDialog(false)}
+                sx={{ 
+                  px: 3, 
+                  py: 1.5,
+                  borderRadius: 2,
+                  borderColor: 'grey.400',
+                  color: 'text.secondary',
+                  fontWeight: '600',
+                  '&:hover': {
+                    borderColor: 'grey.600',
+                    bgcolor: 'grey.50',
+                    transform: 'translateY(-1px)'
+                  },
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant="contained" 
+                color="error" 
+                onClick={handleDelete}
+                sx={{ 
+                  px: 3, 
+                  py: 1.5,
+                  borderRadius: 2,
+                  fontWeight: '600',
+                  boxShadow: '0 4px 12px rgba(211, 47, 47, 0.3)',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 6px 20px rgba(211, 47, 47, 0.4)'
+                  },
+                  transition: 'all 0.3s ease'
+                }}
+              >
                 Delete
               </Button>
             </DialogActions>
@@ -827,7 +1302,7 @@ const DocumentManagement: React.FC = () => {
           </Snackbar>
         </Box>
       </Fade>
-    </Container>
+    </Box>
   );
 };
 

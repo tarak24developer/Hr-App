@@ -10,8 +10,7 @@ import {
   limit,
   onSnapshot,
   serverTimestamp,
-  writeBatch,
-  deleteDoc
+  writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -128,13 +127,14 @@ class TrackingDataService {
       return { success: true };
     } catch (error) {
       console.error('Error initializing tracking collections:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
   // Initialize user consent collection
   private async initializeUserConsentCollection() {
     try {
+      if (!db) throw new Error('Firestore not initialized');
       const consentCollection = collection(db, TRACKING_COLLECTIONS.USER_CONSENT);
       const existingConsent = await getDocs(consentCollection);
       
@@ -151,6 +151,7 @@ class TrackingDataService {
   // Initialize tracking analytics collection
   private async initializeTrackingAnalyticsCollection() {
     try {
+      if (!db) throw new Error('Firestore not initialized');
       const analyticsCollection = collection(db, TRACKING_COLLECTIONS.TRACKING_ANALYTICS);
       const existingAnalytics = await getDocs(analyticsCollection);
       
@@ -186,13 +187,13 @@ class TrackingDataService {
       
       if (!existingDocs.empty) {
         // Update existing record
-        const docRef = doc(db, TRACKING_COLLECTIONS.USER_TRACKING, existingDocs.docs[0].id);
+        const docRef = doc(db!, TRACKING_COLLECTIONS.USER_TRACKING, existingDocs.docs[0]!.id);
         await updateDoc(docRef, {
           ...record,
           updatedAt: serverTimestamp()
         });
         
-        return { success: true, data: { id: existingDocs.docs[0].id, ...record } };
+        return { success: true, data: { id: existingDocs.docs[0]!.id, ...record } };
       } else {
         // Create new record
         const docRef = await addDoc(collectionRef, {
@@ -205,7 +206,7 @@ class TrackingDataService {
       }
     } catch (error) {
       console.error('Error saving user tracking record:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
@@ -230,13 +231,13 @@ class TrackingDataService {
       
       if (!existingDocs.empty) {
         // Update existing consent
-        const docRef = doc(db, TRACKING_COLLECTIONS.USER_CONSENT, existingDocs.docs[0].id);
+        const docRef = doc(db!, TRACKING_COLLECTIONS.USER_CONSENT, existingDocs.docs[0]!.id);
         await updateDoc(docRef, {
           ...record,
           updatedAt: serverTimestamp()
         });
         
-        return { success: true, data: { id: existingDocs.docs[0].id, ...record } };
+        return { success: true, data: { id: existingDocs.docs[0]!.id, ...record } };
       } else {
         // Create new consent
         const docRef = await addDoc(collectionRef, {
@@ -249,7 +250,7 @@ class TrackingDataService {
       }
     } catch (error) {
       console.error('Error saving user consent record:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
@@ -273,7 +274,7 @@ class TrackingDataService {
       return { success: true, data: { id: docRef.id, ...record } };
     } catch (error) {
       console.error('Error saving location history record:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
@@ -299,9 +300,9 @@ class TrackingDataService {
         records.push({
           id: doc.id,
           ...data,
-          lastSeen: data.lastSeen?.toDate ? data.lastSeen.toDate() : new Date(data.lastSeen),
-          lastActivity: data.lastActivity?.toDate ? data.lastActivity.toDate() : new Date(data.lastActivity),
-          loginTime: data.loginTime?.toDate ? data.loginTime.toDate() : new Date(data.loginTime)
+          lastSeen: data['lastSeen']?.toDate ? data['lastSeen'].toDate() : new Date(data['lastSeen']),
+          lastActivity: data['lastActivity']?.toDate ? data['lastActivity'].toDate() : new Date(data['lastActivity']),
+          loginTime: data['loginTime']?.toDate ? data['loginTime'].toDate() : new Date(data['loginTime'])
         } as UserTrackingRecord);
       });
       
@@ -330,11 +331,11 @@ class TrackingDataService {
       const querySnapshot = await getDocs(q);
       
       if (!querySnapshot.empty) {
-        const data = querySnapshot.docs[0].data();
+        const data = querySnapshot.docs[0]!.data();
         return {
-          id: querySnapshot.docs[0].id,
+          id: querySnapshot.docs[0]!.id,
           ...data,
-          consentDate: data.consentDate?.toDate ? data.consentDate.toDate() : new Date(data.consentDate)
+          consentDate: data['consentDate']?.toDate ? data['consentDate'].toDate() : new Date(data['consentDate'])
         } as UserConsentRecord;
       }
       
@@ -369,7 +370,7 @@ class TrackingDataService {
         records.push({
           id: doc.id,
           ...data,
-          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
+          createdAt: data['createdAt']?.toDate ? data['createdAt'].toDate() : new Date(data['createdAt'])
         } as LocationHistoryRecord);
       });
       
@@ -401,9 +402,9 @@ class TrackingDataService {
           records.push({
             id: doc.id,
             ...data,
-            lastSeen: data.lastSeen?.toDate ? data.lastSeen.toDate() : new Date(data.lastSeen),
-            lastActivity: data.lastActivity?.toDate ? data.lastActivity.toDate() : new Date(data.lastActivity),
-            loginTime: data.loginTime?.toDate ? data.loginTime.toDate() : new Date(data.loginTime)
+            lastSeen: data['lastSeen']?.toDate ? data['lastSeen'].toDate() : new Date(data['lastSeen']),
+            lastActivity: data['lastActivity']?.toDate ? data['lastActivity'].toDate() : new Date(data['lastActivity']),
+            loginTime: data['loginTime']?.toDate ? data['loginTime'].toDate() : new Date(data['loginTime'])
           } as UserTrackingRecord);
         });
         callback(records);
@@ -452,10 +453,10 @@ class TrackingDataService {
         totalDistance,
         averageAccuracy: isNaN(averageAccuracy) ? 0 : averageAccuracy,
         deviceTypes: {
-          desktop: deviceTypes.desktop || 0,
-          laptop: deviceTypes.laptop || 0,
-          mobile: deviceTypes.mobile || 0,
-          tablet: deviceTypes.tablet || 0
+          desktop: deviceTypes['desktop'] || 0,
+          laptop: deviceTypes['laptop'] || 0,
+          mobile: deviceTypes['mobile'] || 0,
+          tablet: deviceTypes['tablet'] || 0
         },
         locations: {
           total: trackingRecords.length,
@@ -475,7 +476,7 @@ class TrackingDataService {
       
       if (!existingAnalytics.empty) {
         // Update existing analytics
-        const docRef = doc(db, TRACKING_COLLECTIONS.TRACKING_ANALYTICS, existingAnalytics.docs[0].id);
+        const docRef = doc(db!, TRACKING_COLLECTIONS.TRACKING_ANALYTICS, existingAnalytics.docs[0]!.id);
         await updateDoc(docRef, analyticsData);
       } else {
         // Create new analytics record
@@ -488,7 +489,7 @@ class TrackingDataService {
       return { success: true, data: analyticsData };
     } catch (error) {
       console.error('Error updating tracking analytics:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
@@ -523,7 +524,7 @@ class TrackingDataService {
       return { success: true, cleaned: oldHistoryDocs.size };
     } catch (error) {
       console.error('Error cleaning up old tracking data:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 }

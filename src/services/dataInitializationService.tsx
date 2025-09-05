@@ -382,14 +382,14 @@ export const sampleData = {
 };
 
 // Helper function to get sample data for a collection
-export const getSampleData = (collectionName) => {
+export const getSampleData = (collectionName: string) => {
   try {
     if (!collectionName || typeof collectionName !== 'string') {
       console.warn('Invalid collection name provided to getSampleData:', collectionName);
       return [];
     }
     
-    const data = sampleData[collectionName];
+    const data = (sampleData as any)[collectionName];
     
     if (!data) {
       console.log(`No sample data found for collection: ${collectionName}`);
@@ -409,13 +409,13 @@ export const getSampleData = (collectionName) => {
 };
 
 // Helper function to check if a collection should be initialized
-export const shouldInitializeCollection = (collectionName) => {
+export const shouldInitializeCollection = (collectionName: string) => {
   try {
     if (!collectionName || typeof collectionName !== 'string') {
       return false;
     }
     
-    return sampleData.hasOwnProperty(collectionName) && Array.isArray(sampleData[collectionName]);
+    return Object.prototype.hasOwnProperty.call(sampleData, collectionName) && Array.isArray((sampleData as any)[collectionName]);
   } catch (error) {
     console.error(`Error checking if collection should be initialized: ${collectionName}`, error);
     return false;

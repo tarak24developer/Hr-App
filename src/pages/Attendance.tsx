@@ -531,7 +531,9 @@ const Attendance: React.FC = () => {
     load();
     return () => {
       unsubscribes.forEach(u => {
-        try { u(); } catch {}
+        try { u(); } catch (error) {
+          console.warn('Error unsubscribing:', error);
+        }
       });
     };
   }, []);
@@ -1296,7 +1298,7 @@ const Attendance: React.FC = () => {
                      <div className="text-2xl font-bold text-blue-600">
                        {attendanceRecords.filter(r => r.date === today).length}
                      </div>
-                     <div className="text-sm text-blue-600">Today's Records</div>
+                     <div className="text-sm text-blue-600">Today&apos;s Records</div>
                    </div>
                    <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
                      <CheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />

@@ -380,28 +380,28 @@ const LiveTrackingMap: React.FC = () => {
           </Card>
         </Box>
 
-             {/* Map View Controls */}
-       <Paper sx={{ p: 2, mb: 3 }}>
-         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+      {/* Map View Controls */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
            <Typography variant="h6">Live Tracking Map</Typography>
            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-             <Button
-               variant={mapView === 'all-users' ? 'contained' : 'outlined'}
-               onClick={() => setMapView('all-users')}
+            <Button
+              variant={mapView === 'all-users' ? 'contained' : 'outlined'}
+              onClick={() => setMapView('all-users')}
                size="small"
-             >
+            >
                All Users ({trackingData.length})
-             </Button>
-             <Button
-               variant={mapView === 'my-location' ? 'contained' : 'outlined'}
-               onClick={() => setMapView('my-location')}
+            </Button>
+            <Button
+              variant={mapView === 'my-location' ? 'contained' : 'outlined'}
+              onClick={() => setMapView('my-location')}
                size="small"
-             >
-               My Location
-             </Button>
-             <Button
-               variant={mapView === 'selected-users' ? 'contained' : 'outlined'}
-               onClick={() => setMapView('selected-users')}
+            >
+              My Location
+            </Button>
+            <Button
+              variant={mapView === 'selected-users' ? 'contained' : 'outlined'}
+              onClick={() => setMapView('selected-users')}
                size="small"
                disabled={selectedUsers.length === 0}
              >
@@ -425,9 +425,9 @@ const LiveTrackingMap: React.FC = () => {
                color="primary"
              >
                Update My Location
-             </Button>
-           </Box>
-         </Box>
+            </Button>
+          </Box>
+        </Box>
         
         {/* Live Map */}
         <Box
@@ -443,10 +443,10 @@ const LiveTrackingMap: React.FC = () => {
           {filteredData.length === 0 ? (
             <Box
               sx={{
-                display: 'flex',
+            display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
+            alignItems: 'center',
+            justifyContent: 'center',
                 height: '100%',
                 backgroundColor: 'grey.50',
                 color: 'text.secondary'
@@ -455,13 +455,13 @@ const LiveTrackingMap: React.FC = () => {
               <MyLocationIcon sx={{ fontSize: 64, mb: 2, opacity: 0.5 }} />
               <Typography variant="h6" gutterBottom>
                 No Location Data Available
-              </Typography>
+            </Typography>
               <Typography variant="body2" textAlign="center" sx={{ maxWidth: 400 }}>
                 {trackingData.length === 0 
                   ? "No users are currently being tracked. Grant location permission to start tracking your location."
                   : "No users match the current filter. Try selecting 'All Users' or adjust your selection."
                 }
-              </Typography>
+            </Typography>
               {trackingData.length === 0 && (
                 <Button
                   variant="contained"
@@ -472,7 +472,7 @@ const LiveTrackingMap: React.FC = () => {
                   Start Location Tracking
                 </Button>
               )}
-            </Box>
+          </Box>
           ) : (
             <LiveMap
               users={filteredData}

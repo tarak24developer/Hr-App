@@ -52,7 +52,6 @@ import {
   Badge as BadgeIcon,
   Download as DownloadIcon,
   Emergency as EmergencyIcon,
-  Refresh as RefreshIcon,
   AccountBalance as BankIcon,
   CreditCard as CardIcon,
   School as EducationIcon,
@@ -62,7 +61,6 @@ import {
 } from '@mui/icons-material';
 import firebaseService from '../services/firebaseService';
 import { useAuthStore } from '../stores/authStore';
-import { populateSampleUsers, checkUsersCollection } from '../utils/sampleData';
 import { formatIndianCurrency } from '../utils/currency';
 
 interface Employee {
@@ -139,7 +137,7 @@ const statusColors = {
 };
 
 const EmployeeDirectory: React.FC = () => {
-  const { user } = useAuthStore ? useAuthStore() : { user: null } as any;
+  const { user } = useAuthStore();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);

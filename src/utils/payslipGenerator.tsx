@@ -174,8 +174,8 @@ export const generateBulkPayslips = async (payrollsData: Array<{ payroll: Payrol
         if (result.success) {
           results.push({
             success: true,
-            employee: result.employee,
-            filename: result.filename || undefined
+            employee: item.employee.employeeName,
+            filename: result.filename || ''
           });
         } else {
           results.push({ 

@@ -1,13 +1,19 @@
 import firebaseService from './firebaseService';
 import { getSampleData } from './dataInitializationService';
 
+interface DataServiceOptions {
+  filters?: Record<string, any>;
+  orderBy?: { field: string; direction: 'asc' | 'desc' }[] | null;
+  limit?: number | null;
+}
+
 class DataService {
   constructor() {
-    this.useFirestoreFallback = true; // Always use Firestore
+    // Always use Firestore
   }
 
   // Generic data fetching - now only uses Firestore
-  async fetchData(endpoint, options = {}) {
+  async fetchData(endpoint: string, options: DataServiceOptions = {}) {
     try {
       // Always use Firestore
       return this.fetchFromFirestore(endpoint, options);
@@ -15,19 +21,19 @@ class DataService {
       console.error(`Unexpected error in fetchData for ${endpoint}:`, error);
       return { 
         success: false, 
-        error: error.message, 
+        error: (error as Error).message, 
         source: 'error' 
       };
     }
   }
 
   // Convert object filters to Firestore array format
-  convertFiltersToFirestoreFormat(filters) {
+  convertFiltersToFirestoreFormat(filters: Record<string, any>): Array<{field: string; operator: string; value: any}> {
     if (!filters || typeof filters !== 'object') {
       return [];
     }
     
-    const firestoreFilters = [];
+    const firestoreFilters: Array<{field: string; operator: string; value: any}> = [];
     
     Object.entries(filters).forEach(([key, value]) => {
       // Skip undefined, null, or empty string values
@@ -60,7 +66,7 @@ class DataService {
   }
 
   // Fetch data from Firestore based on endpoint
-  async fetchFromFirestore(endpoint, options = {}) {
+  async fetchFromFirestore(endpoint: string, options: DataServiceOptions = {}) {
     try {
       const collectionName = this.getCollectionNameFromEndpoint(endpoint);
       const sampleData = getSampleData(collectionName) || [];
@@ -77,7 +83,7 @@ class DataService {
       }
       
       // Convert filters to Firestore format
-      const firestoreFilters = this.convertFiltersToFirestoreFormat(options.filters);
+      const firestoreFilters = this.convertFiltersToFirestoreFormat(options.filters || {});
       
       console.log(`Fetching from Firestore: ${collectionName}`, {
         endpoint,
@@ -88,13 +94,19 @@ class DataService {
         sampleDataLength: sampleData.length
       });
       
-      const result = await firebaseService.getCollectionWithFallback(
-        collectionName, 
-        sampleData,
-        firestoreFilters,
-        options.orderBy || null,
-        options.limit || null
-      );
+      const queryOptions: any = {
+        where: firestoreFilters
+      };
+      
+      if (options.orderBy) {
+        queryOptions.orderBy = options.orderBy;
+      }
+      
+      if (options.limit) {
+        queryOptions.limit = options.limit;
+      }
+      
+      const result = await firebaseService.getCollection(collectionName, queryOptions);
 
       return { 
         success: true, 
@@ -109,20 +121,20 @@ class DataService {
       console.error('Error context:', {
         endpoint,
         options,
-        errorMessage: error.message,
-        errorStack: error.stack
+        errorMessage: (error as Error).message,
+        errorStack: (error as Error).stack
       });
       
       return { 
         success: false, 
-        error: error.message, 
+        error: (error as Error).message, 
         source: 'firestore' 
       };
     }
   }
 
   // Get collection name from API endpoint
-  getCollectionNameFromEndpoint(endpoint) {
+  getCollectionNameFromEndpoint(endpoint: string): string {
     try {
       // Ensure endpoint is a string
       if (!endpoint || typeof endpoint !== 'string') {
@@ -131,10 +143,10 @@ class DataService {
       }
       
       // Remove leading slash and query parameters
-      const cleanEndpoint = endpoint.split('?')[0].replace(/^\//, '');
+      const cleanEndpoint = endpoint.split('?')[0]?.replace(/^\//, '') || '';
       
       // Map common endpoints to collection names
-      const endpointMap = {
+      const endpointMap: Record<string, string> = {
         'employees': 'employees',
         'departments': 'departments',
         'users': 'users',
@@ -179,7 +191,7 @@ class DataService {
       // Default fallback - use first part of endpoint
       const fallback = cleanEndpoint.split('/')[0];
       console.log(`Using fallback collection name: ${fallback} for endpoint: ${endpoint}`);
-      return fallback;
+      return fallback || 'users';
     } catch (error) {
       console.error('Error in getCollectionNameFromEndpoint:', error);
       return 'users'; // Safe fallback
@@ -187,36 +199,36 @@ class DataService {
   }
 
   // Generic CRUD operations - now only use Firestore
-  async create(endpoint, data) {
+  async create(endpoint: string, data: any) {
     try {
       return this.createInFirestore(endpoint, data);
     } catch (error) {
       console.error(`Create operation failed for ${endpoint}:`, error);
-      return { success: false, error: error.message, source: 'firestore' };
+      return { success: false, error: (error as Error).message, source: 'firestore' };
     }
   }
 
-  async createInFirestore(endpoint, data) {
+  async createInFirestore(endpoint: string, data: any) {
     try {
       const collectionName = this.getCollectionNameFromEndpoint(endpoint);
       const result = await firebaseService.addDocument(collectionName, data);
       return { success: true, data: result.data, source: 'firestore' };
     } catch (error) {
       console.error(`Firestore create failed for ${endpoint}:`, error);
-      return { success: false, error: error.message, source: 'firestore' };
+      return { success: false, error: (error as Error).message, source: 'firestore' };
     }
   }
 
-  async update(endpoint, data) {
+  async update(endpoint: string, data: any) {
     try {
       return this.updateInFirestore(endpoint, data);
     } catch (error) {
       console.error(`Update operation failed for ${endpoint}:`, error);
-      return { success: false, error: error.message, source: 'firestore' };
+      return { success: false, error: (error as Error).message, source: 'firestore' };
     }
   }
 
-  async updateInFirestore(endpoint, data) {
+  async updateInFirestore(endpoint: string, data: any) {
     try {
       const collectionName = this.getCollectionNameFromEndpoint(endpoint);
       const documentId = this.extractDocumentId(endpoint);
@@ -228,20 +240,20 @@ class DataService {
       return { success: true, data: result.data, source: 'firestore' };
     } catch (error) {
       console.error(`Firestore update failed for ${endpoint}:`, error);
-      return { success: false, error: error.message, source: 'firestore' };
+      return { success: false, error: (error as Error).message, source: 'firestore' };
     }
   }
 
-  async delete(endpoint) {
+  async delete(endpoint: string) {
     try {
       return this.deleteFromFirestore(endpoint);
     } catch (error) {
       console.error(`Delete operation failed for ${endpoint}:`, error);
-      return { success: false, error: error.message, source: 'firestore' };
+      return { success: false, error: (error as Error).message, source: 'firestore' };
     }
   }
 
-  async deleteFromFirestore(endpoint) {
+  async deleteFromFirestore(endpoint: string) {
     try {
       const collectionName = this.getCollectionNameFromEndpoint(endpoint);
       const documentId = this.extractDocumentId(endpoint);
@@ -253,18 +265,18 @@ class DataService {
       return { success: true, data: result.data, source: 'firestore' };
     } catch (error) {
       console.error(`Firestore delete failed for ${endpoint}:`, error);
-      return { success: false, error: error.message, source: 'firestore' };
+      return { success: false, error: (error as Error).message, source: 'firestore' };
     }
   }
 
   // Extract document ID from endpoint
-  extractDocumentId(endpoint) {
+  extractDocumentId(endpoint: string): string {
     const parts = endpoint.split('/');
-    return parts[parts.length - 1];
+    return parts[parts.length - 1] || '';
   }
 
   // Specialized methods for common operations
-  async getEmployees(filters = {}) {
+  async getEmployees(filters: Record<string, any> = {}) {
     return this.fetchData('/employees', { filters });
   }
 
@@ -276,11 +288,11 @@ class DataService {
     return this.fetchData('/users');
   }
 
-  async getAttendance(filters = {}) {
+  async getAttendance(filters: Record<string, any> = {}) {
     return this.fetchData('/attendance', { filters });
   }
 
-  async getLeaves(filters = {}) {
+  async getLeaves(filters: Record<string, any> = {}) {
     return this.fetchData('/leaves', { filters });
   }
 
@@ -312,20 +324,20 @@ class DataService {
     return this.fetchData('/announcements');
   }
 
-  async getDocuments(filters = {}) {
+  async getDocuments(filters: Record<string, any> = {}) {
     return this.fetchData('/documents', { filters });
   }
 
   // Performance and analytics data
-  async getPerformanceOverview(period = 'month', department = 'all') {
+  async getPerformanceOverview(period: string = 'month', department: string = 'all') {
     return this.fetchData(`/performance/overview?period=${period}&department=${department}`);
   }
 
-  async getPerformanceTrends(period = 'month', months = 6) {
+  async getPerformanceTrends(period: string = 'month', months: number = 6) {
     return this.fetchData(`/performance/trends?period=${period}&months=${months}`);
   }
 
-  async getPerformanceStats(period = 'month') {
+  async getPerformanceStats(period: string = 'month') {
     return this.fetchData(`/performance/stats?period=${period}`);
   }
 

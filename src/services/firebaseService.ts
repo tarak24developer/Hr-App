@@ -18,7 +18,7 @@ import {
   DocumentReference
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { ApiResponse } from '@/types';
+import type { ApiResponse } from '../types';
 
 interface QueryOptions {
   where?: Array<{ field: string; operator: string; value: any }>;

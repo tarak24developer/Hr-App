@@ -1,7 +1,21 @@
 import { useEffect, useRef, useCallback } from 'react';
 
+// Type definitions
+interface MemoryInfo {
+  usedJSHeapSize: number;
+  totalJSHeapSize: number;
+  jsHeapSizeLimit: number;
+}
+
+interface NetworkInfo {
+  effectiveType: string;
+  downlink: number;
+  rtt: number;
+  saveData: boolean;
+}
+
 // Performance monitoring hook
-export const usePerformance = (componentName) => {
+export const usePerformance = (componentName: string) => {
   const renderCount = useRef(0);
   const lastRenderTime = useRef(performance.now());
   const mountTime = useRef(performance.now());
@@ -26,7 +40,7 @@ export const usePerformance = (componentName) => {
     };
   }, [componentName]);
 
-  const measureOperation = useCallback((operationName, operation) => {
+  const measureOperation = useCallback((operationName: string, operation: () => any) => {
     const start = performance.now();
     const result = operation();
     const duration = performance.now() - start;
@@ -43,11 +57,11 @@ export const usePerformance = (componentName) => {
 
 // Memory usage monitoring hook
 export const useMemoryUsage = () => {
-  const memoryInfo = useRef(null);
+  const memoryInfo = useRef<MemoryInfo | null>(null);
 
   useEffect(() => {
     if ('memory' in performance) {
-      memoryInfo.current = performance.memory;
+      memoryInfo.current = (performance as any).memory as MemoryInfo;
     }
   }, []);
 
@@ -67,11 +81,11 @@ export const useMemoryUsage = () => {
 
 // Network performance monitoring hook
 export const useNetworkPerformance = () => {
-  const networkInfo = useRef(null);
+  const networkInfo = useRef<NetworkInfo | null>(null);
 
   useEffect(() => {
     if ('connection' in navigator) {
-      networkInfo.current = navigator.connection;
+      networkInfo.current = (navigator as any).connection as NetworkInfo;
     }
   }, []);
 

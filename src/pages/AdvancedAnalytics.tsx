@@ -16,7 +16,6 @@ import {
   MenuItem,
   Button,
   Stack,
-  Grid,
   Chip,
   LinearProgress,
   Table,
@@ -30,10 +29,7 @@ import {
   TrendingUp as TrendingUpIcon,
   People as PeopleIcon,
   AttachMoney as MoneyIcon,
-  Assessment as AssessmentIcon,
-  Business as BusinessIcon,
   Schedule as ScheduleIcon,
-  AccountBalance as AccountBalanceIcon,
   Refresh as RefreshIcon,
   Work as WorkIcon
 } from '@mui/icons-material';
@@ -109,16 +105,6 @@ interface Attendance {
   overtimeHours: number;
 }
 
-interface Payroll {
-  id: string;
-  employeeId: string;
-  month: string;
-  year: string;
-  basicSalary: number;
-  allowances: number;
-  deductions: number;
-  netSalary: number;
-}
 
 interface Expense {
   id: string;
@@ -144,20 +130,18 @@ const AdvancedAnalytics: React.FC = () => {
       setError('');
 
       // Fetch all required data from Firebase
-      const [usersResult, attendanceResult, payrollResult, expensesResult] = await Promise.all([
+      const [usersResult, attendanceResult, expensesResult] = await Promise.all([
         firebaseService.getCollection('users'),
         firebaseService.getCollection('attendance'),
-        firebaseService.getCollection('payroll'),
         firebaseService.getCollection('expenses')
       ]);
 
-      if (!usersResult.success || !attendanceResult.success || !payrollResult.success || !expensesResult.success) {
+      if (!usersResult.success || !attendanceResult.success || !expensesResult.success) {
         throw new Error('Failed to fetch data from Firebase');
       }
 
       const users = usersResult.data as User[] || [];
       const attendance = attendanceResult.data as Attendance[] || [];
-      const payroll = payrollResult.data as Payroll[] || [];
       const expenses = expensesResult.data as Expense[] || [];
 
       // For main metrics, use overall data (not period-filtered) to ensure data is visible
@@ -375,7 +359,7 @@ const AdvancedAnalytics: React.FC = () => {
                 Advanced Analytics Dashboard
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                Comprehensive insights into your organization's performance and trends
+                Comprehensive insights into your organization&apos;s performance and trends
                 {selectedPeriod !== 'month' && (
                   <span> • Viewing {getPeriodDescription()} data</span>
                 )}
@@ -530,7 +514,7 @@ const AdvancedAnalytics: React.FC = () => {
                 Department Overview
               </Typography>
               <Box>
-                {analyticsData.departmentStats.map((dept, index) => (
+                {analyticsData.departmentStats.map((dept) => (
                   <Box key={dept.department} mb={2}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                       <Typography variant="body2" fontWeight="medium">

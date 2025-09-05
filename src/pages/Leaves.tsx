@@ -618,23 +618,26 @@ const Leaves: React.FC = () => {
         const startDate = new Date(request.startDate);
         
         switch (dateFilter) {
-          case 'this-week':
+          case 'this-week': {
             const weekStart = new Date(today);
             weekStart.setDate(today.getDate() - today.getDay());
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekStart.getDate() + 6);
             matchesDate = startDate >= weekStart && startDate <= weekEnd;
             break;
-          case 'this-month':
+          }
+          case 'this-month': {
             matchesDate = startDate.getMonth() === today.getMonth() && 
                         startDate.getFullYear() === today.getFullYear();
             break;
-          case 'next-month':
+          }
+          case 'next-month': {
             const nextMonth = new Date(today);
             nextMonth.setMonth(today.getMonth() + 1);
             matchesDate = startDate.getMonth() === nextMonth.getMonth() && 
                         startDate.getFullYear() === nextMonth.getFullYear();
             break;
+          }
         }
       }
       
@@ -2297,7 +2300,7 @@ const Leaves: React.FC = () => {
               <div className="text-center">
                 <h4 className="text-lg font-medium text-gray-900 mb-2">Leave Balance Details</h4>
                 <p className="text-gray-600">
-                  {viewingBalance.employeeName}'s current leave balance.
+                  {viewingBalance.employeeName}&apos;s current leave balance.
                 </p>
               </div>
 

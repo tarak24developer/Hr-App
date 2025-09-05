@@ -469,7 +469,7 @@ const Dashboard: React.FC = () => {
             HRMS Dashboard
           </Typography>
           <Typography variant="body1" color="textSecondary">
-            Welcome back! Here's your overview for today.
+            Welcome back! Here&apos;s your overview for today.
           </Typography>
         </Box>
                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
@@ -600,7 +600,7 @@ const Dashboard: React.FC = () => {
                                              No notifications
                                            </Typography>
                                            <Typography variant="body2" color="textSecondary">
-                                             You're all caught up! No upcoming events or announcements.
+                                             You&apos;re all caught up! No upcoming events or announcements.
                                            </Typography>
                                          </Box>
                                        ) : (

@@ -1,15 +1,30 @@
-import React from 'react';
+import type { ReactNode, MouseEvent } from 'react';
 import {
   Box,
   Container,
   Typography,
   Fade,
   Grow,
-  useTheme,
   Grid,
   Card,
   CardContent,
+  type SxProps,
+  type Theme,
 } from '@mui/material';
+
+interface ModernPageTemplateProps {
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  children?: ReactNode;
+  headerActions?: ReactNode;
+  statsCards?: ReactNode[];
+  loading?: boolean;
+  loadingText?: string;
+  error?: boolean | string | null;
+  errorText?: string;
+  onRetry?: (event: MouseEvent<HTMLButtonElement>) => void;
+  sx?: SxProps<Theme>;
+}
 
 const ModernPageTemplate = ({ 
   title, 
@@ -21,9 +36,8 @@ const ModernPageTemplate = ({
   loadingText = "Loading...",
   error = null,
   errorText = "Something went wrong",
-  onRetry = null,
-}) => {
-  const theme = useTheme();
+  onRetry,
+}: ModernPageTemplateProps) => {
 
   if (loading) {
     return (

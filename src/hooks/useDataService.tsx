@@ -1,8 +1,31 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import dataService from '../services/dataService';
-import React from 'react'; // Added missing import for React
 
-export const useDataService = (endpoint, options = {}) => {
+// Type definitions
+interface DataServiceOptions {
+  autoFetch?: boolean;
+  filters?: Record<string, any>;
+  orderBy?: string | null;
+  limit?: number | null;
+  onSuccess?: (data: any[], source: string) => void;
+  onError?: (error: string) => void;
+  dependencies?: any[];
+}
+
+interface DataServiceResult {
+  data: any[];
+  loading: boolean;
+  error: string | null;
+  message: string;
+  source: string;
+  fetchData: () => Promise<void>;
+  createItem: (itemData: any) => Promise<{ success: boolean; data?: any; error?: string | undefined }>;
+  updateItem: (itemId: string | number, updateData: any) => Promise<{ success: boolean; data?: any; error?: string | undefined }>;
+  deleteItem: (itemId: string | number) => Promise<{ success: boolean; data?: any; error?: string | undefined }>;
+  refresh: () => void;
+}
+
+export const useDataService = (endpoint: string, options: DataServiceOptions = {}): DataServiceResult => {
   // Validate endpoint
   if (!endpoint || typeof endpoint !== 'string') {
     console.error('Invalid endpoint provided to useDataService:', endpoint);
@@ -25,12 +48,12 @@ export const useDataService = (endpoint, options = {}) => {
   } = options;
 
   // Validate and clean filters
-  const cleanFilters = React.useMemo(() => {
+  const cleanFilters = useMemo(() => {
     if (!filters || typeof filters !== 'object') {
       return {};
     }
     
-    const cleaned = {};
+    const cleaned: Record<string, any> = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         cleaned[key] = value;
@@ -39,9 +62,9 @@ export const useDataService = (endpoint, options = {}) => {
     return cleaned;
   }, [filters]);
 
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [source, setSource] = useState('');
 
@@ -52,28 +75,28 @@ export const useDataService = (endpoint, options = {}) => {
       
       const result = await dataService.fetchData(endpoint, {
         filters: cleanFilters,
-        orderBy,
+        orderBy: orderBy ? [{ field: orderBy, direction: 'asc' as const }] : null,
         limit
       });
 
       if (result.success) {
-        setData(result.data);
-        setSource(result.source);
+        setData(result.data || []);
+        setSource(result.source || '');
         setMessage(result.message || '');
         
         if (onSuccess) {
-          onSuccess(result.data, result.source);
+          onSuccess(result.data || [], result.source || '');
         }
       } else {
-        setError(result.error);
+        setError(result.error || 'Unknown error');
         setData([]);
         
         if (onError) {
-          onError(result.error);
+          onError(result.error || 'Unknown error');
         }
       }
     } catch (err) {
-      const errorMessage = err.message || 'Failed to fetch data';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data';
       setError(errorMessage);
       setData([]);
       
@@ -85,7 +108,7 @@ export const useDataService = (endpoint, options = {}) => {
     }
   }, [endpoint, cleanFilters, orderBy, limit, onSuccess, onError, ...dependencies]);
 
-  const createItem = useCallback(async (itemData) => {
+  const createItem = useCallback(async (itemData: any) => {
     try {
       setLoading(true);
       const result = await dataService.create(endpoint, itemData);
@@ -98,13 +121,14 @@ export const useDataService = (endpoint, options = {}) => {
         return { success: false, error: result.error };
       }
     } catch (err) {
-      return { success: false, error: err.message };
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create item';
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
   }, [endpoint, fetchData]);
 
-  const updateItem = useCallback(async (itemId, updateData) => {
+  const updateItem = useCallback(async (itemId: string | number, updateData: any) => {
     try {
       setLoading(true);
       const updateEndpoint = `${endpoint}/${itemId}`;
@@ -118,13 +142,14 @@ export const useDataService = (endpoint, options = {}) => {
         return { success: false, error: result.error };
       }
     } catch (err) {
-      return { success: false, error: err.message };
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update item';
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
   }, [endpoint, fetchData]);
 
-  const deleteItem = useCallback(async (itemId) => {
+  const deleteItem = useCallback(async (itemId: string | number) => {
     try {
       setLoading(true);
       const deleteEndpoint = `${endpoint}/${itemId}`;
@@ -138,7 +163,8 @@ export const useDataService = (endpoint, options = {}) => {
         return { success: false, error: result.error };
       }
     } catch (err) {
-      return { success: false, error: err.message };
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete item';
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
@@ -169,11 +195,11 @@ export const useDataService = (endpoint, options = {}) => {
 };
 
 // Specialized hooks for common data types
-export const useEmployees = (filters = {}) => {
+export const useEmployees = (filters: Record<string, any> = {}): DataServiceResult => {
   // Ensure filters are valid objects
-  const validFilters = React.useMemo(() => {
+  const validFilters = useMemo(() => {
     if (!filters || typeof filters !== 'object') return {};
-    const cleaned = {};
+    const cleaned: Record<string, any> = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         cleaned[key] = value;
@@ -185,19 +211,19 @@ export const useEmployees = (filters = {}) => {
   return useDataService('/employees', { filters: validFilters });
 };
 
-export const useDepartments = () => {
+export const useDepartments = (): DataServiceResult => {
   return useDataService('/departments');
 };
 
-export const useUsers = () => {
+export const useUsers = (): DataServiceResult => {
   return useDataService('/users');
 };
 
-export const useAttendance = (filters = {}) => {
+export const useAttendance = (filters: Record<string, any> = {}): DataServiceResult => {
   // Ensure filters are valid objects
-  const validFilters = React.useMemo(() => {
+  const validFilters = useMemo(() => {
     if (!filters || typeof filters !== 'object') return {};
-    const cleaned = {};
+    const cleaned: Record<string, any> = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         cleaned[key] = value;
@@ -209,11 +235,11 @@ export const useAttendance = (filters = {}) => {
   return useDataService('/attendance', { filters: validFilters });
 };
 
-export const useLeaves = (filters = {}) => {
+export const useLeaves = (filters: Record<string, any> = {}): DataServiceResult => {
   // Ensure filters are valid objects
-  const validFilters = React.useMemo(() => {
+  const validFilters = useMemo(() => {
     if (!filters || typeof filters !== 'object') return {};
-    const cleaned = {};
+    const cleaned: Record<string, any> = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         cleaned[key] = value;
@@ -225,39 +251,39 @@ export const useLeaves = (filters = {}) => {
   return useDataService('/leaves', { filters: validFilters });
 };
 
-export const useAssets = () => {
+export const useAssets = (): DataServiceResult => {
   return useDataService('/assets');
 };
 
-export const useInventory = () => {
+export const useInventory = (): DataServiceResult => {
   return useDataService('/inventory');
 };
 
-export const useTraining = () => {
+export const useTraining = (): DataServiceResult => {
   return useDataService('/training');
 };
 
-export const useIncidents = () => {
+export const useIncidents = (): DataServiceResult => {
   return useDataService('/incidents');
 };
 
-export const useExpenses = () => {
+export const useExpenses = (): DataServiceResult => {
   return useDataService('/expense-management');
 };
 
-export const useHolidays = () => {
+export const useHolidays = (): DataServiceResult => {
   return useDataService('/holidays');
 };
 
-export const useAnnouncements = () => {
+export const useAnnouncements = (): DataServiceResult => {
   return useDataService('/announcements');
 };
 
-export const useDocuments = (filters = {}) => {
+export const useDocuments = (filters: Record<string, any> = {}): DataServiceResult => {
   // Ensure filters are valid objects
-  const validFilters = React.useMemo(() => {
+  const validFilters = useMemo(() => {
     if (!filters || typeof filters !== 'object') return {};
-    const cleaned = {};
+    const cleaned: Record<string, any> = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         cleaned[key] = value;
@@ -269,15 +295,15 @@ export const useDocuments = (filters = {}) => {
   return useDataService('/documents', { filters: validFilters });
 };
 
-export const usePermissions = () => {
+export const usePermissions = (): DataServiceResult => {
   return useDataService('/access-control/permissions');
 };
 
-export const useRoleTemplates = () => {
+export const useRoleTemplates = (): DataServiceResult => {
   return useDataService('/access-control/role-templates');
 };
 
-export const usePerformanceOverview = (period = 'month', department = 'all') => {
+export const usePerformanceOverview = (period: string = 'month', department: string = 'all'): DataServiceResult => {
   // Ensure parameters are valid
   const validPeriod = period && typeof period === 'string' ? period : 'month';
   const validDepartment = department && typeof department === 'string' ? department : 'all';
@@ -285,7 +311,7 @@ export const usePerformanceOverview = (period = 'month', department = 'all') => 
   return useDataService(`/performance/overview?period=${validPeriod}&department=${validDepartment}`);
 };
 
-export const usePerformanceTrends = (period = 'month', months = 6) => {
+export const usePerformanceTrends = (period: string = 'month', months: number = 6): DataServiceResult => {
   // Ensure parameters are valid
   const validPeriod = period && typeof period === 'string' ? period : 'month';
   const validMonths = typeof months === 'number' && months > 0 ? months : 6;
@@ -293,17 +319,17 @@ export const usePerformanceTrends = (period = 'month', months = 6) => {
   return useDataService(`/performance/trends?period=${validPeriod}&months=${validMonths}`);
 };
 
-export const usePerformanceStats = (period = 'month') => {
+export const usePerformanceStats = (period: string = 'month'): DataServiceResult => {
   // Ensure parameter is valid
   const validPeriod = period && typeof period === 'string' ? period : 'month';
   
   return useDataService(`/performance/stats?period=${validPeriod}`);
 };
 
-export const useGoals = () => {
+export const useGoals = (): DataServiceResult => {
   return useDataService('/performance/goals');
 };
 
-export const useKPIs = () => {
+export const useKPIs = (): DataServiceResult => {
   return useDataService('/performance/kpis');
 };

@@ -3,7 +3,6 @@ import {
   Package, 
   Search, 
   Plus, 
-  Filter, 
   Download, 
   Edit, 
   Trash2, 
@@ -12,8 +11,7 @@ import {
   MapPin,
   User,
   AlertTriangle,
-  CheckCircle,
-  Clock
+  CheckCircle
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 

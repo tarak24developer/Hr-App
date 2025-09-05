@@ -9,13 +9,12 @@ import {
   MenuItem,
   Chip,
   Collapse,
-  Grid,
   Typography,
-  IconButton,
-  Tooltip,
   Grow,
   useTheme,
   alpha,
+  SxProps,
+  Theme,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -25,7 +24,34 @@ import {
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 
-const ModernSearchFilter = ({
+// Type definitions
+interface FilterOption {
+  value: string;
+  label: string;
+}
+
+interface FilterConfig {
+  field: string;
+  label: string;
+  type: 'select' | 'date' | 'dateRange' | 'text';
+  options?: FilterOption[];
+}
+
+interface ModernSearchFilterProps {
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  filters?: FilterConfig[];
+  onFilterChange?: (filters: Record<string, any>) => void;
+  onClearFilters?: () => void;
+  onApplyFilters?: () => void;
+  showFilters?: boolean;
+  onToggleFilters?: () => void;
+  placeholder?: string;
+  sx?: SxProps<Theme>;
+  [key: string]: any;
+}
+
+const ModernSearchFilter: React.FC<ModernSearchFilterProps> = ({
   searchValue = '',
   onSearchChange,
   filters = [],
@@ -35,13 +61,12 @@ const ModernSearchFilter = ({
   showFilters = false,
   onToggleFilters,
   placeholder = "Search...",
-  sx = {},
-  ...props
+  sx = {}
 }) => {
   const theme = useTheme();
-  const [localFilters, setLocalFilters] = useState({});
+  const [localFilters, setLocalFilters] = useState<Record<string, any>>({});
 
-  const handleFilterChange = (field, value) => {
+  const handleFilterChange = (field: string, value: any) => {
     setLocalFilters(prev => ({
       ...prev,
       [field]: value
@@ -162,9 +187,9 @@ const ModernSearchFilter = ({
               Filter Options
             </Typography>
             
-            <Grid container spacing={3}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 3 }}>
               {filters.map((filter) => (
-                <Grid item xs={12} sm={6} md={4} key={filter.field}>
+                <Box key={filter.field}>
                   {filter.type === 'select' ? (
                     <FormControl fullWidth size="small">
                       <InputLabel>{filter.label}</InputLabel>
@@ -245,9 +270,9 @@ const ModernSearchFilter = ({
                       size="small"
                     />
                   )}
-                </Grid>
+                </Box>
               ))}
-            </Grid>
+            </Box>
 
             {/* Filter Actions */}
             <Box sx={{ display: 'flex', gap: 2, mt: 3, justifyContent: 'flex-end' }}>

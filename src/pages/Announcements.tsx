@@ -4,6 +4,10 @@ import {
   Typography,
   Button,
   TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   FormControl,
   InputLabel,
   Select,
@@ -16,23 +20,16 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   Card,
   CardContent,
   Alert,
   Snackbar,
-  Pagination,
-  FormControlLabel,
-  Switch,
-  Divider,
+  TablePagination,
   Tooltip,
   Avatar,
-  Badge,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  ListItemAvatar
+  CircularProgress,
+  Fade,
+  Stack
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -40,13 +37,9 @@ import {
   Delete as DeleteIcon,
   Visibility as ViewIcon,
   Search as SearchIcon,
-  FilterList as FilterIcon,
   Announcement as AnnouncementIcon,
-  Notifications as NotificationsIcon,
   Schedule as ScheduleIcon,
   Person as PersonIcon,
-  Category as CategoryIcon,
-  Description as DescriptionIcon,
   Archive as ArchiveIcon,
   Refresh as RefreshIcon,
   Info as InfoIcon,
@@ -54,6 +47,7 @@ import {
   Error as ErrorIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
+import firebaseService from '../services/firebaseService';
 
 interface Announcement {
   id: string;
@@ -69,7 +63,7 @@ interface Announcement {
   isPinned: boolean;
   isArchived: boolean;
   publishDate: Date;
-  expiryDate?: Date;
+  expiryDate?: Date | undefined;
   createdAt: Date;
   updatedAt: Date;
   attachments: string[];
@@ -144,11 +138,21 @@ const Announcements: React.FC = () => {
   const [categories, setCategories] = useState<AnnouncementCategory[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [filters, setFilters] = useState<AnnouncementFilters>(initialFilters);
-  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isViewMode, setIsViewMode] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [processing, setProcessing] = useState(false);
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    summary: '',
+    type: 'general' as 'info' | 'warning' | 'error' | 'success' | 'general' | 'urgent' | 'maintenance' | 'update',
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
+    category: '',
+    targetAudience: ['all'] as string[]
+  });
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -159,74 +163,87 @@ const Announcements: React.FC = () => {
     severity: 'info'
   });
 
-  // Mock data for development
-  const mockCategories: AnnouncementCategory[] = [
+
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      // Load announcements
+      const announcementsResult = await firebaseService.getCollection('announcements');
+      if (announcementsResult?.success && announcementsResult.data) {
+        const transformedAnnouncements: Announcement[] = announcementsResult.data.map((announcement: any) => ({
+          id: announcement.id,
+          title: announcement.title || '',
+          content: announcement.content || '',
+          summary: announcement.summary || '',
+          type: announcement.type || 'general',
+          priority: announcement.priority || 'medium',
+          category: announcement.category || '',
+          authorId: announcement.authorId || '',
+          targetAudience: announcement.targetAudience || ['all'],
+          isPublished: announcement.isPublished || false,
+          isPinned: announcement.isPinned || false,
+          isArchived: announcement.isArchived || false,
+          publishDate: announcement.publishDate ? new Date(announcement.publishDate) : new Date(),
+          expiryDate: announcement.expiryDate ? new Date(announcement.expiryDate) : undefined,
+          createdAt: announcement.createdAt ? new Date(announcement.createdAt) : new Date(),
+          updatedAt: announcement.updatedAt ? new Date(announcement.updatedAt) : new Date(),
+          attachments: announcement.attachments || [],
+          tags: announcement.tags || [],
+          readCount: announcement.readCount || 0,
+          likeCount: announcement.likeCount || 0,
+          commentCount: announcement.commentCount || 0
+        })) as Announcement[];
+        setAnnouncements(transformedAnnouncements);
+      }
+
+      // Load categories
+      const categoriesResult = await firebaseService.getCollection('announcementCategories');
+      if (categoriesResult?.success && categoriesResult.data) {
+        const transformedCategories: AnnouncementCategory[] = categoriesResult.data.map((category: any) => ({
+          id: category.id,
+          name: category.name || '',
+          description: category.description || '',
+          color: category.color || '#9e9e9e',
+          icon: category.icon || 'general',
+          isActive: category.isActive !== undefined ? category.isActive : true
+        }));
+        setCategories(transformedCategories);
+      } else {
+        // Set default categories if none exist
+        setCategories([
     { id: '1', name: 'General', description: 'General announcements', color: '#9e9e9e', icon: 'general', isActive: true },
     { id: '2', name: 'System', description: 'System-related announcements', color: '#2196f3', icon: 'info', isActive: true },
     { id: '3', name: 'Maintenance', description: 'Maintenance notifications', color: '#795548', icon: 'maintenance', isActive: true },
     { id: '4', name: 'Updates', description: 'System updates and changes', color: '#607d8b', icon: 'update', isActive: true },
     { id: '5', name: 'Urgent', description: 'Urgent announcements', color: '#9c27b0', icon: 'urgent', isActive: true }
-  ];
+        ]);
+      }
 
-  const mockUsers: User[] = [
-    { id: '1', name: 'John Doe', email: 'john@example.com', role: 'Manager' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com', role: 'Employee' },
-    { id: '3', name: 'Mike Johnson', email: 'mike@example.com', role: 'Director' }
-  ];
-
-  const mockAnnouncements: Announcement[] = [
-    {
-      id: '1',
-      title: 'System Maintenance Scheduled',
-      content: 'We will be performing scheduled system maintenance on Saturday, January 20th, 2024 from 2:00 AM to 6:00 AM EST. During this time, the system may be temporarily unavailable. We apologize for any inconvenience.',
-      summary: 'Scheduled system maintenance on January 20th',
-      type: 'maintenance',
-      priority: 'high',
-      category: 'Maintenance',
-      authorId: '3',
-      targetAudience: ['all'],
-      isPublished: true,
-      isPinned: true,
-      isArchived: false,
-      publishDate: new Date('2024-01-15T10:00:00'),
-      expiryDate: new Date('2024-01-21T23:59:59'),
-      createdAt: new Date('2024-01-15T09:00:00'),
-      updatedAt: new Date('2024-01-15T09:00:00'),
-      attachments: ['maintenance_schedule.pdf'],
-      tags: ['maintenance', 'system', 'scheduled'],
-      readCount: 45,
-      likeCount: 12,
-      commentCount: 3
-    },
-    {
-      id: '2',
-      title: 'New Feature Release',
-      content: 'We are excited to announce the release of our new employee portal features! The updated interface includes improved navigation, enhanced reporting tools, and mobile optimization. Please take some time to explore the new features.',
-      summary: 'New employee portal features released',
-      type: 'update',
-      priority: 'medium',
-      category: 'Updates',
-      authorId: '1',
-      targetAudience: ['employees', 'managers'],
-      isPublished: true,
-      isPinned: false,
-      isArchived: false,
-      publishDate: new Date('2024-01-14T14:00:00'),
-      createdAt: new Date('2024-01-14T13:00:00'),
-      updatedAt: new Date('2024-01-14T13:00:00'),
-      attachments: ['feature_guide.pdf', 'screenshots.zip'],
-      tags: ['features', 'portal', 'release'],
-      readCount: 89,
-      likeCount: 34,
-      commentCount: 8
+      // Load users
+      const usersResult = await firebaseService.getCollection('users');
+      if (usersResult?.success && usersResult.data) {
+        const transformedUsers: User[] = usersResult.data.map((user: any) => ({
+          id: user.id,
+          name: user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : user.name || 'Unknown User',
+          email: user.email || '',
+          role: user.role || 'Employee',
+          avatar: user.avatar || undefined
+        }));
+        setUsers(transformedUsers);
+      }
+    } catch (err: any) {
+      console.error('Error loading data:', err);
+      setError(err.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
     }
-  ];
-
-  useEffect(() => {
-    // Load mock data
-    setCategories(mockCategories);
-    setUsers(mockUsers);
-    setAnnouncements(mockAnnouncements);
   }, []);
 
   useEffect(() => {
@@ -276,7 +293,7 @@ const Announcements: React.FC = () => {
     }
 
     setFilteredAnnouncements(filtered);
-    setCurrentPage(1);
+    setPage(0);
   }, [announcements, filters]);
 
   const handleFilterChange = (field: keyof AnnouncementFilters, value: any) => {
@@ -287,78 +304,143 @@ const Announcements: React.FC = () => {
   };
 
   const handleCreateAnnouncement = () => {
-    setSelectedAnnouncement(null);
-    setIsViewMode(false);
+    setFormData({
+      title: '',
+      content: '',
+      summary: '',
+      type: 'general',
+      priority: 'medium',
+      category: '',
+      targetAudience: ['all']
+    });
     setIsDialogOpen(true);
   };
 
-  const handleEditAnnouncement = (announcement: Announcement) => {
-    setSelectedAnnouncement(announcement);
-    setIsViewMode(false);
-    setIsDialogOpen(true);
+  const handleEditAnnouncement = (_announcement: Announcement) => {
+    setSnackbar({
+      open: true,
+      message: 'Edit announcement functionality coming soon',
+      severity: 'info'
+    });
   };
 
-  const handleViewAnnouncement = (announcement: Announcement) => {
-    setSelectedAnnouncement(announcement);
-    setIsViewMode(true);
-    setIsDialogOpen(true);
+  const handleViewAnnouncement = (_announcement: Announcement) => {
+    setSnackbar({
+      open: true,
+      message: 'View announcement functionality coming soon',
+      severity: 'info'
+    });
   };
 
-  const handleDeleteAnnouncement = (announcementId: string) => {
-    setAnnouncements(prev => prev.filter(ann => ann.id !== announcementId));
+  const handleDeleteAnnouncement = async (announcementId: string) => {
+    try {
+      const result = await firebaseService.deleteDocument('announcements', announcementId);
+      
+      if (result?.success) {
     setSnackbar({
       open: true,
       message: 'Announcement deleted successfully',
       severity: 'success'
     });
-  };
-
-  const handleSaveAnnouncement = (announcementData: Partial<Announcement>) => {
-    if (selectedAnnouncement) {
-      // Update existing announcement
-      setAnnouncements(prev => prev.map(ann =>
-        ann.id === selectedAnnouncement.id
-          ? { ...ann, ...announcementData, updatedAt: new Date() }
-          : ann
-      ));
+        loadData(); // Reload data from Firebase
+      } else {
+        throw new Error(result?.error || 'Failed to delete announcement');
+      }
+    } catch (err: any) {
+      console.error('Error deleting announcement:', err);
       setSnackbar({
         open: true,
-        message: 'Announcement updated successfully',
-        severity: 'success'
+        message: err.message || 'Failed to delete announcement',
+        severity: 'error'
       });
-    } else {
+    }
+  };
+
+  const handleSaveAnnouncement = async () => {
+    try {
+      setProcessing(true);
+      
+      // Validate required fields
+      if (!formData.title.trim() || !formData.content.trim() || !formData.category) {
+      setSnackbar({
+        open: true,
+          message: 'Please fill in all required fields',
+          severity: 'error'
+      });
+        return;
+      }
+
       // Create new announcement
-      const newAnnouncement: Announcement = {
-        id: Date.now().toString(),
-        title: announcementData.title || '',
-        content: announcementData.content || '',
-        summary: announcementData.summary || '',
-        type: announcementData.type || 'general',
-        priority: announcementData.priority || 'medium',
-        category: announcementData.category || '',
-        authorId: '1', // Current user ID
-        targetAudience: announcementData.targetAudience || ['all'],
+      const newAnnouncementData = {
+        title: formData.title.trim(),
+        content: formData.content.trim(),
+        summary: formData.summary.trim() || formData.content.trim().substring(0, 100) + '...',
+        type: formData.type,
+        priority: formData.priority,
+        category: formData.category,
+        authorId: '1', // TODO: Get from auth context
+        targetAudience: formData.targetAudience,
         isPublished: false,
         isPinned: false,
         isArchived: false,
-        publishDate: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        attachments: announcementData.attachments || [],
-        tags: announcementData.tags || [],
+        publishDate: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        attachments: [],
+        tags: [],
         readCount: 0,
         likeCount: 0,
         commentCount: 0
       };
-      setAnnouncements(prev => [newAnnouncement, ...prev]);
+      
+      const result = await firebaseService.addDocument('announcements', newAnnouncementData);
+      
+      if (result?.success) {
       setSnackbar({
         open: true,
         message: 'Announcement created successfully',
         severity: 'success'
       });
+        loadData(); // Reload data from Firebase
+        setIsDialogOpen(false);
+        setFormData({
+          title: '',
+          content: '',
+          summary: '',
+          type: 'general',
+          priority: 'medium',
+          category: '',
+          targetAudience: ['all']
+        });
+      } else {
+        throw new Error(result?.error || 'Failed to create announcement');
+      }
+    } catch (err: any) {
+      console.error('Error creating announcement:', err);
+      setSnackbar({
+        open: true,
+        message: err.message || 'Failed to create announcement',
+        severity: 'error'
+      });
+    } finally {
+      setProcessing(false);
     }
-    setIsDialogOpen(false);
   };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setFormData({
+      title: '',
+      content: '',
+      summary: '',
+      type: 'general',
+      priority: 'medium',
+      category: '',
+      targetAudience: ['all']
+    });
+  };
+
+
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -412,39 +494,95 @@ const Announcements: React.FC = () => {
     return announcements.length;
   };
 
-  const getTodayCount = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return announcements.filter(announcement => 
-      announcement.createdAt >= today
-    ).length;
-  };
 
   const paginatedAnnouncements = filteredAnnouncements.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
   );
 
-  const totalPages = Math.ceil(filteredAnnouncements.length / itemsPerPage);
+  const handleChangePage = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  if (loading) {
+  return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '50vh',
+        bgcolor: 'grey.50'
+      }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={60} sx={{ mb: 2 }} />
+          <Typography variant="h6" sx={{ color: 'text.secondary' }}>
+            Loading Announcements...
+        </Typography>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Announcements
-        </Typography>
+    <Box sx={{ p: 3, bgcolor: 'grey.50', minHeight: '100vh' }}>
+      <Fade in timeout={300}>
         <Box>
+          {/* Header */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+            <Box>
+              <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                Announcements
+              </Typography>
+              <Typography variant="body1" color="textSecondary">
+                Manage and publish company announcements and updates
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={2}>
           <Button
             variant="outlined"
             startIcon={<ArchiveIcon />}
-            sx={{ mr: 1 }}
+                sx={{ 
+                  borderRadius: 2,
+                  px: 3,
+                  py: 1.5,
+                  textTransform: 'none',
+                  fontWeight: '600',
+                  borderColor: 'grey.400',
+                  color: 'text.secondary',
+                  '&:hover': {
+                    borderColor: 'grey.600',
+                    bgcolor: 'grey.50',
+                    transform: 'translateY(-1px)'
+                  },
+                  transition: 'all 0.2s ease'
+                }}
           >
             Archive All
           </Button>
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
-            sx={{ mr: 1 }}
+                onClick={loadData}
+                sx={{ 
+                  borderRadius: 2,
+                  px: 3,
+                  py: 1.5,
+                  textTransform: 'none',
+                  fontWeight: '600',
+                  borderColor: 'grey.400',
+                  color: 'text.secondary',
+                  '&:hover': {
+                    borderColor: 'grey.600',
+                    bgcolor: 'grey.50',
+                    transform: 'translateY(-1px)'
+                  },
+                  transition: 'all 0.2s ease'
+                }}
           >
             Refresh
           </Button>
@@ -452,90 +590,341 @@ const Announcements: React.FC = () => {
             variant="contained"
             startIcon={<AddIcon />}
             onClick={handleCreateAnnouncement}
+                sx={{
+                  borderRadius: 2,
+                  px: 3,
+                  py: 1.5,
+                  textTransform: 'none',
+                  fontWeight: '600',
+                  fontSize: '0.9rem',
+                  boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)'
+                  },
+                  transition: 'all 0.3s ease'
+                }}
           >
             Create Announcement
           </Button>
-        </Box>
+            </Stack>
       </Box>
 
+          {error && (
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {error}
+            </Alert>
+          )}
+
       {/* Statistics Cards */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 3, mb: 3 }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
+          <Box sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, 
+            gap: 3, 
+            mb: 4 
+          }}>
+            <Card sx={{ 
+              p: 2.5, 
+              bgcolor: 'white', 
+              height: '100%', 
+              minHeight: 120,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'grey.100',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.12)',
+                borderColor: 'primary.200'
+              }
+            }}>
+              <CardContent sx={{ p: 0 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  mb: 1.5
+                }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      color="textSecondary" 
+                      sx={{ 
+                        fontWeight: '600',
+                        fontSize: '0.75rem',
+                        mb: 0.5
+                      }}
+                    >
               Total Announcements
             </Typography>
-            <Typography variant="h4" component="div">
+                    <Typography 
+                      variant="h4" 
+                      component="div" 
+                      sx={{ 
+                        fontWeight: '700', 
+                        color: 'primary.main',
+                        lineHeight: 1.1
+                      }}
+                    >
               {getTotalCount()}
             </Typography>
-            <Typography variant="body2" color="textSecondary">
-              All time
-            </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    p: 1, 
+                    borderRadius: 2, 
+                    bgcolor: 'primary.50',
+                    color: 'primary.main',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <AnnouncementIcon sx={{ fontSize: 24 }} />
+                  </Box>
+                </Box>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
+
+            <Card sx={{ 
+              p: 2.5, 
+              bgcolor: 'white', 
+              height: '100%', 
+              minHeight: 120,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'grey.100',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.12)',
+                borderColor: 'success.200'
+              }
+            }}>
+              <CardContent sx={{ p: 0 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  mb: 1.5
+                }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      color="textSecondary" 
+                      sx={{ 
+                        fontWeight: '600',
+                        fontSize: '0.75rem',
+                        mb: 0.5
+                      }}
+                    >
               Published
             </Typography>
-            <Typography variant="h4" component="div" color="success.main">
+                    <Typography 
+                      variant="h4" 
+                      component="div" 
+                      sx={{ 
+                        fontWeight: '700', 
+                        color: 'success.main',
+                        lineHeight: 1.1
+                      }}
+                    >
               {getPublishedCount()}
             </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Live announcements
-            </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    p: 1, 
+                    borderRadius: 2, 
+                    bgcolor: 'success.50',
+                    color: 'success.main',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <CheckCircleIcon sx={{ fontSize: 24 }} />
+                  </Box>
+                </Box>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
+
+            <Card sx={{ 
+              p: 2.5, 
+              bgcolor: 'white', 
+              height: '100%', 
+              minHeight: 120,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'grey.100',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.12)',
+                borderColor: 'warning.200'
+              }
+            }}>
+              <CardContent sx={{ p: 0 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  mb: 1.5
+                }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      color="textSecondary" 
+                      sx={{ 
+                        fontWeight: '600',
+                        fontSize: '0.75rem',
+                        mb: 0.5
+                      }}
+                    >
               Drafts
             </Typography>
-            <Typography variant="h4" component="div" color="warning.main">
+                    <Typography 
+                      variant="h4" 
+                      component="div" 
+                      sx={{ 
+                        fontWeight: '700', 
+                        color: 'warning.main',
+                        lineHeight: 1.1
+                      }}
+                    >
               {getDraftCount()}
             </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Pending review
-            </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    p: 1, 
+                    borderRadius: 2, 
+                    bgcolor: 'warning.50',
+                    color: 'warning.main',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <ScheduleIcon sx={{ fontSize: 24 }} />
+                  </Box>
+                </Box>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
+
+            <Card sx={{ 
+              p: 2.5, 
+              bgcolor: 'white', 
+              height: '100%', 
+              minHeight: 120,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              borderRadius: 2,
+              border: '1px solid',
+              borderColor: 'grey.100',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.12)',
+                borderColor: 'info.200'
+              }
+            }}>
+              <CardContent sx={{ p: 0 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'space-between',
+                  mb: 1.5
+                }}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography 
+                      variant="body2" 
+                      color="textSecondary" 
+                      sx={{ 
+                        fontWeight: '600',
+                        fontSize: '0.75rem',
+                        mb: 0.5
+                      }}
+                    >
               Pinned
             </Typography>
-            <Typography variant="h4" component="div" color="primary.main">
+                    <Typography 
+                      variant="h4" 
+                      component="div" 
+                      sx={{ 
+                        fontWeight: '700', 
+                        color: 'info.main',
+                        lineHeight: 1.1
+                      }}
+                    >
               {getPinnedCount()}
             </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Important announcements
-            </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    p: 1, 
+                    borderRadius: 2, 
+                    bgcolor: 'info.50',
+                    color: 'info.main',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <ArchiveIcon sx={{ fontSize: 24 }} />
+                  </Box>
+                </Box>
           </CardContent>
         </Card>
       </Box>
 
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterIcon sx={{ mr: 1 }} />
-          <Typography variant="h6">Filters</Typography>
-        </Box>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' }, gap: 2 }}>
+          <Card sx={{ 
+            bgcolor: 'white', 
+            boxShadow: 2,
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: 'grey.200',
+            mb: 3
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: 'text.primary' }}>
+                Filters & Search
+              </Typography>
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, 
+                gap: 2, 
+                alignItems: 'center' 
+              }}>
           <TextField
-            fullWidth
-            label="Search"
+                  placeholder="Search announcements..."
             value={filters.search}
             onChange={(e) => handleFilterChange('search', e.target.value)}
             InputProps={{
               startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
             }}
-          />
-          <FormControl fullWidth>
+                  size="medium"
+                  sx={{ 
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'primary.main'
+                      }
+                    }
+                  }}
+                />
+                
+                <FormControl size="medium">
             <InputLabel>Type</InputLabel>
             <Select
               value={filters.type}
               label="Type"
               onChange={(e) => handleFilterChange('type', e.target.value)}
+                    sx={{
+                      borderRadius: 2,
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'grey.300'
+                      }
+                    }}
             >
               <MenuItem value="">All Types</MenuItem>
               <MenuItem value="info">Info</MenuItem>
@@ -548,12 +937,19 @@ const Announcements: React.FC = () => {
               <MenuItem value="update">Update</MenuItem>
             </Select>
           </FormControl>
-          <FormControl fullWidth>
+
+                <FormControl size="medium">
             <InputLabel>Priority</InputLabel>
             <Select
               value={filters.priority}
               label="Priority"
               onChange={(e) => handleFilterChange('priority', e.target.value)}
+                    sx={{
+                      borderRadius: 2,
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'grey.300'
+                      }
+                    }}
             >
               <MenuItem value="">All Priorities</MenuItem>
               <MenuItem value="low">Low</MenuItem>
@@ -562,12 +958,19 @@ const Announcements: React.FC = () => {
               <MenuItem value="urgent">Urgent</MenuItem>
             </Select>
           </FormControl>
-          <FormControl fullWidth>
+
+                <FormControl size="medium">
             <InputLabel>Category</InputLabel>
             <Select
               value={filters.category}
               label="Category"
               onChange={(e) => handleFilterChange('category', e.target.value)}
+                    sx={{
+                      borderRadius: 2,
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'grey.300'
+                      }
+                    }}
             >
               <MenuItem value="">All Categories</MenuItem>
               {categories.map(category => (
@@ -577,12 +980,19 @@ const Announcements: React.FC = () => {
               ))}
             </Select>
           </FormControl>
-          <FormControl fullWidth>
+
+                <FormControl size="medium">
             <InputLabel>Status</InputLabel>
             <Select
               value={filters.status}
               label="Status"
               onChange={(e) => handleFilterChange('status', e.target.value)}
+                    sx={{
+                      borderRadius: 2,
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'grey.300'
+                      }
+                    }}
             >
               <MenuItem value="all">All</MenuItem>
               <MenuItem value="published">Published</MenuItem>
@@ -592,27 +1002,42 @@ const Announcements: React.FC = () => {
             </Select>
           </FormControl>
         </Box>
-      </Paper>
+            </CardContent>
+          </Card>
 
       {/* Announcements Table */}
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+          <Card sx={{ 
+            bgcolor: 'white', 
+            boxShadow: 2,
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: 'grey.200',
+            overflow: 'hidden'
+          }}>
         <TableContainer>
           <Table stickyHeader>
             <TableHead>
-              <TableRow>
-                <TableCell>Type</TableCell>
-                <TableCell>Title</TableCell>
-                <TableCell>Priority</TableCell>
-                <TableCell>Category</TableCell>
-                <TableCell>Author</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Published</TableCell>
-                <TableCell>Actions</TableCell>
+                  <TableRow sx={{ bgcolor: 'grey.50' }}>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Type</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Title</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Priority</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Category</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Author</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Status</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Published</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', color: 'text.primary' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {paginatedAnnouncements.map((announcement) => (
-                <TableRow key={announcement.id} hover>
+                    <TableRow 
+                      key={announcement.id} 
+                      hover
+                      sx={{ 
+                        '&:hover': { bgcolor: 'primary.50' },
+                        '&:nth-of-type(even)': { bgcolor: 'grey.25' }
+                      }}
+                    >
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {getTypeIcon(announcement.type)}
@@ -696,12 +1121,19 @@ const Announcements: React.FC = () => {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Stack direction="row" spacing={0.5} justifyContent="center">
                       <Tooltip title="View Details">
                         <IconButton
                           size="small"
                           onClick={() => handleViewAnnouncement(announcement)}
-                          color="primary"
+                              sx={{ 
+                                color: 'info.main',
+                                '&:hover': { 
+                                  bgcolor: 'info.50',
+                                  transform: 'scale(1.1)'
+                                },
+                                transition: 'all 0.2s ease'
+                              }}
                         >
                           <ViewIcon />
                         </IconButton>
@@ -710,7 +1142,14 @@ const Announcements: React.FC = () => {
                         <IconButton
                           size="small"
                           onClick={() => handleEditAnnouncement(announcement)}
-                          color="primary"
+                              sx={{ 
+                                color: 'primary.main',
+                                '&:hover': { 
+                                  bgcolor: 'primary.50',
+                                  transform: 'scale(1.1)'
+                                },
+                                transition: 'all 0.2s ease'
+                              }}
                         >
                           <EditIcon />
                         </IconButton>
@@ -719,33 +1158,248 @@ const Announcements: React.FC = () => {
                         <IconButton
                           size="small"
                           onClick={() => handleDeleteAnnouncement(announcement.id)}
-                          color="error"
+                              sx={{ 
+                                color: 'error.main',
+                                '&:hover': { 
+                                  bgcolor: 'error.50',
+                                  transform: 'scale(1.1)'
+                                },
+                                transition: 'all 0.2s ease'
+                              }}
                         >
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
-                    </Box>
+                        </Stack>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableContainer>
-      </Paper>
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 25]}
+              component="div"
+              count={filteredAnnouncements.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              sx={{
+                borderTop: '1px solid',
+                borderColor: 'grey.200',
+                bgcolor: 'grey.50'
+              }}
+            />
+          </Card>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(_, page) => setCurrentPage(page)}
-            color="primary"
-            showFirstButton
-            showLastButton
+          {/* Create Announcement Dialog */}
+          <Dialog 
+            open={isDialogOpen} 
+            onClose={handleCloseDialog} 
+            maxWidth="md" 
+            fullWidth
+            PaperProps={{
+              sx: {
+                borderRadius: 3,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+                border: '1px solid',
+                borderColor: 'grey.200'
+              }
+            }}
+          >
+            <DialogTitle sx={{ 
+              bgcolor: 'primary.main', 
+              color: 'white',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              fontSize: '1.25rem'
+            }}>
+              Create New Announcement
+            </DialogTitle>
+            
+            <DialogContent sx={{ p: 3 }}>
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, 
+                gap: 3 
+              }}>
+                <Box sx={{ gridColumn: '1 / -1' }}>
+                  <TextField
+                    label="Title"
+                    value={formData.title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    fullWidth
+                    required
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2
+                      }
+                    }}
           />
         </Box>
-      )}
+                
+                <Box sx={{ gridColumn: '1 / -1' }}>
+                  <TextField
+                    label="Summary"
+                    value={formData.summary}
+                    onChange={(e) => setFormData(prev => ({ ...prev, summary: e.target.value }))}
+                    fullWidth
+                    multiline
+                    rows={2}
+                    placeholder="Brief summary of the announcement (optional)"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2
+                      }
+                    }}
+                  />
+                </Box>
+                
+                <Box sx={{ gridColumn: '1 / -1' }}>
+                  <TextField
+                    label="Content"
+                    value={formData.content}
+                    onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                    multiline
+                    rows={6}
+                    fullWidth
+                    required
+                    placeholder="Detailed content of the announcement..."
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2
+                      }
+                    }}
+                  />
+                </Box>
+                
+                <Box>
+                  <FormControl fullWidth>
+                    <InputLabel>Type</InputLabel>
+                    <Select
+                      value={formData.type}
+                      label="Type"
+                      onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      <MenuItem value="general">General</MenuItem>
+                      <MenuItem value="info">Info</MenuItem>
+                      <MenuItem value="success">Success</MenuItem>
+                      <MenuItem value="warning">Warning</MenuItem>
+                      <MenuItem value="error">Error</MenuItem>
+                      <MenuItem value="urgent">Urgent</MenuItem>
+                      <MenuItem value="maintenance">Maintenance</MenuItem>
+                      <MenuItem value="update">Update</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+                
+                <Box>
+                  <FormControl fullWidth>
+                    <InputLabel>Priority</InputLabel>
+                    <Select
+                      value={formData.priority}
+                      label="Priority"
+                      onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as any }))}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      <MenuItem value="low">Low</MenuItem>
+                      <MenuItem value="medium">Medium</MenuItem>
+                      <MenuItem value="high">High</MenuItem>
+                      <MenuItem value="urgent">Urgent</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+                
+                <Box>
+                  <FormControl fullWidth>
+                    <InputLabel>Category</InputLabel>
+                    <Select
+                      value={formData.category}
+                      label="Category"
+                      onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      {categories.map((category) => (
+                        <MenuItem key={category.id} value={category.name}>
+                          {category.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
+                
+                <Box>
+                  <FormControl fullWidth>
+                    <InputLabel>Target Audience</InputLabel>
+                    <Select
+                      value={formData.targetAudience}
+                      label="Target Audience"
+                      multiple
+                      onChange={(e) => setFormData(prev => ({ ...prev, targetAudience: e.target.value as string[] }))}
+                      sx={{ borderRadius: 2 }}
+                    >
+                      <MenuItem value="all">All Users</MenuItem>
+                      <MenuItem value="employees">Employees</MenuItem>
+                      <MenuItem value="managers">Managers</MenuItem>
+                      <MenuItem value="directors">Directors</MenuItem>
+                      <MenuItem value="hr">HR Team</MenuItem>
+                      <MenuItem value="it">IT Team</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+              </Box>
+            </DialogContent>
+            
+            <DialogActions sx={{ p: 3, gap: 2 }}>
+              <Button 
+                onClick={handleCloseDialog}
+                sx={{ 
+                  px: 3, 
+                  py: 1.5,
+                  borderRadius: 2,
+                  borderColor: 'grey.400',
+                  color: 'text.secondary',
+                  fontWeight: '600',
+                  '&:hover': {
+                    borderColor: 'grey.600',
+                    bgcolor: 'grey.50',
+                    transform: 'translateY(-1px)'
+                  },
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Cancel
+              </Button>
+              
+              <Button 
+                variant="contained" 
+                onClick={handleSaveAnnouncement}
+                disabled={processing || !formData.title.trim() || !formData.content.trim() || !formData.category}
+                sx={{ 
+                  px: 3, 
+                  py: 1.5,
+                  borderRadius: 2,
+                  fontWeight: '600',
+                  bgcolor: 'primary.main',
+                  boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
+                  '&:hover': {
+                    bgcolor: 'primary.dark',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 6px 20px rgba(25, 118, 210, 0.4)'
+                  },
+                  transition: 'all 0.3s ease',
+                  '&:disabled': {
+                    bgcolor: 'grey.400',
+                    boxShadow: 'none'
+                  }
+                }}
+              >
+                {processing ? <CircularProgress size={20} /> : 'Create Announcement'}
+              </Button>
+            </DialogActions>
+          </Dialog>
 
       {/* Snackbar */}
       <Snackbar
@@ -761,6 +1415,8 @@ const Announcements: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+        </Box>
+      </Fade>
     </Box>
   );
 };

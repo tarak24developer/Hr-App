@@ -270,11 +270,11 @@ const UserTracking: React.FC = () => {
       // Save to Firebase
       await trackingDataService.saveUserTrackingRecord(updatedUser);
       
-      setSnackbar({
-        open: true,
-        message: 'Tracking status updated successfully',
-        severity: 'success'
-      });
+    setSnackbar({
+      open: true,
+      message: 'Tracking status updated successfully',
+      severity: 'success'
+    });
     } catch (error) {
       console.error('Error updating tracking status:', error);
       setSnackbar({
@@ -305,11 +305,11 @@ const UserTracking: React.FC = () => {
         return;
       }
       
-      setSnackbar({
-        open: true,
-        message: 'Location refreshed successfully',
-        severity: 'success'
-      });
+    setSnackbar({
+      open: true,
+      message: 'Location refreshed successfully',
+      severity: 'success'
+    });
     } catch (error) {
       console.error('Error refreshing location:', error);
       setSnackbar({
@@ -403,46 +403,46 @@ const UserTracking: React.FC = () => {
         gap: 3, 
         mb: 3 
       }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Users
-            </Typography>
-            <Typography variant="h4" component="div">
-              {getTotalUsersCount()}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Online Users
-            </Typography>
-            <Typography variant="h4" component="div" color="success.main">
-              {getOnlineUsersCount()}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Active Departments
-            </Typography>
-            <Typography variant="h4" component="div" color="primary.main">
-              {getActiveDepartments().length}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Tracking Enabled
-            </Typography>
-            <Typography variant="h4" component="div" color="info.main">
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Total Users
+              </Typography>
+              <Typography variant="h4" component="div">
+                {getTotalUsersCount()}
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Online Users
+              </Typography>
+              <Typography variant="h4" component="div" color="success.main">
+                {getOnlineUsersCount()}
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Active Departments
+              </Typography>
+              <Typography variant="h4" component="div" color="primary.main">
+                {getActiveDepartments().length}
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Tracking Enabled
+              </Typography>
+              <Typography variant="h4" component="div" color="info.main">
               {trackingData.filter(user => user.trackingEnabled !== false).length}
-            </Typography>
-          </CardContent>
-        </Card>
+              </Typography>
+            </CardContent>
+          </Card>
       </Box>
 
       {/* Filters */}
@@ -456,59 +456,59 @@ const UserTracking: React.FC = () => {
           gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, 
           gap: 2 
         }}>
-          <TextField
-            fullWidth
-            label="Search Users"
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-              )
-            }}
-          />
-          <FormControl fullWidth>
-            <InputLabel>Department</InputLabel>
-            <Select
-              value={filters.department}
-              label="Department"
-              onChange={(e) => handleFilterChange('department', e.target.value)}
-            >
-              <MenuItem value="">All Departments</MenuItem>
-              {getActiveDepartments().map(dept => (
-                <MenuItem key={dept} value={dept}>
-                  {dept}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={filters.status}
-              label="Status"
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-            >
-              <MenuItem value="">All Statuses</MenuItem>
-              <MenuItem value="online">Online</MenuItem>
-              <MenuItem value="offline">Offline</MenuItem>
+            <TextField
+              fullWidth
+              label="Search Users"
+              value={filters.search}
+              onChange={(e) => handleFilterChange('search', e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                )
+              }}
+            />
+            <FormControl fullWidth>
+              <InputLabel>Department</InputLabel>
+              <Select
+                value={filters.department}
+                label="Department"
+                onChange={(e) => handleFilterChange('department', e.target.value)}
+              >
+                <MenuItem value="">All Departments</MenuItem>
+                {getActiveDepartments().map(dept => (
+                  <MenuItem key={dept} value={dept}>
+                    {dept}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={filters.status}
+                label="Status"
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+              >
+                <MenuItem value="">All Statuses</MenuItem>
+                <MenuItem value="online">Online</MenuItem>
+                <MenuItem value="offline">Offline</MenuItem>
               <MenuItem value="idle">Idle</MenuItem>
               <MenuItem value="away">Away</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Device Type</InputLabel>
-            <Select
-              value={filters.deviceType}
-              label="Device Type"
-              onChange={(e) => handleFilterChange('deviceType', e.target.value)}
-            >
-              <MenuItem value="">All Devices</MenuItem>
-              <MenuItem value="desktop">Desktop</MenuItem>
-              <MenuItem value="mobile">Mobile</MenuItem>
-              <MenuItem value="tablet">Tablet</MenuItem>
-            </Select>
-          </FormControl>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Device Type</InputLabel>
+              <Select
+                value={filters.deviceType}
+                label="Device Type"
+                onChange={(e) => handleFilterChange('deviceType', e.target.value)}
+              >
+                <MenuItem value="">All Devices</MenuItem>
+                <MenuItem value="desktop">Desktop</MenuItem>
+                <MenuItem value="mobile">Mobile</MenuItem>
+                <MenuItem value="tablet">Tablet</MenuItem>
+              </Select>
+            </FormControl>
         </Box>
       </Paper>
 
@@ -813,32 +813,32 @@ const UserTracking: React.FC = () => {
                 </Box>
               </Box>
               <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" gutterBottom>Current Location</Typography>
-                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                  <Typography variant="h6" gutterBottom>Current Location</Typography>
+                  <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box sx={{ 
                     display: 'grid', 
                     gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, 
                     gap: 2 
                   }}>
-                    <Typography variant="body2">
-                      <strong>Coordinates:</strong> {selectedUser.currentLocation.latitude.toFixed(4)}, {selectedUser.currentLocation.longitude.toFixed(4)}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Accuracy:</strong> {selectedUser.currentLocation.accuracy}m
-                    </Typography>
-                    <Typography variant="body2">
+                        <Typography variant="body2">
+                          <strong>Coordinates:</strong> {selectedUser.currentLocation.latitude.toFixed(4)}, {selectedUser.currentLocation.longitude.toFixed(4)}
+                        </Typography>
+                        <Typography variant="body2">
+                          <strong>Accuracy:</strong> {selectedUser.currentLocation.accuracy}m
+                        </Typography>
+                        <Typography variant="body2">
                       <strong>Address:</strong> {selectedUser.currentLocation.address || 'Not available'}
-                    </Typography>
-                    <Typography variant="body2">
+                        </Typography>
+                        <Typography variant="body2">
                       <strong>City/Country:</strong> {selectedUser.currentLocation.city || 'Unknown'}, {selectedUser.currentLocation.country || 'Unknown'}
-                    </Typography>
+                        </Typography>
                     <Typography variant="body2" sx={{ gridColumn: { xs: '1', sm: '1 / -1' } }}>
                       <strong>Last Updated:</strong> {new Date(selectedUser.currentLocation.timestamp).toLocaleString()}
-                    </Typography>
+                        </Typography>
                   </Box>
                 </Box>
               </Box>
-              <Box>
+                            <Box>
                 <Typography variant="h6" gutterBottom>Session Information</Typography>
                 <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
                   <Box sx={{ 
@@ -848,17 +848,17 @@ const UserTracking: React.FC = () => {
                   }}>
                     <Typography variant="body2">
                       <strong>Session ID:</strong> {selectedUser.sessionId}
-                    </Typography>
+                              </Typography>
                     <Typography variant="body2">
                       <strong>Login Time:</strong> {selectedUser.loginTime ? selectedUser.loginTime.toLocaleString() : 'Not available'}
-                    </Typography>
+                              </Typography>
                     <Typography variant="body2">
                       <strong>Last Activity:</strong> {selectedUser.lastActivity ? selectedUser.lastActivity.toLocaleString() : 'Not available'}
-                    </Typography>
+                                </Typography>
                     <Typography variant="body2">
                       <strong>Total Distance:</strong> {selectedUser.totalDistance ? `${selectedUser.totalDistance.toFixed(2)} km` : 'Not tracked'}
                     </Typography>
-                  </Box>
+                            </Box>
                 </Box>
               </Box>
             </Box>

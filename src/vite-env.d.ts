@@ -1,5 +1,35 @@
 /// <reference types="vite/client" />
 
+// Global type definitions
+declare global {
+  interface GeolocationPosition {
+    coords: GeolocationCoordinates;
+    timestamp: number;
+  }
+
+  interface GeolocationCoordinates {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    altitude?: number | null;
+    altitudeAccuracy?: number | null;
+    heading?: number | null;
+    speed?: number | null;
+  }
+
+  interface GeolocationPositionError {
+    code: number;
+    message: string;
+  }
+
+  namespace NodeJS {
+    interface Timeout {
+      ref(): void;
+      unref(): void;
+    }
+  }
+}
+
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY: string
   readonly VITE_FIREBASE_AUTH_DOMAIN: string

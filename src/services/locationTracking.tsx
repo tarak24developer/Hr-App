@@ -62,12 +62,8 @@ class LocationTrackingService {
 
   // Get client IP address (simplified version)
   private async getClientIP(): Promise<string> {
-    try {
-      // This is a simplified approach - in production you might want to use a service
-      return 'unknown';
-    } catch (error) {
-      return 'unknown';
-    }
+    // This is a simplified approach - in production you might want to use a service
+    return 'unknown';
   }
 
   // Set current user for tracking

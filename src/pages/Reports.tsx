@@ -1,27 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Card,
-  CardContent,
-  Typography,
-  Grid,
-  Button,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
   CircularProgress,
   Tabs,
-  Tab,
-  LinearProgress
+  Tab
 } from '@mui/material';
 import { 
   Assessment as AssessmentIcon,
@@ -34,9 +16,7 @@ import {
   BarChart as BarChartIcon,
   Business as BusinessIcon,
   CalendarToday as CalendarIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import firebaseService from '@/services/firebaseService';
@@ -115,8 +95,8 @@ const Reports: React.FC = () => {
   const [selectedReportType, setSelectedReportType] = useState<string>('');
   const [reportFilters, setReportFilters] = useState<ReportFilters>({
     dateRange: {
-      start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      end: new Date().toISOString().split('T')[0]
+      start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!,
+      end: new Date().toISOString().split('T')[0]!
     },
     departments: [],
     employees: []
@@ -177,7 +157,7 @@ const Reports: React.FC = () => {
         (monthAttendance.filter(att => att.status === 'present').length / monthAttendance.length) * 100 : 0;
 
       // Calculate average salary
-      const totalSalary = activeUsers.reduce((sum, user) => sum + (user.salary || 0), 0);
+      const totalSalary = activeUsers.reduce((sum, user) => sum + (((user as any).salary) || 0), 0);
       const averageSalary = activeUsers.length > 0 ? totalSalary / activeUsers.length : 0;
 
       // Generate monthly trends
@@ -223,7 +203,7 @@ const Reports: React.FC = () => {
           department: dept,
           employeeCount: deptUsers.length,
           avgSalary: deptUsers.length > 0 ? 
-            deptUsers.reduce((sum, user) => sum + (user.salary || 0), 0) / deptUsers.length : 0,
+            deptUsers.reduce((sum, user) => sum + (((user as any).salary) || 0), 0) / deptUsers.length : 0,
           attendanceRate: deptAttendance.length > 0 ? 
             (deptAttendance.filter(att => att.status === 'present').length / deptAttendance.length) * 100 : 0,
           performance: Math.random() * 100 // Placeholder - would be calculated from actual performance data
@@ -326,29 +306,10 @@ const Reports: React.FC = () => {
     }
   };
 
-  const exportReport = (reportId: string) => {
+  const exportReport = (_reportId: string) => {
     showNotification('Export functionality coming soon', 'info');
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'excellent': return 'success';
-      case 'good': return 'info';
-      case 'average': return 'warning';
-      case 'poor': return 'error';
-      default: return 'default';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'excellent': return <CheckCircleIcon />;
-      case 'good': return <CheckCircleIcon />;
-      case 'average': return <WarningIcon />;
-      case 'poor': return <ErrorIcon />;
-      default: return <WarningIcon />;
-    }
-  };
 
   if (loading && !analyticsData) {
     return (
@@ -378,7 +339,7 @@ const Reports: React.FC = () => {
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={selectedTab} onChange={(e, newValue) => setSelectedTab(newValue)}>
+        <Tabs value={selectedTab} onChange={(_e, newValue) => setSelectedTab(newValue)}>
           <Tab label="Analytics Dashboard" icon={<BarChartIcon />} />
           <Tab label="Generated Reports" icon={<AssessmentIcon />} />
           <Tab label="Create Report" icon={<AssessmentIcon />} />
@@ -498,7 +459,7 @@ const Reports: React.FC = () => {
                       fill="#8884d8"
                       dataKey="employeeCount"
                     >
-                      {analyticsData.departmentStats.map((entry, index) => (
+                      {analyticsData.departmentStats.map((_entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -546,9 +507,9 @@ const Reports: React.FC = () => {
                           'bg-red-500'
                         }`}
                         role="progressbar"
-                        aria-valuenow="0"
-                        aria-valuemin="0"
-                        aria-valuemax="100"
+                        aria-valuenow={0}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
                         aria-label={`${metric.category} progress: ${roundedValue}%`}
                         data-width={progressWidth}
                       ></div>

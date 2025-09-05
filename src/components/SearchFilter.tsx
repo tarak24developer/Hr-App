@@ -14,7 +14,9 @@ import {
   MenuItem,
   Button,
   useTheme,
-  Paper
+  Paper,
+  SxProps,
+  Theme,
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -24,6 +26,30 @@ import {
   ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 
+// Type definitions
+interface FilterOption {
+  value: string;
+  label: string;
+}
+
+interface FilterConfig {
+  key: string;
+  label: string;
+  options: FilterOption[];
+}
+
+interface SearchFilterProps {
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  filters?: Record<string, any>;
+  onFilterChange?: (filters: Record<string, any>) => void;
+  onClearAll?: () => void;
+  searchPlaceholder?: string;
+  filterOptions?: FilterConfig[];
+  loading?: boolean;
+  sx?: SxProps<Theme>;
+}
+
 const SearchFilter = ({
   searchValue = '',
   onSearchChange,
@@ -31,15 +57,14 @@ const SearchFilter = ({
   onFilterChange,
   onClearAll,
   searchPlaceholder = 'Search...',
-  showAdvancedFilters = false,
   filterOptions = [],
   loading = false,
   sx = {}
-}) => {
+}: SearchFilterProps) => {
   const theme = useTheme();
   const [showFilters, setShowFilters] = useState(false);
   const [localSearchValue, setLocalSearchValue] = useState(searchValue);
-  const [localFilters, setLocalFilters] = useState(filters);
+  const [localFilters, setLocalFilters] = useState<Record<string, any>>(filters);
 
   useEffect(() => {
     setLocalSearchValue(searchValue);
@@ -49,7 +74,7 @@ const SearchFilter = ({
     setLocalFilters(filters);
   }, [filters]);
 
-  const handleSearchChange = (event) => {
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setLocalSearchValue(value);
     if (onSearchChange) {
@@ -57,7 +82,7 @@ const SearchFilter = ({
     }
   };
 
-  const handleFilterChange = (filterKey, value) => {
+  const handleFilterChange = (filterKey: string, value: any) => {
     const newFilters = { ...localFilters, [filterKey]: value };
     setLocalFilters(newFilters);
     if (onFilterChange) {
@@ -72,12 +97,6 @@ const SearchFilter = ({
     }
   };
 
-  const handleClearFilters = () => {
-    setLocalFilters({});
-    if (onFilterChange) {
-      onFilterChange({});
-    }
-  };
 
   const handleClearAll = () => {
     setLocalSearchValue('');

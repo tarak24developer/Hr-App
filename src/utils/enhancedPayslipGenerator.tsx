@@ -139,30 +139,7 @@ class EnhancedPayslipGenerator {
     }
   }
 
-  private setColumnWidths() {
-    if (!this.worksheet) return;
-
-    const columnWidths = [
-      { wch: 20 }, // Employee Details
-      { wch: 12 }, // Gross Salary
-      { wch: 12 }, // Basic + DA
-      { wch: 12 }, // HRA
-      { wch: 15 }, // Special Allowance
-      { wch: 15 }, // Calculated Gross
-      { wch: 10 }, // PF
-      { wch: 10 }, // ESI
-      { wch: 10 }, // PT
-      { wch: 15 }, // Salary Advance
-      { wch: 18 }, // Advance Deduction
-      { wch: 18 }, // Balance Advance
-      { wch: 18 }, // Total Deductions
-      { wch: 15 }, // Net Payable
-      { wch: 12 }, // OT Payment
-      { wch: 15 }  // Final Payable
-    ];
-
-    this.worksheet['!cols'] = columnWidths;
-  }
+  // Removed unused method _setColumnWidths
 }
 
 export const generateEnhancedSalaryStatement = async (salarySheet: SalaryData[], month: string, year: string, overtimeRate: number = 0): Promise<{ success: boolean; filename?: string; error?: string }> => {

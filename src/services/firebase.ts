@@ -49,7 +49,7 @@ export const storage = hasRealCredentials && app ? getStorage(app) : null;
 export const functions = hasRealCredentials && app ? getFunctions(app) : null;
 
 // Initialize Analytics conditionally
-export const analytics = hasRealCredentials && app && isSupported() ? 
+export const analytics = hasRealCredentials && app ? 
   isSupported().then(yes => yes ? getAnalytics(app) : null) : 
   Promise.resolve(null);
 
@@ -57,22 +57,22 @@ export const analytics = hasRealCredentials && app && isSupported() ?
 if (import.meta.env.DEV && hasRealCredentials && app) {
   try {
     // Auth emulator
-    if (import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true') {
+    if (import.meta.env['VITE_USE_FIREBASE_EMULATOR'] === 'true') {
       connectAuthEmulator(auth!, 'http://localhost:9099');
     }
     
     // Firestore emulator
-    if (import.meta.env.VITE_USE_FIRESTORE_EMULATOR === 'true') {
+    if (import.meta.env['VITE_USE_FIRESTORE_EMULATOR'] === 'true') {
       connectFirestoreEmulator(db!, 'localhost', 8080);
     }
     
     // Storage emulator
-    if (import.meta.env.VITE_USE_STORAGE_EMULATOR === 'true') {
+    if (import.meta.env['VITE_USE_STORAGE_EMULATOR'] === 'true') {
       connectStorageEmulator(storage!, 'localhost', 9199);
     }
     
     // Functions emulator
-    if (import.meta.env.VITE_USE_FUNCTIONS_EMULATOR === 'true') {
+    if (import.meta.env['VITE_USE_FUNCTIONS_EMULATOR'] === 'true') {
       connectFunctionsEmulator(functions!, 'localhost', 5001);
     }
   } catch (error) {

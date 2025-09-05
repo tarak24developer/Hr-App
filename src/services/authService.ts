@@ -7,12 +7,11 @@ import {
   sendPasswordResetEmail,
   confirmPasswordReset,
   updatePassword,
-  User as FirebaseUser,
   UserCredential
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import type { User, UserRole } from '@/types';
+import type { User, UserRole } from '../types';
 
 export interface AuthState {
   user: User | null;
@@ -427,7 +426,7 @@ class AuthService {
     }
   }
 
-  public hasPermission(resource: string, action: string): boolean {
+  public hasPermission(_resource: string, _action: string): boolean {
     if (!this.currentUser) return false;
     
     // For now, return true for admin, false for others

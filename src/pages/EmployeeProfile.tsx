@@ -20,10 +20,8 @@ import {
   IconButton,
   Tooltip,
   InputAdornment,
-  List,
   ListItem,
   ListItemText,
-  ListItemAvatar,
   Paper,
   TableContainer,
   Table,
@@ -38,7 +36,6 @@ import {
   Delete as DeleteIcon,
   CreditCard as PayrollIcon,
   AccessTime as AttendanceIcon,
-  Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
   ContentCopy as CopyIcon,
   Business as BusinessIcon,
@@ -95,14 +92,12 @@ type ExtendedEmployee = Employee & Partial<{
 
 const EmployeeProfile: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation() as any;
-  const params = useParams();
+  const location = useLocation();
+  const params = useParams<{ id?: string }>();
 
   // removed local employees list to reduce unused state/lints
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isPayrollDialogOpen, setIsPayrollDialogOpen] = useState(false);
-  const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const [editFormData, setEditFormData] = useState<Partial<ExtendedEmployee>>({});
   const [loading, setLoading] = useState(true);
   const [snackbar, setSnackbar] = useState<{
@@ -118,19 +113,19 @@ const EmployeeProfile: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchValue, setSearchValue] = useState<Employee | null>(null);
   const [isInlineEdit, setIsInlineEdit] = useState(false);
-	const [filterText, setFilterText] = useState('');
+	const [filterText, setFilterText] = useState<string>('');
 	const [filterDept, setFilterDept] = useState<string | 'all'>('all');
-	const [sortBy, setSortBy] = useState<'name'|'department'|'position'>('name');
-	const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
+	const [sortBy] = useState<'name'|'department'|'position'>('name');
+	const [sortDir] = useState<'asc'|'desc'>('asc');
 
-	const filteredSortedEmployees = (employees as any[])
-		.filter((e) => {
+	const filteredSortedEmployees = employees
+		.filter((e: Employee) => {
 			const t = filterText.trim().toLowerCase();
 			const passesText = !t || (e.name || e.email || '').toLowerCase().includes(t) || (e.employeeId || '').toLowerCase().includes(t);
 			const passesDept = filterDept === 'all' || (e.department || '').toLowerCase() === String(filterDept).toLowerCase();
 			return passesText && passesDept;
 		})
-		.sort((a, b) => {
+		.sort((a: Employee, b: Employee) => {
 			const av = (a[sortBy] || '').toString().toLowerCase();
 			const bv = (b[sortBy] || '').toString().toLowerCase();
 			if (av < bv) return sortDir === 'asc' ? -1 : 1;
@@ -140,7 +135,7 @@ const EmployeeProfile: React.FC = () => {
 
   const opsRef = useRef<HTMLDivElement | null>(null);
 
-  const selectEmployee = (emp: any) => {
+  const selectEmployee = (emp: Employee) => {
     setSelectedEmployee(emp);
     setSearchValue(emp);
     setIsInlineEdit(false);
@@ -245,8 +240,8 @@ const EmployeeProfile: React.FC = () => {
           }));
           setEmployees(transformedEmployees as Employee[]);
 
-          const routeId = location?.state?.employeeId || params?.['id'];
-          const found = routeId ? (transformedEmployees.find((e: any) => e['id'] === routeId) || null) : null;
+          const routeId = (location.state as any)?.employeeId || params?.id;
+          const found = routeId ? (transformedEmployees.find((e: Employee) => e.id === routeId) || null) : null;
           setSelectedEmployee(found);
           setSearchValue(found || null);
         }
@@ -382,15 +377,16 @@ const EmployeeProfile: React.FC = () => {
             sx={{ minWidth: 300 }}
             options={employees}
             value={searchValue}
-            getOptionLabel={(opt: any) => opt?.name || opt?.email || opt?.employeeId || ''}
-            onChange={(_, val: any) => { if (val) selectEmployee(val); }}
+            getOptionLabel={(opt: Employee) => opt?.name || opt?.email || opt?.employeeId || ''}
+            onChange={(_, val: Employee | null) => { if (val) selectEmployee(val); }}
             renderInput={(params) => (
+              // @ts-ignore - Material-UI type issue with strict mode
               <TextField
-                {...(params as any)}
+                {...params}
                 size="small"
                 placeholder="Search employees"
                 InputProps={{
-                  ...(params.InputProps as any),
+                  ...params.InputProps,
                   startAdornment: (
                     <InputAdornment position="start">
                       <span role="img" aria-label="search">🔎</span>
@@ -419,9 +415,9 @@ const EmployeeProfile: React.FC = () => {
             <TextField size="small" label="Quick search" value={filterText} onChange={(e) => setFilterText(e.target.value)} sx={{ minWidth: 200 }} />
             <FormControl size="small" sx={{ minWidth: 180 }}>
               <InputLabel>Department</InputLabel>
-              <Select value={filterDept} label="Department" onChange={(e) => setFilterDept(e.target.value as any)}>
+              <Select value={filterDept} label="Department" onChange={(e) => setFilterDept(e.target.value as string | 'all')}>
                 <MenuItem value="all">All</MenuItem>
-                {Array.from(new Set(employees.map((e: any) => e.department || 'Unassigned'))).map((d: any) => (
+                {Array.from(new Set(employees.map((e: Employee) => e.department || 'Unassigned'))).map((d: string) => (
                   <MenuItem key={d} value={d}>{d}</MenuItem>
                 ))}
               </Select>
@@ -448,7 +444,7 @@ const EmployeeProfile: React.FC = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredSortedEmployees.map((emp: any) => (
+                  filteredSortedEmployees.map((emp: Employee) => (
                     <TableRow key={emp.id} hover sx={{ cursor: 'pointer' }} onClick={() => selectEmployee(emp)}>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -525,7 +521,7 @@ const EmployeeProfile: React.FC = () => {
                 Operations
               </Typography>
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <Button variant="contained" startIcon={<EditIcon />} onClick={() => { setIsInlineEdit(true); setEditFormData(selectedEmployee as any); }}>
+                <Button variant="contained" startIcon={<EditIcon />} onClick={() => { setIsInlineEdit(true); setEditFormData(selectedEmployee as Partial<ExtendedEmployee>); }}>
                   Edit Employee
                 </Button>
                 <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={() => handleDeleteEmployee()}>
@@ -727,7 +723,7 @@ const EmployeeProfile: React.FC = () => {
                 </Paper>
               </Box>
               <Box sx={{ display: 'flex', gap: 2, mt: 3, justifyContent: 'flex-end' }}>
-                <Button variant="outlined" onClick={() => { setIsInlineEdit(false); setEditFormData(selectedEmployee as any); }}>
+                <Button variant="outlined" onClick={() => { setIsInlineEdit(false); setEditFormData(selectedEmployee as Partial<ExtendedEmployee>); }}>
                   Cancel
                 </Button>
                 <Button variant="contained" startIcon={<CheckCircleIcon />} onClick={handleSaveEdit}>

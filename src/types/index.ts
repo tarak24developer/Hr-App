@@ -332,7 +332,7 @@ export interface UserTrackingData {
   logoutTime?: string;
   lastActivity?: string;
   totalDistance: number;
-  currentLocation?: Location;
+  currentLocation?: LocationWithAccuracy;
   deviceInfo?: DeviceInfo;
   isActive: boolean;
   department: string;
@@ -349,7 +349,7 @@ export interface DeviceInfo {
   userAgent: string;
 }
 
-export interface Location {
+export interface LocationWithAccuracy {
   latitude: number;
   longitude: number;
   accuracy: number;

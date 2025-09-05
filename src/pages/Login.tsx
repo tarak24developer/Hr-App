@@ -25,7 +25,7 @@ const Login: React.FC = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors, isValid },
+    formState: { errors },
     reset
   } = useForm<LoginFormData>({
     mode: 'onChange'
@@ -79,7 +79,7 @@ const Login: React.FC = () => {
               Reset your password
             </h2>
             <p className="mt-2 text-center text-sm text-gray-600">
-              Enter your email address and we'll send you a link to reset your password.
+              Enter your email address and we&apos;ll send you a link to reset your password.
             </p>
           </div>
 
@@ -267,7 +267,7 @@ const Login: React.FC = () => {
 
           <div className="text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <button
                 type="button"
                 onClick={() => navigate('/register')}

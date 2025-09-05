@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Shield, Users, Key, Lock, RefreshCw, Edit, X, Eye, EyeOff, Save, AlertTriangle } from 'lucide-react';
+import { Shield, Users, Key, Lock, RefreshCw, Edit, Eye, EyeOff, Save, AlertTriangle } from 'lucide-react';
 import { collection, onSnapshot, orderBy, query, updateDoc, doc, limit as fsLimit } from 'firebase/firestore';
 import type { User, UserRole } from '@/types';
 import authService from '@/services/authService';
@@ -82,7 +82,7 @@ const Security: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify_center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600 dark:text-gray-400 text-lg">Loading Security...</p>
@@ -131,7 +131,7 @@ const Security: React.FC = () => {
             </div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items_center gap-3">
+            <div className="flex items-center gap-3">
               <Shield className="w-6 h-6 text-green-600" />
               <div>
                 <p className="text-xs text-gray-500">Active</p>
@@ -470,7 +470,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose
                 {isAdmin && !isCurrentUser && (
                   <p className="text-xs text-amber-600 flex items-center mt-2">
                     <AlertTriangle className="w-3 h-3 mr-1" />
-                    Admin override: You can change any user's password
+                    Admin override: You can change any user&apos;s password
                   </p>
                 )}
               </div>

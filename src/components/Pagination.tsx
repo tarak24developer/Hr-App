@@ -8,7 +8,8 @@ import {
   MenuItem,
   Typography,
   Stack,
-  useTheme
+  type SxProps,
+  type Theme,
 } from '@mui/material';
 import {
   FirstPage as FirstPageIcon,
@@ -16,6 +17,21 @@ import {
   NavigateBefore as NavigateBeforeIcon,
   NavigateNext as NavigateNextIcon
 } from '@mui/icons-material';
+
+type PaginationSize = 'small' | 'medium' | 'large';
+
+interface CustomPaginationProps {
+  currentPage?: number;
+  totalPages?: number;
+  totalItems?: number;
+  itemsPerPage?: number;
+  onPageChange?: (page: number) => void;
+  onItemsPerPageChange?: (value: number) => void;
+  showItemsPerPage?: boolean;
+  showTotal?: boolean;
+  size?: PaginationSize;
+  sx?: SxProps<Theme>;
+}
 
 const CustomPagination = ({
   currentPage = 1,
@@ -27,18 +43,17 @@ const CustomPagination = ({
   showItemsPerPage = true,
   showTotal = true,
   size = 'medium'
-}) => {
-  const theme = useTheme();
+}: CustomPaginationProps) => {
 
-  const handlePageChange = (event, page) => {
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
     if (onPageChange) {
       onPageChange(page);
     }
   };
 
-  const handleItemsPerPageChange = (event) => {
+  const handleItemsPerPageChange = (event: any) => {
     if (onItemsPerPageChange) {
-      onItemsPerPageChange(event.target.value);
+      onItemsPerPageChange(Number(event.target.value));
     }
   };
 
@@ -136,7 +151,10 @@ const CustomPagination = ({
                 previous: NavigateBeforeIcon,
                 next: NavigateNextIcon,
               }}
-              {...item}
+              page={item.page}
+              selected={item.selected}
+              disabled={item.disabled}
+              onClick={item.onClick}
             />
           )}
           sx={{

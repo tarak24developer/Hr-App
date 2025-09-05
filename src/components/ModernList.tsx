@@ -1,4 +1,4 @@
-import React from 'react';
+import type { ReactNode, MouseEvent } from 'react';
 import {
   List,
   ListItem,
@@ -14,17 +14,58 @@ import {
   Grow,
   useTheme,
   alpha,
+  type SxProps,
+  type Theme,
+  type ListProps,
 } from '@mui/material';
 
+// Type definitions
+type ChipColor = 'default' | 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
+type PaletteColorKey = 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
+
+interface ModernListAction {
+  icon: ReactNode;
+  tooltip: string;
+  onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
+  color?: PaletteColorKey;
+}
+
+interface ModernListDetail {
+  icon?: ReactNode;
+  text: string;
+}
+
+interface ModernListItem {
+  id?: string | number;
+  avatar?: ReactNode;
+  icon?: ReactNode;
+  title?: string;
+  name?: string;
+  subtitle?: string;
+  status?: string;
+  statusColor?: ChipColor;
+  details?: ModernListDetail[];
+  actions?: ModernListAction[];
+}
+
+interface ModernListProps extends Omit<ListProps, 'children'> {
+  items?: ModernListItem[];
+  renderItem?: (item: ModernListItem, index: number) => ReactNode;
+  emptyMessage?: string;
+  emptyIcon?: ReactNode;
+  loading?: boolean;
+  sx?: SxProps<Theme>;
+}
+
 const ModernList = ({
-  items = [],
+  items = [] as ModernListItem[],
   renderItem,
   emptyMessage = "No items found",
   emptyIcon,
   loading = false,
   sx = {},
   ...props
-}) => {
+}: ModernListProps) => {
   const theme = useTheme();
 
   if (loading) {
@@ -89,10 +130,10 @@ const ModernList = ({
       }}
       {...props}
     >
-      {items.map((item, index) => (
+      {items.map((item: ModernListItem, index: number) => (
         <Grow in timeout={800 + index * 100} key={item.id || index}>
           {renderItem ? (
-            renderItem(item, index)
+            <Box component="div">{renderItem(item, index)}</Box>
           ) : (
             <ListItem>
               <ListItemAvatar>
@@ -131,7 +172,7 @@ const ModernList = ({
                     )}
                     {item.details && (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        {item.details.map((detail, detailIndex) => (
+                        {item.details.map((detail: ModernListDetail, detailIndex: number) => (
                           <Box key={detailIndex} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             {detail.icon && detail.icon}
                             <Typography variant="caption" color="text.secondary">
@@ -147,21 +188,25 @@ const ModernList = ({
               <ListItemSecondaryAction>
                 {item.actions && (
                   <Box sx={{ display: 'flex', gap: 1 }}>
-                    {item.actions.map((action, actionIndex) => (
-                      <Tooltip key={actionIndex} title={action.tooltip}>
-                        <IconButton
-                          onClick={action.onClick}
-                          sx={{
-                            color: action.color || 'primary.main',
-                            '&:hover': {
-                              background: alpha(theme.palette[action.color || 'primary'].main, 0.1),
-                            },
-                          }}
-                        >
-                          {action.icon}
-                        </IconButton>
-                      </Tooltip>
-                    ))}
+                    {item.actions.map((action: ModernListAction, actionIndex: number) => {
+                      const paletteKey: PaletteColorKey = action.color || 'primary';
+                      const hoverBg = alpha(theme.palette[paletteKey]!.main, 0.1);
+                      return (
+                        <Tooltip key={actionIndex} title={action.tooltip}>
+                          <IconButton
+                            onClick={action.onClick}
+                            sx={{
+                              color: `${paletteKey}.main`,
+                              '&:hover': {
+                                background: hoverBg,
+                              },
+                            }}
+                          >
+                            {action.icon}
+                          </IconButton>
+                        </Tooltip>
+                      );
+                    })}
                   </Box>
                 )}
               </ListItemSecondaryAction>

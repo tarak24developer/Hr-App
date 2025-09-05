@@ -271,18 +271,18 @@ const Inventory: React.FC = () => {
   const convertToDateString = (dateField: any): string => {
     if (!dateField) return '';
     if (dateField instanceof Date) {
-      return dateField.toISOString().split('T')[0];
+      return dateField.toISOString().split('T')[0] || '';
     }
     if (typeof dateField === 'string') {
       try {
-        return new Date(dateField).toISOString().split('T')[0];
+        return new Date(dateField).toISOString().split('T')[0] || '';
       } catch {
         return dateField;
       }
     }
     // Handle Firebase Timestamp objects
     if (dateField && typeof dateField.toDate === 'function') {
-      return dateField.toDate().toISOString().split('T')[0];
+      return dateField.toDate().toISOString().split('T')[0] || '';
     }
     return '';
   };
@@ -1305,7 +1305,7 @@ const Inventory: React.FC = () => {
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <Typography variant="body1" sx={{ mb: 1 }}>
-            Are you sure you want to delete the inventory item <strong>"{deleteConfirm.itemName}"</strong>?
+            Are you sure you want to delete the inventory item <strong>&quot;{deleteConfirm.itemName}&quot;</strong>?
           </Typography>
           <Typography variant="body2" color="textSecondary">
             This action cannot be undone. All item data will be permanently removed.

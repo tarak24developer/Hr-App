@@ -305,7 +305,7 @@ const LiveMap: React.FC<LiveMapProps> = ({
           </Box>
         </Box>
       </Box>
-    </Box>
+        </Box>
   );
 };
 

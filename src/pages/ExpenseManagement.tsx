@@ -243,7 +243,7 @@ const ExpenseManagement: React.FC = () => {
         employeeId: expense.employeeId,
         managerId: expense.managerId || '',
         department: expense.department,
-        expenseDate: expense.expenseDate.toISOString().split('T')[0],
+        expenseDate: expense.expenseDate ? (expense.expenseDate.toISOString().split('T')[0] || '') : '',
         isReimbursable: expense.isReimbursable,
         reimbursementAmount: expense.reimbursementAmount?.toString() || ''
       });

@@ -35,7 +35,6 @@ import {
   Alert,
   Snackbar
 } from '@mui/material';
-import { Grid } from '@mui/material';
 import {
   Add as AddIcon,
   Edit as EditIcon,
@@ -64,7 +63,7 @@ interface ExitChecklistItem {
   completedAt?: Date;
 }
 
-interface ExitProcess {
+interface ExitProcessData {
   id: string;
   employeeId: string;
   employeeName: string;
@@ -93,14 +92,14 @@ interface Employee {
 const ExitProcess: React.FC = () => {
   console.log('ExitProcess component rendering');
   
-  const [exitProcesses, setExitProcesses] = useState<ExitProcess[]>([]);
-  const [filteredProcesses, setFilteredProcesses] = useState<ExitProcess[]>([]);
+  const [exitProcesses, setExitProcesses] = useState<ExitProcessData[]>([]);
+  const [filteredProcesses, setFilteredProcesses] = useState<ExitProcessData[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedProcess, setSelectedProcess] = useState<ExitProcess | null>(null);
+  const [selectedProcess, setSelectedProcess] = useState<ExitProcessData | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
   const [isCreateMode, setIsCreateMode] = useState(false);
-  const [filters, setFilters] = useState({
+  const [filters] = useState({
     status: '',
     priority: '',
     department: '',
@@ -131,7 +130,7 @@ const ExitProcess: React.FC = () => {
   });
 
   // Form state for creating/editing processes
-  const [formData, setFormData] = useState<Partial<ExitProcess>>({
+  const [formData, setFormData] = useState<Partial<ExitProcessData>>({
     employeeId: '',
     employeeName: '',
     employeeEmail: '',
@@ -166,7 +165,7 @@ const ExitProcess: React.FC = () => {
         exitDate: selectedProcess.exitDate,
         reason: selectedProcess.reason,
         priority: selectedProcess.priority,
-        notes: selectedProcess.notes,
+        notes: selectedProcess.notes || '',
         checklist: selectedProcess.checklist
       });
     }
@@ -192,7 +191,7 @@ const ExitProcess: React.FC = () => {
       console.log('Raw Firebase response:', response);
       if (response.success && response.data) {
         // Transform Firebase data to ExitProcess format
-        const processes: ExitProcess[] = response.data.map((doc: any) => {
+        const processes: ExitProcessData[] = response.data.map((doc: any) => {
           // Helper function to safely convert dates
           const safeDate = (dateValue: any): Date => {
             if (!dateValue) return new Date();
@@ -231,7 +230,7 @@ const ExitProcess: React.FC = () => {
             notes: doc.notes || '',
             initiatedBy: doc.initiatedBy || '',
             initiatedAt: safeDate(doc.initiatedAt),
-            completedAt: doc.completedAt ? safeDate(doc.completedAt) : undefined,
+            completedAt: doc.completedAt ? safeDate(doc.completedAt) : new Date(),
             lastUpdated: safeDate(doc.lastUpdated)
           };
         });
@@ -324,7 +323,7 @@ const ExitProcess: React.FC = () => {
     setIsDialogOpen(true);
   };
 
-  const handleEditProcess = (process: ExitProcess) => {
+  const handleEditProcess = (process: ExitProcessData) => {
     console.log('handleEditProcess called with:', process);
     setSelectedProcess(process);
     setIsViewMode(false);
@@ -332,7 +331,7 @@ const ExitProcess: React.FC = () => {
     setIsDialogOpen(true);
   };
 
-  const handleViewProcess = (process: ExitProcess) => {
+  const handleViewProcess = (process: ExitProcessData) => {
     console.log('handleViewProcess called with:', process);
     setSelectedProcess(process);
     setIsViewMode(true);
@@ -489,9 +488,6 @@ const ExitProcess: React.FC = () => {
     return totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
   };
 
-  const getDepartmentCount = (departmentName: string) => {
-    return exitProcesses.filter(process => process.employeeDepartment === departmentName).length;
-  };
 
   const getStatusCount = (statusName: string) => {
     return exitProcesses.filter(process => process.status === statusName).length;
@@ -501,8 +497,6 @@ const ExitProcess: React.FC = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-
-  const totalPages = Math.ceil(filteredProcesses.length / itemsPerPage);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -772,8 +766,8 @@ const ExitProcess: React.FC = () => {
           {isViewMode && selectedProcess ? (
             // View Mode - Display process details
             <Box sx={{ mt: 2 }}>
-              <Grid container spacing={3}>
-                <Grid xs={12} md={6}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3 }}>
+                <Box sx={{ gridColumn: 'span 1' }}>
                   <Typography variant="h6" gutterBottom>Employee Information</Typography>
                   <List dense>
                     <ListItem>
@@ -837,8 +831,8 @@ const ExitProcess: React.FC = () => {
                       />
                     </ListItem>
                   </List>
-                </Grid>
-                <Grid xs={12} md={6}>
+                </Box>
+                <Box sx={{ gridColumn: 'span 1' }}>
                   <Typography variant="h6" gutterBottom>Process Details</Typography>
                   <List dense>
                     <ListItem>
@@ -878,8 +872,8 @@ const ExitProcess: React.FC = () => {
                       />
                     </ListItem>
                   </List>
-                </Grid>
-                <Grid xs={12}>
+                </Box>
+                <Box sx={{ gridColumn: 'span 2' }}>
                   <Typography variant="h6" gutterBottom>Checklist Progress</Typography>
                   <Accordion>
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -931,18 +925,18 @@ const ExitProcess: React.FC = () => {
                       </List>
                     </AccordionDetails>
                   </Accordion>
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             </Box>
           ) : (
             // Create/Edit Mode - Show form
             <Box sx={{ mt: 2 }}>
-              <Grid container spacing={3}>
-                <Grid xs={12} md={6}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3 }}>
+                <Box sx={{ gridColumn: 'span 1' }}>
                   <FormControl fullWidth sx={{ mb: 2 }}>
                     <InputLabel>Select Employee *</InputLabel>
                     <Select
-                      value={formData.employeeId}
+                      value={formData.employeeId || ''}
                       label="Select Employee *"
                       onChange={(e) => {
                         const selectedEmployee = employees.find(emp => emp.id === e.target.value);
@@ -988,9 +982,9 @@ const ExitProcess: React.FC = () => {
                     disabled
                     sx={{ mb: 2 }}
                   />
-                </Grid>
+                </Box>
 
-                <Grid xs={12} md={6}>
+                <Box sx={{ gridColumn: 'span 1' }}>
                   <TextField
                     fullWidth
                     label="Exit Date"
@@ -1006,7 +1000,7 @@ const ExitProcess: React.FC = () => {
                   <FormControl fullWidth sx={{ mb: 2 }}>
                     <InputLabel>Priority</InputLabel>
                     <Select
-                      value={formData.priority}
+                      value={formData.priority || 'medium'}
                       label="Priority"
                       onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as any }))}
                     >
@@ -1037,9 +1031,9 @@ const ExitProcess: React.FC = () => {
                     rows={3}
                     sx={{ mb: 2 }}
                   />
-                </Grid>
+                </Box>
 
-                <Grid xs={12}>
+                <Box sx={{ gridColumn: 'span 2' }}>
                   <Typography variant="h6" gutterBottom>
                     Default Checklist Items
                   </Typography>
@@ -1084,8 +1078,8 @@ const ExitProcess: React.FC = () => {
                       />
                     </ListItem>
                   </List>
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             </Box>
           )}
         </DialogContent>
@@ -1164,7 +1158,7 @@ const ExitProcess: React.FC = () => {
                     const response = await firebaseService.addDocument('exitProcesses', processData);
                     console.log('Firebase response:', response);
                     if (response.success && response.data) {
-                      const createdProcess = response.data as ExitProcess;
+                      const createdProcess = response.data as ExitProcessData;
                       console.log('Created process with ID:', createdProcess.id);
                       
                       setExitProcesses(prev => [createdProcess, ...prev]);
@@ -1188,7 +1182,7 @@ const ExitProcess: React.FC = () => {
                         exitDate: formData.exitDate || selectedProcess.exitDate,
                         reason: formData.reason || selectedProcess.reason,
                         priority: formData.priority || selectedProcess.priority,
-                        notes: formData.notes || selectedProcess.notes,
+                        notes: formData.notes || selectedProcess.notes || '',
                         lastUpdated: new Date()
                       };
                       

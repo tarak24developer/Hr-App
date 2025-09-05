@@ -25,9 +25,23 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
-const COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#8b5cf6'];
+const COLORS: string[] = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#8b5cf6'];
 
-export const ProfessionalLineChart = ({ data, title, height = 400 }) => {
+// Common data point interface for charts
+export interface ChartPoint {
+  name: string;
+  value: number;
+  // Allow additional series keys if needed by callers
+  [key: string]: string | number | undefined;
+}
+
+interface ChartProps {
+  data: ChartPoint[];
+  title: string;
+  height?: number;
+}
+
+export const ProfessionalLineChart: React.FC<ChartProps> = ({ data, title, height = 400 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mounted, setMounted] = useState(false);
@@ -124,7 +138,7 @@ export const ProfessionalLineChart = ({ data, title, height = 400 }) => {
   );
 };
 
-export const ProfessionalAreaChart = ({ data, title, height = 400 }) => {
+export const ProfessionalAreaChart: React.FC<ChartProps> = ({ data, title, height = 400 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mounted, setMounted] = useState(false);
@@ -220,7 +234,7 @@ export const ProfessionalAreaChart = ({ data, title, height = 400 }) => {
   );
 };
 
-export const ProfessionalBarChart = ({ data, title, height = 400 }) => {
+export const ProfessionalBarChart: React.FC<ChartProps> = ({ data, title, height = 400 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mounted, setMounted] = useState(false);
@@ -313,7 +327,7 @@ export const ProfessionalBarChart = ({ data, title, height = 400 }) => {
   );
 };
 
-export const ProfessionalPieChart = ({ data, title, height = 400 }) => {
+export const ProfessionalPieChart: React.FC<ChartProps> = ({ data, title, height = 400 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mounted, setMounted] = useState(false);
@@ -377,12 +391,12 @@ export const ProfessionalPieChart = ({ data, title, height = 400 }) => {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }: { name: string; percent?: number }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                 outerRadius={isMobile ? 80 : 120}
                 fill="#8884d8"
                 dataKey="value"
               >
-                {data.map((entry, index) => (
+                {data.map((_entry: ChartPoint, index: number) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>

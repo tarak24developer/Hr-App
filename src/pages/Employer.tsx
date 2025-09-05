@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Paper,
   Typography,
   Button,
   TextField,
@@ -29,7 +28,7 @@ import {
   LocationOn as LocationIcon,
   People as PeopleIcon,
   CalendarToday as CalendarIcon,
-  Industry as IndustryIcon
+  Business as IndustryIcon
 } from '@mui/icons-material';
 
 interface EmployerProfile {
@@ -251,7 +250,7 @@ const Employer: React.FC = () => {
                     bgcolor: 'primary.main',
                     fontSize: '2rem'
                   }}
-                  src={profile.logo}
+                  src={profile.logo || ''}
                 >
                   {profile.companyName.charAt(0)}
                 </Avatar>

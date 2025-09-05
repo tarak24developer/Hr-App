@@ -28,9 +28,7 @@ import {
   Pagination,
   FormControlLabel,
   Switch,
-  Tooltip,
-  Avatar,
-  Grid
+  Tooltip
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -40,14 +38,13 @@ import {
   CalendarToday as CalendarIcon,
   Upload as UploadIcon,
   Download as DownloadIcon,
-  Refresh as RefreshIcon,
   Event as EventIcon,
   Public as PublicIcon,
   Business as BusinessIcon,
   Star as StarIcon,
   Save as SaveIcon
 } from '@mui/icons-material';
-import firebaseService from '@/services/firebaseService';
+import firebaseService from '../services/firebaseService';
 
 interface Holiday {
   id: string;
@@ -78,6 +75,7 @@ interface HolidayFilters {
   search: string;
   type: string;
   year: string;
+  country: string;
   showActiveOnly: boolean;
 }
 
@@ -96,6 +94,7 @@ const initialFilters: HolidayFilters = {
   search: '',
   type: '',
   year: '',
+  country: '',
   showActiveOnly: true
 };
 
@@ -121,8 +120,6 @@ const typeIcons = {
 const Holidays: React.FC = () => {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [filteredHolidays, setFilteredHolidays] = useState<Holiday[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
   const [filters, setFilters] = useState<HolidayFilters>(initialFilters);
   const [selectedHoliday, setSelectedHoliday] = useState<Holiday | null>(null);
   const [formData, setFormData] = useState<HolidayFormData>(initialFormData);
@@ -143,8 +140,6 @@ const Holidays: React.FC = () => {
   // Remove mock data; integrate Firebase
   const fetchHolidays = async () => {
     try {
-      setLoading(true);
-      setError('');
       const result = await firebaseService.getCollection('holidays');
       if (result && result.success && result.data) {
         const mapped: Holiday[] = result.data.map((doc: any) => ({
@@ -166,10 +161,12 @@ const Holidays: React.FC = () => {
       }
     } catch (e: any) {
       console.error('Error fetching holidays:', e);
-      setError('Failed to load holidays');
+      setSnackbar({
+        open: true,
+        message: 'Failed to load holidays',
+        severity: 'error'
+      });
       setHolidays([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -200,6 +197,10 @@ const Holidays: React.FC = () => {
 
     if (filters.year) {
       filtered = filtered.filter(holiday => holiday.date.startsWith(filters.year));
+    }
+
+    if (filters.country) {
+      filtered = filtered.filter(holiday => holiday.country === filters.country);
     }
 
     if (filters.showActiveOnly) {
@@ -480,9 +481,9 @@ const Holidays: React.FC = () => {
           <FormControl fullWidth>
             <InputLabel>Country</InputLabel>
             <Select
-              value={(filters as any).country || ''}
+              value={filters.country}
               label="Country"
-              onChange={(e) => handleFilterChange('country' as any, e.target.value)}
+              onChange={(e) => handleFilterChange('country', e.target.value)}
             >
               <MenuItem value="">All Countries</MenuItem>
               {countries.map(country => (
@@ -657,8 +658,8 @@ const Holidays: React.FC = () => {
               <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                 Basic Details
               </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
+                <Box sx={{ gridColumn: 'span 1' }}>
                   <TextField
                     fullWidth
                     label="Holiday Name *"
@@ -670,8 +671,8 @@ const Holidays: React.FC = () => {
                     size="medium"
                     margin="normal"
                   />
-                </Grid>
-                <Grid item xs={12} sm={6}>
+                </Box>
+                <Box sx={{ gridColumn: 'span 1' }}>
                   <TextField
                     fullWidth
                     label="Date *"
@@ -685,8 +686,8 @@ const Holidays: React.FC = () => {
                     size="medium"
                     margin="normal"
                   />
-                </Grid>
-                <Grid item xs={12} sm={6}>
+                </Box>
+                <Box sx={{ gridColumn: 'span 1' }}>
                   <FormControl fullWidth required disabled={isViewMode} size="medium" sx={{ minWidth: 240 }}>
                     <InputLabel id="holiday-type-label">Type *</InputLabel>
                     <Select
@@ -706,8 +707,8 @@ const Holidays: React.FC = () => {
                       ))}
                     </Select>
                   </FormControl>
-                </Grid>
-                <Grid item xs={12}>
+                </Box>
+                <Box sx={{ gridColumn: 'span 2' }}>
                   <TextField
                     fullWidth
                     label="Description"
@@ -720,16 +721,16 @@ const Holidays: React.FC = () => {
                     size="medium"
                     margin="normal"
                   />
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             </Paper>
 
             <Paper variant="outlined" sx={{ p: 2.5, mb: 1.5, bgcolor: 'grey.50', borderRadius: 2 }}>
               <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
                 Region & Settings
               </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
+                <Box sx={{ gridColumn: 'span 1' }}>
                   <FormControl fullWidth disabled={isViewMode} size="medium" sx={{ minWidth: 240 }}>
                     <InputLabel id="holiday-country-label">Country</InputLabel>
                     <Select
@@ -753,8 +754,8 @@ const Holidays: React.FC = () => {
                       ))}
                     </Select>
                   </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
+                </Box>
+                <Box sx={{ gridColumn: 'span 1' }}>
                   <FormControl fullWidth disabled={isViewMode} size="medium" sx={{ minWidth: 240 }}>
                     <InputLabel id="holiday-region-label">Region</InputLabel>
                     <Select
@@ -779,8 +780,8 @@ const Holidays: React.FC = () => {
                       ))}
                     </Select>
                   </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
+                </Box>
+                <Box sx={{ gridColumn: 'span 1' }}>
                   <FormControlLabel
                     control={
                       <Switch
@@ -791,8 +792,8 @@ const Holidays: React.FC = () => {
                     }
                     label="Recurring every year"
                   />
-                </Grid>
-                <Grid item xs={12} sm={6}>
+                </Box>
+                <Box sx={{ gridColumn: 'span 1' }}>
                   <FormControlLabel
                     control={
                       <Switch
@@ -803,8 +804,8 @@ const Holidays: React.FC = () => {
                     }
                     label="Active"
                   />
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             </Paper>
           </Box>
         </DialogContent>
@@ -838,4 +839,4 @@ const Holidays: React.FC = () => {
   );
 };
 
-export default Holidays; 
+export default Holidays;

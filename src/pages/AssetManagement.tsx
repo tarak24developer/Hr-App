@@ -26,7 +26,6 @@ import {
   CircularProgress,
   Tooltip,
   Pagination,
-  Alert,
   List,
   ListItem,
   ListItemIcon,
@@ -51,10 +50,8 @@ import {
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
   Schedule as ScheduleIcon,
-  Error as ErrorIcon,
   Refresh as RefreshIcon,
   Download as DownloadIcon,
-  Archive as ArchiveIcon,
   Person as PersonIcon
 } from '@mui/icons-material';
 import firebaseService from '../services/firebaseService';
@@ -67,6 +64,8 @@ interface User {
   department: string;
 }
 
+type FirebaseDate = Date | { toDate(): Date } | string;
+
 interface Asset {
   id: string;
   name: string;
@@ -74,14 +73,14 @@ interface Asset {
   serialNumber: string;
   model: string;
   manufacturer: string;
-  purchaseDate: any; // Can be Date, Firebase Timestamp, or string
+  purchaseDate: FirebaseDate;
   purchasePrice: number;
   currentValue: number;
   status: 'available' | 'assigned' | 'maintenance' | 'retired' | 'lost';
   assignedTo?: string;
   location: string;
   condition: 'excellent' | 'good' | 'fair' | 'poor';
-  warrantyExpiry?: any | null; // Can be Date, Firebase Timestamp, string, or null
+  warrantyExpiry?: FirebaseDate | null;
   description?: string;
   supplier?: string;
   supplierContact?: string;
@@ -90,18 +89,18 @@ interface Asset {
   imageUrl?: string; // Asset image URL
   maintenanceHistory?: MaintenanceRecord[];
   depreciationRate?: number; // Annual depreciation percentage
-  createdAt: any; // Can be Date, Firebase Timestamp, or string
-  updatedAt: any; // Can be Date, Firebase Timestamp, or string
+  createdAt: FirebaseDate;
+  updatedAt: FirebaseDate;
 }
 
 interface MaintenanceRecord {
   id: string;
-  date: any;
+  date: FirebaseDate;
   type: 'preventive' | 'repair' | 'upgrade' | 'inspection';
   description: string;
   cost: number;
   performedBy: string;
-  nextMaintenanceDate?: any;
+  nextMaintenanceDate?: FirebaseDate | undefined;
 }
 
 const AssetManagement: React.FC = () => {
@@ -154,7 +153,7 @@ const AssetManagement: React.FC = () => {
 
   const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
   const [selectedAssetForMaintenance, setSelectedAssetForMaintenance] = useState<Asset | null>(null);
-  const [bulkSelection, setBulkSelection] = useState<string[]>([]);
+  const [bulkSelection] = useState<string[]>([]);
 
   const [deleteConfirm, setDeleteConfirm] = useState<{
     open: boolean;
@@ -265,41 +264,49 @@ const AssetManagement: React.FC = () => {
   };
 
   // Helper function to safely convert Firebase date fields to ISO date strings
-  const convertToDateString = (dateField: any): string => {
+  const convertToDateString = (dateField: FirebaseDate | null | undefined): string => {
     if (!dateField) return '';
-    if (dateField instanceof Date) {
-      return dateField.toISOString().split('T')[0];
+    
+    // Type guard to ensure dateField is not null/undefined
+    const field = dateField as FirebaseDate;
+    
+    if (field instanceof Date) {
+      return field.toISOString().split('T')[0] || '';
     }
-    if (typeof dateField === 'string') {
+    if (typeof field === 'string') {
       try {
-        return new Date(dateField).toISOString().split('T')[0];
+        return new Date(field).toISOString().split('T')[0] || '';
       } catch {
-        return dateField;
+        return field || '';
       }
     }
     // Handle Firebase Timestamp objects
-    if (dateField && typeof dateField.toDate === 'function') {
-      return dateField.toDate().toISOString().split('T')[0];
+    if (typeof field === 'object' && typeof field.toDate === 'function') {
+      return field.toDate().toISOString().split('T')[0] || '';
     }
     return '';
   };
 
   // Helper function to safely convert any date type to a display string
-  const convertToDisplayDate = (dateField: any): string => {
+  const convertToDisplayDate = (dateField: FirebaseDate | null | undefined): string => {
     if (!dateField) return 'Not specified';
-    if (dateField instanceof Date) {
-      return dateField.toLocaleDateString();
+    
+    // Type guard to ensure dateField is not null/undefined
+    const field = dateField as FirebaseDate;
+    
+    if (field instanceof Date) {
+      return field.toLocaleDateString();
     }
-    if (typeof dateField === 'string') {
+    if (typeof field === 'string') {
       try {
-        return new Date(dateField).toLocaleDateString();
+        return new Date(field).toLocaleDateString();
       } catch {
-        return dateField;
+        return field as string;
       }
     }
     // Handle Firebase Timestamp objects
-    if (dateField && typeof dateField.toDate === 'function') {
-      return dateField.toDate().toLocaleDateString();
+    if (typeof field === 'object' && typeof field.toDate === 'function') {
+      return field.toDate().toLocaleDateString();
     }
     return 'Invalid date';
   };
@@ -533,13 +540,6 @@ const AssetManagement: React.FC = () => {
     showNotification('Bulk assignment feature coming soon!', 'info');
   };
 
-  const handleBulkSelection = (assetId: string) => {
-    setBulkSelection(prev => 
-      prev.includes(assetId) 
-        ? prev.filter(id => id !== assetId)
-        : [...prev, assetId]
-    );
-  };
 
   // Maintenance functions
   const handleAddMaintenance = async () => {
@@ -589,15 +589,7 @@ const AssetManagement: React.FC = () => {
     }
   };
 
-  // Calculate depreciation
-  const calculateDepreciation = (asset: Asset) => {
-    if (!asset.depreciationRate || !asset.purchaseDate) return asset.currentValue;
-    
-    const purchaseDate = new Date(asset.purchaseDate);
-    const yearsSincePurchase = (new Date().getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
-    const depreciationAmount = asset.purchasePrice * (asset.depreciationRate / 100) * yearsSincePurchase;
-    return Math.max(asset.purchasePrice - depreciationAmount, 0);
-  };
+
 
   if (assetsLoading || usersLoading) {
     return (
@@ -1433,7 +1425,7 @@ const AssetManagement: React.FC = () => {
         </DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           <Typography variant="body1" sx={{ mb: 1 }}>
-            Are you sure you want to delete the asset <strong>"{deleteConfirm.assetName}"</strong>?
+            Are you sure you want to delete the asset <strong>&quot;{deleteConfirm.assetName}&quot;</strong>?
           </Typography>
           <Typography variant="body2" color="textSecondary">
             This action cannot be undone. All asset data will be permanently removed.
