@@ -32,7 +32,14 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  ListItemAvatar
+  ListItemAvatar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Grid,
+  CircularProgress,
+  Fade
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -52,49 +59,14 @@ import {
   Info as InfoIcon,
   Warning as WarningIcon,
   Error as ErrorIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  PushPin as PinIcon,
+  Publish as PublishIcon,
+  Create as DraftIcon
 } from '@mui/icons-material';
+import { announcementService } from '../services/announcementService';
+import { Announcement, AnnouncementCategory, AnnouncementFormData, AnnouncementStats, User } from '../types';
 
-interface Announcement {
-  id: string;
-  title: string;
-  content: string;
-  summary: string;
-  type: 'info' | 'warning' | 'error' | 'success' | 'general' | 'urgent' | 'maintenance' | 'update';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  category: string;
-  authorId: string;
-  targetAudience: string[];
-  isPublished: boolean;
-  isPinned: boolean;
-  isArchived: boolean;
-  publishDate: Date;
-  expiryDate?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  attachments: string[];
-  tags: string[];
-  readCount: number;
-  likeCount: number;
-  commentCount: number;
-}
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  avatar?: string;
-}
-
-interface AnnouncementCategory {
-  id: string;
-  name: string;
-  description: string;
-  color: string;
-  icon: string;
-  isActive: boolean;
-}
 
 interface AnnouncementFilters {
   search: string;
@@ -143,12 +115,31 @@ const Announcements: React.FC = () => {
   const [filteredAnnouncements, setFilteredAnnouncements] = useState<Announcement[]>([]);
   const [categories, setCategories] = useState<AnnouncementCategory[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [stats, setStats] = useState<AnnouncementStats | null>(null);
   const [filters, setFilters] = useState<AnnouncementFilters>(initialFilters);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
+  const [isFormMode, setIsFormMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState<AnnouncementFormData>({
+    title: '',
+    content: '',
+    summary: '',
+    type: 'general',
+    priority: 'medium',
+    category: '',
+    targetAudience: ['all'],
+    isPublished: false,
+    isPinned: false,
+    publishDate: new Date().toISOString(),
+    attachments: [],
+    tags: []
+  });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [announcementToDelete, setAnnouncementToDelete] = useState<Announcement | null>(null);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -159,74 +150,68 @@ const Announcements: React.FC = () => {
     severity: 'info'
   });
 
-  // Mock data for development
-  const mockCategories: AnnouncementCategory[] = [
-    { id: '1', name: 'General', description: 'General announcements', color: '#9e9e9e', icon: 'general', isActive: true },
-    { id: '2', name: 'System', description: 'System-related announcements', color: '#2196f3', icon: 'info', isActive: true },
-    { id: '3', name: 'Maintenance', description: 'Maintenance notifications', color: '#795548', icon: 'maintenance', isActive: true },
-    { id: '4', name: 'Updates', description: 'System updates and changes', color: '#607d8b', icon: 'update', isActive: true },
-    { id: '5', name: 'Urgent', description: 'Urgent announcements', color: '#9c27b0', icon: 'urgent', isActive: true }
-  ];
-
-  const mockUsers: User[] = [
-    { id: '1', name: 'John Doe', email: 'john@example.com', role: 'Manager' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com', role: 'Employee' },
-    { id: '3', name: 'Mike Johnson', email: 'mike@example.com', role: 'Director' }
-  ];
-
-  const mockAnnouncements: Announcement[] = [
-    {
-      id: '1',
-      title: 'System Maintenance Scheduled',
-      content: 'We will be performing scheduled system maintenance on Saturday, January 20th, 2024 from 2:00 AM to 6:00 AM EST. During this time, the system may be temporarily unavailable. We apologize for any inconvenience.',
-      summary: 'Scheduled system maintenance on January 20th',
-      type: 'maintenance',
-      priority: 'high',
-      category: 'Maintenance',
-      authorId: '3',
-      targetAudience: ['all'],
-      isPublished: true,
-      isPinned: true,
-      isArchived: false,
-      publishDate: new Date('2024-01-15T10:00:00'),
-      expiryDate: new Date('2024-01-21T23:59:59'),
-      createdAt: new Date('2024-01-15T09:00:00'),
-      updatedAt: new Date('2024-01-15T09:00:00'),
-      attachments: ['maintenance_schedule.pdf'],
-      tags: ['maintenance', 'system', 'scheduled'],
-      readCount: 45,
-      likeCount: 12,
-      commentCount: 3
-    },
-    {
-      id: '2',
-      title: 'New Feature Release',
-      content: 'We are excited to announce the release of our new employee portal features! The updated interface includes improved navigation, enhanced reporting tools, and mobile optimization. Please take some time to explore the new features.',
-      summary: 'New employee portal features released',
-      type: 'update',
-      priority: 'medium',
-      category: 'Updates',
-      authorId: '1',
-      targetAudience: ['employees', 'managers'],
-      isPublished: true,
-      isPinned: false,
-      isArchived: false,
-      publishDate: new Date('2024-01-14T14:00:00'),
-      createdAt: new Date('2024-01-14T13:00:00'),
-      updatedAt: new Date('2024-01-14T13:00:00'),
-      attachments: ['feature_guide.pdf', 'screenshots.zip'],
-      tags: ['features', 'portal', 'release'],
-      readCount: 89,
-      likeCount: 34,
-      commentCount: 8
+  // Load data from Firebase
+  const loadAnnouncements = async () => {
+    try {
+      setLoading(true);
+      const result = await announcementService.getAnnouncements();
+      if (result.success && result.data) {
+        setAnnouncements(result.data);
+      } else {
+        console.error('Failed to load announcements:', result.error);
+        setSnackbar({
+          open: true,
+          message: 'Failed to load announcements',
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error loading announcements:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error loading announcements',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const loadCategories = async () => {
+    try {
+      const result = await announcementService.getCategories();
+      if (result.success && result.data) {
+        setCategories(result.data);
+      } else {
+        console.error('Failed to load categories:', result.error);
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const result = await announcementService.getAnnouncementStats();
+      if (result.success && result.data) {
+        setStats(result.data);
+      } else {
+        console.error('Failed to load stats:', result.error);
+      }
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
 
   useEffect(() => {
-    // Load mock data
-    setCategories(mockCategories);
-    setUsers(mockUsers);
-    setAnnouncements(mockAnnouncements);
+    const loadData = async () => {
+      await Promise.all([
+        loadAnnouncements(),
+        loadCategories(),
+        loadStats()
+      ]);
+    };
+    loadData();
   }, []);
 
   useEffect(() => {
@@ -289,75 +274,198 @@ const Announcements: React.FC = () => {
   const handleCreateAnnouncement = () => {
     setSelectedAnnouncement(null);
     setIsViewMode(false);
+    setIsFormMode(true);
+    setFormData({
+      title: '',
+      content: '',
+      summary: '',
+      type: 'general',
+      priority: 'medium',
+      category: '',
+      targetAudience: ['all'],
+      isPublished: false,
+      isPinned: false,
+      publishDate: new Date().toISOString(),
+      attachments: [],
+      tags: []
+    });
     setIsDialogOpen(true);
   };
 
   const handleEditAnnouncement = (announcement: Announcement) => {
     setSelectedAnnouncement(announcement);
     setIsViewMode(false);
+    setIsFormMode(true);
+    setFormData({
+      title: announcement.title,
+      content: announcement.content,
+      summary: announcement.summary,
+      type: announcement.type,
+      priority: announcement.priority,
+      category: announcement.category,
+      targetAudience: announcement.targetAudience,
+      isPublished: announcement.isPublished,
+      isPinned: announcement.isPinned,
+      publishDate: announcement.publishDate,
+      expiryDate: announcement.expiryDate,
+      attachments: announcement.attachments,
+      tags: announcement.tags
+    });
     setIsDialogOpen(true);
   };
 
   const handleViewAnnouncement = (announcement: Announcement) => {
     setSelectedAnnouncement(announcement);
     setIsViewMode(true);
+    setIsFormMode(false);
     setIsDialogOpen(true);
+    // Increment read count
+    announcementService.incrementReadCount(announcement.id);
   };
 
-  const handleDeleteAnnouncement = (announcementId: string) => {
-    setAnnouncements(prev => prev.filter(ann => ann.id !== announcementId));
-    setSnackbar({
-      open: true,
-      message: 'Announcement deleted successfully',
-      severity: 'success'
+  const handleDeleteClick = (announcement: Announcement) => {
+    setAnnouncementToDelete(announcement);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!announcementToDelete) return;
+    
+    try {
+      setLoading(true);
+      const result = await announcementService.permanentDeleteAnnouncement(announcementToDelete.id);
+      if (result.success) {
+        setSnackbar({
+          open: true,
+          message: 'Announcement deleted successfully',
+          severity: 'success'
+        });
+        await Promise.all([loadAnnouncements(), loadStats()]);
+      } else {
+        throw new Error(result.error || 'Failed to delete announcement');
+      }
+    } catch (error: any) {
+      console.error('Error deleting announcement:', error);
+      setSnackbar({
+        open: true,
+        message: error.message || 'Failed to delete announcement',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+      setDeleteDialogOpen(false);
+      setAnnouncementToDelete(null);
+    }
+  };
+
+  const handleFormSubmit = async () => {
+    if (!formData.title.trim()) {
+      setSnackbar({
+        open: true,
+        message: 'Title is required',
+        severity: 'error'
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      let result;
+      
+      if (selectedAnnouncement) {
+        result = await announcementService.updateAnnouncement(selectedAnnouncement.id, formData);
+      } else {
+        result = await announcementService.createAnnouncement(formData);
+      }
+
+      if (result.success) {
+        setSnackbar({
+          open: true,
+          message: `Announcement ${selectedAnnouncement ? 'updated' : 'created'} successfully`,
+          severity: 'success'
+        });
+        await Promise.all([loadAnnouncements(), loadStats()]);
+        handleCloseDialog();
+      } else {
+        throw new Error(result.error || 'Failed to save announcement');
+      }
+    } catch (error: any) {
+      console.error('Error saving announcement:', error);
+      setSnackbar({
+        open: true,
+        message: error.message || 'Failed to save announcement',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setIsViewMode(false);
+    setIsFormMode(false);
+    setSelectedAnnouncement(null);
+    setFormData({
+      title: '',
+      content: '',
+      summary: '',
+      type: 'general',
+      priority: 'medium',
+      category: '',
+      targetAudience: ['all'],
+      isPublished: false,
+      isPinned: false,
+      publishDate: new Date().toISOString(),
+      attachments: [],
+      tags: []
     });
   };
 
-  const handleSaveAnnouncement = (announcementData: Partial<Announcement>) => {
-    if (selectedAnnouncement) {
-      // Update existing announcement
-      setAnnouncements(prev => prev.map(ann =>
-        ann.id === selectedAnnouncement.id
-          ? { ...ann, ...announcementData, updatedAt: new Date() }
-          : ann
-      ));
+  const handleTogglePin = async (announcement: Announcement) => {
+    try {
+      const result = await announcementService.togglePinAnnouncement(announcement.id, !announcement.isPinned);
+      if (result.success) {
+        setSnackbar({
+          open: true,
+          message: `Announcement ${!announcement.isPinned ? 'pinned' : 'unpinned'} successfully`,
+          severity: 'success'
+        });
+        await loadAnnouncements();
+      } else {
+        throw new Error(result.error || 'Failed to toggle pin status');
+      }
+    } catch (error: any) {
+      console.error('Error toggling pin status:', error);
       setSnackbar({
         open: true,
-        message: 'Announcement updated successfully',
-        severity: 'success'
-      });
-    } else {
-      // Create new announcement
-      const newAnnouncement: Announcement = {
-        id: Date.now().toString(),
-        title: announcementData.title || '',
-        content: announcementData.content || '',
-        summary: announcementData.summary || '',
-        type: announcementData.type || 'general',
-        priority: announcementData.priority || 'medium',
-        category: announcementData.category || '',
-        authorId: '1', // Current user ID
-        targetAudience: announcementData.targetAudience || ['all'],
-        isPublished: false,
-        isPinned: false,
-        isArchived: false,
-        publishDate: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        attachments: announcementData.attachments || [],
-        tags: announcementData.tags || [],
-        readCount: 0,
-        likeCount: 0,
-        commentCount: 0
-      };
-      setAnnouncements(prev => [newAnnouncement, ...prev]);
-      setSnackbar({
-        open: true,
-        message: 'Announcement created successfully',
-        severity: 'success'
+        message: error.message || 'Failed to toggle pin status',
+        severity: 'error'
       });
     }
-    setIsDialogOpen(false);
+  };
+
+  const handleTogglePublish = async (announcement: Announcement) => {
+    try {
+      const result = await announcementService.togglePublishAnnouncement(announcement.id, !announcement.isPublished);
+      if (result.success) {
+        setSnackbar({
+          open: true,
+          message: `Announcement ${!announcement.isPublished ? 'published' : 'unpublished'} successfully`,
+          severity: 'success'
+        });
+        await loadAnnouncements();
+      } else {
+        throw new Error(result.error || 'Failed to toggle publish status');
+      }
+    } catch (error: any) {
+      console.error('Error toggling publish status:', error);
+      setSnackbar({
+        open: true,
+        message: error.message || 'Failed to toggle publish status',
+        severity: 'error'
+      });
+    }
   };
 
   const getTypeIcon = (type: string) => {
@@ -397,27 +505,23 @@ const Announcements: React.FC = () => {
   };
 
   const getPublishedCount = () => {
-    return announcements.filter(announcement => announcement.isPublished).length;
+    return stats?.published || 0;
   };
 
   const getDraftCount = () => {
-    return announcements.filter(announcement => !announcement.isPublished).length;
+    return stats?.drafts || 0;
   };
 
   const getPinnedCount = () => {
-    return announcements.filter(announcement => announcement.isPinned).length;
+    return stats?.pinned || 0;
   };
 
   const getTotalCount = () => {
-    return announcements.length;
+    return stats?.total || 0;
   };
 
   const getTodayCount = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return announcements.filter(announcement => 
-      announcement.createdAt >= today
-    ).length;
+    return stats?.today || 0;
   };
 
   const paginatedAnnouncements = filteredAnnouncements.slice(
@@ -459,60 +563,68 @@ const Announcements: React.FC = () => {
       </Box>
 
       {/* Statistics Cards */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 3, mb: 3 }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Announcements
-            </Typography>
-            <Typography variant="h4" component="div">
-              {getTotalCount()}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              All time
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Published
-            </Typography>
-            <Typography variant="h4" component="div" color="success.main">
-              {getPublishedCount()}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Live announcements
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Drafts
-            </Typography>
-            <Typography variant="h4" component="div" color="warning.main">
-              {getDraftCount()}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Pending review
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Pinned
-            </Typography>
-            <Typography variant="h4" component="div" color="primary.main">
-              {getPinnedCount()}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Important announcements
-            </Typography>
-          </CardContent>
-        </Card>
-      </Box>
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Total Announcements
+              </Typography>
+              <Typography variant="h4" component="div">
+                {loading ? <CircularProgress size={24} /> : getTotalCount()}
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                All time
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Published
+              </Typography>
+              <Typography variant="h4" component="div" color="success.main">
+                {loading ? <CircularProgress size={24} /> : getPublishedCount()}
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                Live announcements
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Drafts
+              </Typography>
+              <Typography variant="h4" component="div" color="warning.main">
+                {loading ? <CircularProgress size={24} /> : getDraftCount()}
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                Pending review
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom>
+                Pinned
+              </Typography>
+              <Typography variant="h4" component="div" color="primary.main">
+                {loading ? <CircularProgress size={24} /> : getPinnedCount()}
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                Important announcements
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 3 }}>
@@ -611,7 +723,25 @@ const Announcements: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedAnnouncements.map((announcement) => (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} sx={{ textAlign: 'center', py: 4 }}>
+                    <CircularProgress />
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      Loading announcements...
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : paginatedAnnouncements.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} sx={{ textAlign: 'center', py: 4 }}>
+                    <Typography variant="body2" color="textSecondary">
+                      No announcements found
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedAnnouncements.map((announcement) => (
                 <TableRow key={announcement.id} hover>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -689,10 +819,10 @@ const Announcements: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {announcement.publishDate.toLocaleDateString()}
+                      {new Date(announcement.publishDate).toLocaleDateString()}
                     </Typography>
                     <Typography variant="caption" color="textSecondary">
-                      {announcement.publishDate.toLocaleTimeString()}
+                      {new Date(announcement.publishDate).toLocaleTimeString()}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -715,10 +845,28 @@ const Announcements: React.FC = () => {
                           <EditIcon />
                         </IconButton>
                       </Tooltip>
+                      <Tooltip title={announcement.isPinned ? "Unpin" : "Pin"}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleTogglePin(announcement)}
+                          color={announcement.isPinned ? "warning" : "default"}
+                        >
+                          <PinIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={announcement.isPublished ? "Unpublish" : "Publish"}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleTogglePublish(announcement)}
+                          color={announcement.isPublished ? "success" : "default"}
+                        >
+                          {announcement.isPublished ? <PublishIcon /> : <DraftIcon />}
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="Delete Announcement">
                         <IconButton
                           size="small"
-                          onClick={() => handleDeleteAnnouncement(announcement.id)}
+                          onClick={() => handleDeleteClick(announcement)}
                           color="error"
                         >
                           <DeleteIcon />
@@ -727,7 +875,8 @@ const Announcements: React.FC = () => {
                     </Box>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -746,6 +895,206 @@ const Announcements: React.FC = () => {
           />
         </Box>
       )}
+
+      {/* View/Edit Dialog */}
+      <Dialog
+        open={isDialogOpen}
+        onClose={handleCloseDialog}
+        maxWidth="md"
+        fullWidth
+        TransitionComponent={Fade}
+      >
+        <DialogTitle>
+          {isViewMode ? 'View Announcement' : isFormMode ? (selectedAnnouncement ? 'Edit Announcement' : 'Create Announcement') : 'Announcement Details'}
+        </DialogTitle>
+        <DialogContent>
+          {isViewMode && selectedAnnouncement ? (
+            <Box>
+              <Typography variant="h5" gutterBottom>
+                {selectedAnnouncement.title}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                <Chip
+                  label={selectedAnnouncement.type}
+                  size="small"
+                  sx={{
+                    bgcolor: getTypeColor(selectedAnnouncement.type),
+                    color: 'white',
+                    fontWeight: 'bold'
+                  }}
+                />
+                <Chip
+                  label={selectedAnnouncement.priority}
+                  size="small"
+                  sx={{
+                    bgcolor: getPriorityColor(selectedAnnouncement.priority),
+                    color: 'white',
+                    fontWeight: 'bold'
+                  }}
+                />
+                {selectedAnnouncement.isPinned && (
+                  <Chip label="Pinned" size="small" color="warning" />
+                )}
+              </Box>
+              <Typography variant="body1" paragraph>
+                {selectedAnnouncement.content}
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                Published: {new Date(selectedAnnouncement.publishDate).toLocaleString()}
+              </Typography>
+            </Box>
+          ) : isFormMode ? (
+            <Box sx={{ pt: 1 }}>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12 }}>
+                  <TextField
+                    fullWidth
+                    label="Title"
+                    value={formData.title}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    required
+                  />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <TextField
+                    fullWidth
+                    label="Summary"
+                    value={formData.summary}
+                    onChange={(e) => setFormData(prev => ({ ...prev, summary: e.target.value }))}
+                    multiline
+                    rows={2}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <TextField
+                    fullWidth
+                    label="Content"
+                    value={formData.content}
+                    onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                    multiline
+                    rows={4}
+                    required
+                  />
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <FormControl fullWidth>
+                    <InputLabel>Type</InputLabel>
+                    <Select
+                      value={formData.type}
+                      label="Type"
+                      onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+                    >
+                      <MenuItem value="general">General</MenuItem>
+                      <MenuItem value="info">Info</MenuItem>
+                      <MenuItem value="warning">Warning</MenuItem>
+                      <MenuItem value="error">Error</MenuItem>
+                      <MenuItem value="success">Success</MenuItem>
+                      <MenuItem value="urgent">Urgent</MenuItem>
+                      <MenuItem value="maintenance">Maintenance</MenuItem>
+                      <MenuItem value="update">Update</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <FormControl fullWidth>
+                    <InputLabel>Priority</InputLabel>
+                    <Select
+                      value={formData.priority}
+                      label="Priority"
+                      onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as any }))}
+                    >
+                      <MenuItem value="low">Low</MenuItem>
+                      <MenuItem value="medium">Medium</MenuItem>
+                      <MenuItem value="high">High</MenuItem>
+                      <MenuItem value="urgent">Urgent</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <FormControl fullWidth>
+                    <InputLabel>Category</InputLabel>
+                    <Select
+                      value={formData.category}
+                      label="Category"
+                      onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                    >
+                      {categories.map(category => (
+                        <MenuItem key={category.id} value={category.name}>
+                          {category.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={formData.isPublished}
+                        onChange={(e) => setFormData(prev => ({ ...prev, isPublished: e.target.checked }))}
+                      />
+                    }
+                    label="Published"
+                  />
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={formData.isPinned}
+                        onChange={(e) => setFormData(prev => ({ ...prev, isPinned: e.target.checked }))}
+                      />
+                    }
+                    label="Pinned"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>
+            {isViewMode ? 'Close' : 'Cancel'}
+          </Button>
+          {isFormMode && (
+            <Button
+              onClick={handleFormSubmit}
+              variant="contained"
+              disabled={loading || !formData.title.trim()}
+            >
+              {loading ? <CircularProgress size={20} /> : (selectedAnnouncement ? 'Update' : 'Create')}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Delete Announcement</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to permanently delete "{announcementToDelete?.title}"? This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            variant="contained"
+            color="error"
+            disabled={loading}
+          >
+            {loading ? <CircularProgress size={20} /> : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar */}
       <Snackbar

@@ -362,37 +362,33 @@ export interface Document {
 
 export type DocumentType = 'policy' | 'contract' | 'certificate' | 'report' | 'form' | 'other';
 
-// Notification Types
-export interface Notification {
+// Announcement Types
+export interface Announcement {
   id: string;
   title: string;
-  message: string;
-  type: 'info' | 'success' | 'warning' | 'error' | 'system' | 'user' | 'work' | 'event' | 'assignment' | 'payment' | 'security';
+  content: string;
+  summary: string;
+  type: 'info' | 'warning' | 'error' | 'success' | 'general' | 'urgent' | 'maintenance' | 'update';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   category: string;
-  senderId: string;
-  recipientId: string;
-  isRead: boolean;
+  authorId: string;
+  targetAudience: string[];
+  isPublished: boolean;
   isPinned: boolean;
   isArchived: boolean;
+  publishDate: string;
+  expiryDate?: string;
   createdAt: string;
-  readAt?: string;
-  expiresAt?: string;
-  metadata: Record<string, any>;
-  actions?: NotificationAction[];
+  updatedAt: string;
+  attachments: string[];
+  tags: string[];
+  readCount: number;
+  likeCount: number;
+  commentCount: number;
   isActive?: boolean;
-  updatedAt?: string;
 }
 
-export interface NotificationAction {
-  id: string;
-  label: string;
-  action: string;
-  url?: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-}
-
-export interface NotificationCategory {
+export interface AnnouncementCategory {
   id: string;
   name: string;
   description: string;
@@ -403,22 +399,28 @@ export interface NotificationCategory {
   updatedAt?: string;
 }
 
-export interface NotificationFormData {
+export interface AnnouncementFormData {
   title: string;
-  message: string;
-  type: 'info' | 'success' | 'warning' | 'error' | 'system' | 'user' | 'work' | 'event' | 'assignment' | 'payment' | 'security';
+  content: string;
+  summary: string;
+  type: 'info' | 'warning' | 'error' | 'success' | 'general' | 'urgent' | 'maintenance' | 'update';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   category: string;
-  recipientId: string;
-  expiresAt?: string;
-  metadata: Record<string, any>;
-  actions: NotificationAction[];
+  targetAudience: string[];
+  isPublished: boolean;
+  isPinned: boolean;
+  publishDate: string;
+  expiryDate?: string;
+  attachments: string[];
+  tags: string[];
 }
 
-export interface NotificationStats {
+export interface AnnouncementStats {
   total: number;
-  unread: number;
+  published: number;
+  drafts: number;
   pinned: number;
+  archived: number;
   today: number;
   byType: Record<string, number>;
   byPriority: Record<string, number>;
@@ -426,7 +428,6 @@ export interface NotificationStats {
   byStatus: Record<string, number>;
 }
 
-export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'reminder';
 
 // API Response Types
 export interface ApiResponse<T = any> {
