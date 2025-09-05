@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -35,7 +35,9 @@ import {
   Switch,
   FormControlLabel,
   useTheme,
-  alpha
+  alpha,
+  InputAdornment,
+  Pagination
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -49,9 +51,13 @@ import {
   AdminPanelSettings as AdminIcon,
   Work as EmployeeIcon,
   SupervisorAccount as ManagerIcon,
-  Security as SecurityIcon
+  Security as SecurityIcon,
+  FilterList as FilterIcon,
+  Refresh as RefreshIcon,
+  Download as DownloadIcon
 } from '@mui/icons-material';
 import { User, UserRole } from '../types';
+import userService from '../services/userService';
 
 interface UserFormData {
   firstName: string;
@@ -67,11 +73,15 @@ interface UserFormData {
 const Users: React.FC = () => {
   const theme = useTheme();
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [roles, setRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -92,132 +102,127 @@ const Users: React.FC = () => {
     message: '', 
     severity: 'success' as 'success' | 'error' 
   });
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
   const [processing, setProcessing] = useState(false);
 
-  // Sample data
-  const sampleUsers: User[] = [
-    {
-      id: '1',
-      email: 'john.doe@company.com',
-      firstName: 'John',
-      lastName: 'Doe',
-      role: 'admin',
-      department: 'IT',
-      position: 'System Administrator',
-      hireDate: '2023-01-15',
-      status: 'active',
-      avatar: null,
-      phone: '+1 (555) 123-4567',
-      address: '123 Main St, City, State 12345',
-      emergencyContact: {
-        name: 'Jane Doe',
-        phone: '+1 (555) 987-6543',
-        relationship: 'Spouse'
-      },
-      createdAt: '2023-01-15T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z',
-      isActive: true,
-      lastLoginAt: '2024-01-15T09:30:00Z'
-    },
-    {
-      id: '2',
-      email: 'jane.smith@company.com',
-      firstName: 'Jane',
-      lastName: 'Smith',
-      role: 'hr',
-      department: 'Human Resources',
-      position: 'HR Manager',
-      hireDate: '2023-02-01',
-      status: 'active',
-      avatar: null,
-      phone: '+1 (555) 234-5678',
-      address: '456 Oak Ave, City, State 12345',
-      emergencyContact: {
-        name: 'John Smith',
-        phone: '+1 (555) 876-5432',
-        relationship: 'Spouse'
-      },
-      createdAt: '2023-02-01T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z',
-      isActive: true
-    },
-    {
-      id: '3',
-      email: 'mike.johnson@company.com',
-      firstName: 'Mike',
-      lastName: 'Johnson',
-      role: 'manager',
-      department: 'Engineering',
-      position: 'Engineering Manager',
-      hireDate: '2023-03-10',
-      status: 'active',
-      avatar: null,
-      phone: '+1 (555) 345-6789',
-      address: '789 Pine St, City, State 12345',
-      emergencyContact: {
-        name: 'Sarah Johnson',
-        phone: '+1 (555) 765-4321',
-        relationship: 'Sister'
-      },
-      createdAt: '2023-03-10T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z',
-      isActive: true
-    },
-    {
-      id: '4',
-      email: 'sarah.wilson@company.com',
-      firstName: 'Sarah',
-      lastName: 'Wilson',
-      role: 'employee',
-      department: 'Engineering',
-      position: 'Software Engineer',
-      hireDate: '2023-04-20',
-      status: 'active',
-      avatar: null,
-      phone: '+1 (555) 456-7890',
-      address: '321 Elm St, City, State 12345',
-      emergencyContact: {
-        name: 'Tom Wilson',
-        phone: '+1 (555) 654-3210',
-        relationship: 'Father'
-      },
-      createdAt: '2023-04-20T10:00:00Z',
-      updatedAt: '2024-01-15T10:00:00Z',
-      isActive: true
-    }
-  ];
-
+  // Load data from Firebase
   useEffect(() => {
-    loadUsers();
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Load users from Firebase
+        const usersResult = await userService.getUsers();
+        if (usersResult && usersResult.success && Array.isArray(usersResult.data)) {
+          setUsers(usersResult.data);
+        } else {
+          console.warn('No users data received or request failed:', usersResult);
+          setUsers([]);
+        }
+
+        // Load departments
+        try {
+          const departmentsResult = await userService.getDepartments();
+          setDepartments(departmentsResult || []);
+        } catch (err) {
+          console.warn('Failed to load departments:', err);
+          setDepartments([]);
+        }
+
+        // Load roles
+        try {
+          const rolesResult = await userService.getRoles();
+          setRoles(rolesResult || ['admin', 'hr', 'manager', 'employee']);
+        } catch (err) {
+          console.warn('Failed to load roles:', err);
+          setRoles(['admin', 'hr', 'manager', 'employee']);
+        }
+
+      } catch (err: any) {
+        console.error('Error loading data:', err);
+        setError(err.message || 'Failed to load data');
+        setSnackbar({
+          open: true,
+          message: 'Failed to load data from Firebase',
+          severity: 'error'
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
+
+  // Update filtered users when users or filters change
+  useEffect(() => {
+    applyFilters();
+  }, [users, searchTerm, roleFilter, statusFilter, departmentFilter]);
+
+  const applyFilters = useCallback(() => {
+    let filtered = [...users];
+
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(user =>
+        user.firstName.toLowerCase().includes(searchLower) ||
+        user.lastName.toLowerCase().includes(searchLower) ||
+        user.email.toLowerCase().includes(searchLower) ||
+        user.department.toLowerCase().includes(searchLower) ||
+        user.position.toLowerCase().includes(searchLower)
+      );
+    }
+
+    if (roleFilter !== 'all') {
+      filtered = filtered.filter(user => user.role === roleFilter);
+    }
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(user => 
+        (statusFilter === 'active' && user.status === 'active') ||
+        (statusFilter === 'inactive' && user.status === 'inactive')
+      );
+    }
+
+    if (departmentFilter) {
+      filtered = filtered.filter(user => user.department === departmentFilter);
+    }
+
+    setFilteredUsers(filtered);
+    setCurrentPage(1);
+  }, [users, searchTerm, roleFilter, statusFilter, departmentFilter]);
 
   const loadUsers = async () => {
     try {
       setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setUsers(sampleUsers);
-    } catch (err) {
+      const usersResult = await userService.getUsers();
+      if (usersResult && usersResult.success && Array.isArray(usersResult.data)) {
+        setUsers(usersResult.data);
+      } else {
+        setUsers([]);
+      }
+    } catch (err: any) {
       setError('Failed to load users');
+      setSnackbar({
+        open: true,
+        message: 'Failed to load users',
+        severity: 'error'
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.department.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-    const matchesStatus = statusFilter === 'all' || 
-      (statusFilter === 'active' && user.status === 'active') ||
-      (statusFilter === 'inactive' && user.status === 'inactive');
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  const handleRefresh = () => {
+    loadUsers();
+    setSnackbar({
+      open: true,
+      message: 'Users refreshed successfully',
+      severity: 'success'
+    });
+  };
 
   const handleCreateClick = () => {
     setFormData({
@@ -236,13 +241,13 @@ const Users: React.FC = () => {
   const handleEditClick = (user: User) => {
     setSelectedUser(user);
     setFormData({
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.role,
-      department: user.department,
-      position: user.position,
-      phone: user.phone,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
+      role: user.role || 'employee',
+      department: user.department || '',
+      position: user.position || '',
+      phone: user.phone || '',
       isActive: user.status === 'active'
     });
     setShowEditDialog(true);
@@ -263,8 +268,7 @@ const Users: React.FC = () => {
       setProcessing(true);
       
       if (showCreateDialog) {
-        const newUser: User = {
-          id: Date.now().toString(),
+        const userData = {
           firstName: formData.firstName,
           lastName: formData.lastName,
           email: formData.email,
@@ -286,12 +290,16 @@ const Users: React.FC = () => {
           isActive: formData.isActive
         };
         
-        setUsers(prev => [newUser, ...prev]);
+        const result = await userService.createUser(userData);
+        if (result && result.success) {
+          setUsers(prev => [result.data, ...prev]);
         setSnackbar({ open: true, message: 'User created successfully', severity: 'success' });
         setShowCreateDialog(false);
+        } else {
+          throw new Error(result?.error || 'Failed to create user');
+        }
       } else if (showEditDialog && selectedUser) {
-        const updatedUser: User = {
-          ...selectedUser,
+        const updateData = {
           firstName: formData.firstName,
           lastName: formData.lastName,
           email: formData.email,
@@ -304,14 +312,19 @@ const Users: React.FC = () => {
           updatedAt: new Date().toISOString()
         };
         
+        const result = await userService.updateUser(selectedUser.id, updateData);
+        if (result && result.success) {
         setUsers(prev => prev.map(user => 
-          user.id === selectedUser.id ? updatedUser : user
+            user.id === selectedUser.id ? result.data : user
         ));
         setSnackbar({ open: true, message: 'User updated successfully', severity: 'success' });
         setShowEditDialog(false);
+        } else {
+          throw new Error(result?.error || 'Failed to update user');
       }
-    } catch (err) {
-      setSnackbar({ open: true, message: 'Operation failed', severity: 'error' });
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.message || 'Operation failed', severity: 'error' });
     } finally {
       setProcessing(false);
     }
@@ -320,35 +333,53 @@ const Users: React.FC = () => {
   const handleDelete = async () => {
     try {
       if (selectedUser) {
-        setUsers(prev => prev.filter(user => user.id !== selectedUser.id));
-        setSnackbar({ open: true, message: 'User deleted successfully', severity: 'success' });
+        const result = await userService.deleteUser(selectedUser.id);
+        if (result && result.success) {
+          setUsers(prev => prev.map(user => 
+            user.id === selectedUser.id 
+              ? { ...user, isActive: false, status: 'inactive' }
+              : user
+          ));
+          setSnackbar({ open: true, message: 'User deactivated successfully', severity: 'success' });
         setShowDeleteDialog(false);
         setSelectedUser(null);
+        } else {
+          throw new Error(result?.error || 'Failed to delete user');
       }
-    } catch (err) {
-      setSnackbar({ open: true, message: 'Failed to delete user', severity: 'error' });
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.message || 'Failed to delete user', severity: 'error' });
     }
   };
 
   const handleStatusToggle = async (userId: string) => {
     try {
-      setUsers(prev => prev.map(user => 
-        user.id === userId 
-          ? { 
-              ...user, 
-              status: user.status === 'active' ? 'inactive' : 'active',
-              isActive: user.status !== 'active',
+      const user = users.find(u => u.id === userId);
+      if (user) {
+        const newStatus = !user.isActive;
+        const result = await userService.updateUserStatus(userId, newStatus);
+        if (result && result.success) {
+          setUsers(prev => prev.map(u => 
+            u.id === userId 
+              ? { 
+                  ...u, 
+                  status: newStatus ? 'active' : 'inactive',
+                  isActive: newStatus,
               updatedAt: new Date().toISOString()
             }
-          : user
+              : u
       ));
       setSnackbar({ 
         open: true, 
-        message: 'User status updated successfully', 
+            message: `User ${newStatus ? 'activated' : 'deactivated'} successfully`, 
         severity: 'success' 
       });
-    } catch (err) {
-      setSnackbar({ open: true, message: 'Failed to update status', severity: 'error' });
+        } else {
+          throw new Error(result?.error || 'Failed to update status');
+        }
+      }
+    } catch (err: any) {
+      setSnackbar({ open: true, message: err.message || 'Failed to update status', severity: 'error' });
     }
   };
 
@@ -370,25 +401,91 @@ const Users: React.FC = () => {
     }
   };
 
-  const handleChangePage = (_event: unknown, newPage: number) => {
-    setPage(newPage);
+  const handleExportUsers = () => {
+    const csv = convertToCSV(filteredUsers);
+    downloadCSV(csv, 'users.csv');
+    setSnackbar({
+      open: true,
+      message: 'User data exported successfully',
+      severity: 'success'
+    });
   };
 
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+  const convertToCSV = (data: User[]): string => {
+    const headers = [
+      'S.No', 'First Name', 'Last Name', 'Email', 'Role', 'Department', 'Position', 
+      'Phone', 'Status', 'Hire Date', 'Last Login', 'Created At'
+    ];
+    
+    const csvContent = [
+      headers.join(','),
+      ...data.map((user, index) => [
+        index + 1,
+        user.firstName,
+        user.lastName,
+        user.email,
+        user.role,
+        user.department,
+        user.position,
+        user.phone,
+        user.status,
+        user.hireDate,
+        user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : 'Never',
+        new Date(user.createdAt).toLocaleDateString()
+      ].join(','))
+    ].join('\n');
+    return csvContent;
   };
 
+  const downloadCSV = (csvContent: string, filename: string) => {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+
+  // Show loading state
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center' }}>
-        <CircularProgress />
-      </Container>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
+        <CircularProgress size={60} />
+        <Typography variant="h6" sx={{ ml: 2 }}>
+          Loading Users...
+        </Typography>
+      </Box>
+    );
+  }
+
+  // Show error state
+  if (error) {
+  return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+        <Button variant="contained" onClick={loadUsers}>
+          Retry
+        </Button>
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+    <Box sx={{ p: 3 }}>
       <Fade in timeout={300}>
         <Box>
           {/* Header */}
@@ -396,6 +493,22 @@ const Users: React.FC = () => {
             <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
               User Management
             </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                startIcon={<DownloadIcon />}
+                onClick={handleExportUsers}
+              >
+                Export Users
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                Refresh
+              </Button>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
@@ -409,96 +522,83 @@ const Users: React.FC = () => {
             >
               Add User
             </Button>
+            </Box>
           </Box>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
-
           {/* Stats Cards */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 2, mb: 3 }}>
+          <Box sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+            gap: 3, 
+            mb: 3 
+          }}>
             <Card>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <PersonIcon sx={{ mr: 2, color: 'primary.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {users.length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                <Typography color="textSecondary" gutterBottom>
                       Total Users
                     </Typography>
-                  </Box>
-                </Box>
+                <Typography variant="h4" component="div">
+                  {users.length}
+                </Typography>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ActiveIcon sx={{ mr: 2, color: 'success.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {users.filter(u => u.status === 'active').length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                <Typography color="textSecondary" gutterBottom>
                       Active Users
                     </Typography>
-                  </Box>
-                </Box>
+                <Typography variant="h4" component="div" color="success.main">
+                  {users.filter(u => u.isActive !== false).length}
+                </Typography>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <AdminIcon sx={{ mr: 2, color: 'error.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {users.filter(u => u.role === 'admin').length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                <Typography color="textSecondary" gutterBottom>
                       Administrators
                     </Typography>
-                  </Box>
-                </Box>
+                <Typography variant="h4" component="div" color="error.main">
+                  {users.filter(u => u.role === 'admin').length}
+                </Typography>
               </CardContent>
             </Card>
-
             <Card>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ManagerIcon sx={{ mr: 2, color: 'warning.main' }} />
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {users.filter(u => u.role === 'manager').length}
+                <Typography color="textSecondary" gutterBottom>
+                  Departments
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Managers
+                <Typography variant="h4" component="div" color="primary.main">
+                  {departments.length}
                     </Typography>
-                  </Box>
-                </Box>
               </CardContent>
             </Card>
           </Box>
 
           {/* Filters */}
           <Paper sx={{ p: 2, mb: 3 }}>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <FilterIcon sx={{ mr: 1 }} />
+              <Typography variant="h6">Filters</Typography>
+            </Box>
+            <Box sx={{ 
+              display: 'grid', 
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+              gap: 2 
+            }}>
               <TextField
-                placeholder="Search users..."
+                fullWidth
+                label="Search Users"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
-                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
                 }}
-                size="small"
-                sx={{ minWidth: 300 }}
               />
-              
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+              <FormControl fullWidth>
                 <InputLabel>Role</InputLabel>
                 <Select
                   value={roleFilter}
@@ -506,14 +606,14 @@ const Users: React.FC = () => {
                   onChange={(e) => setRoleFilter(e.target.value as UserRole | 'all')}
                 >
                   <MenuItem value="all">All Roles</MenuItem>
-                  <MenuItem value="admin">Admin</MenuItem>
-                  <MenuItem value="hr">HR</MenuItem>
-                  <MenuItem value="manager">Manager</MenuItem>
-                  <MenuItem value="employee">Employee</MenuItem>
+                  {roles.map(role => (
+                    <MenuItem key={role} value={role}>
+                      {role.charAt(0).toUpperCase() + role.slice(1)}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
-
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+              <FormControl fullWidth>
                 <InputLabel>Status</InputLabel>
                 <Select
                   value={statusFilter}
@@ -525,13 +625,28 @@ const Users: React.FC = () => {
                   <MenuItem value="inactive">Inactive</MenuItem>
                 </Select>
               </FormControl>
+              <FormControl fullWidth>
+                <InputLabel>Department</InputLabel>
+                <Select
+                  value={departmentFilter}
+                  label="Department"
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                >
+                  <MenuItem value="">All Departments</MenuItem>
+                  {departments.map(dept => (
+                    <MenuItem key={dept} value={dept}>
+                      {dept}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Box>
           </Paper>
 
           {/* Users Table */}
-          <Paper>
+          <Paper sx={{ width: '100%', overflow: 'hidden' }}>
             <TableContainer>
-              <Table>
+              <Table stickyHeader>
                 <TableHead>
                   <TableRow>
                     <TableCell>User</TableCell>
@@ -544,23 +659,27 @@ const Users: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredUsers
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((user) => (
+                  {paginatedUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        <Typography variant="body1" color="textSecondary">
+                          {users.length === 0 ? 'No users found. Add your first user to get started.' : 'No users match the current filters.'}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedUsers.map((user) => (
                       <TableRow key={user.id} hover>
                         <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Avatar
-                              sx={{ mr: 2, bgcolor: 'primary.main' }}
-                              src={user.avatar || undefined}
-                            >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>
                               {user.firstName.charAt(0)}{user.lastName.charAt(0)}
                             </Avatar>
                             <Box>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                              <Typography variant="subtitle2" fontWeight="bold">
                                 {user.firstName} {user.lastName}
                               </Typography>
-                              <Typography variant="caption" color="text.secondary">
+                              <Typography variant="caption" color="textSecondary">
                                 {user.email}
                               </Typography>
                             </Box>
@@ -568,28 +687,28 @@ const Users: React.FC = () => {
                         </TableCell>
                         <TableCell>
                           <Chip
-                            icon={getRoleIcon(user.role)}
-                            label={user.role.toUpperCase()}
+                            icon={getRoleIcon(user.role || 'employee')}
+                            label={(user.role || 'employee').toUpperCase()}
                             size="small"
-                            color={getRoleColor(user.role) as any}
+                            color={getRoleColor(user.role || 'employee') as any}
                           />
                         </TableCell>
                         <TableCell>
                           <Box>
-                            <Typography variant="body2">{user.department}</Typography>
+                            <Typography variant="body2">{user.department || 'N/A'}</Typography>
                             <Typography variant="caption" color="text.secondary">
-                              {user.position}
+                              {user.position || 'N/A'}
                             </Typography>
                           </Box>
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2">{user.phone}</Typography>
+                          <Typography variant="body2">{user.phone || 'N/A'}</Typography>
                         </TableCell>
                         <TableCell>
                           <Chip
-                            label={user.status}
+                            label={user.isActive !== false ? 'Active' : 'Inactive'}
                             size="small"
-                            color={user.status === 'active' ? 'success' : 'default'}
+                            color={user.isActive !== false ? 'success' : 'default'}
                             sx={{ textTransform: 'capitalize' }}
                           />
                         </TableCell>
@@ -602,7 +721,7 @@ const Users: React.FC = () => {
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
-                          <Stack direction="row" spacing={1} justifyContent="center">
+                          <Box sx={{ display: 'flex', gap: 0.5 }}>
                             <Tooltip title="View Details">
                               <IconButton size="small" onClick={() => handleViewClick(user)}>
                                 <ViewIcon />
@@ -613,13 +732,13 @@ const Users: React.FC = () => {
                                 <EditIcon />
                               </IconButton>
                             </Tooltip>
-                            <Tooltip title={user.status === 'active' ? 'Deactivate' : 'Activate'}>
+                            <Tooltip title={user.isActive !== false ? 'Deactivate' : 'Activate'}>
                               <IconButton 
                                 size="small" 
                                 onClick={() => handleStatusToggle(user.id)}
-                                color={user.status === 'active' ? 'warning' : 'success'}
+                                color={user.isActive !== false ? 'warning' : 'success'}
                               >
-                                {user.status === 'active' ? <BlockIcon /> : <ActiveIcon />}
+                                {user.isActive !== false ? <BlockIcon /> : <ActiveIcon />}
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Delete User">
@@ -627,24 +746,29 @@ const Users: React.FC = () => {
                                 <DeleteIcon />
                               </IconButton>
                             </Tooltip>
-                          </Stack>
+                          </Box>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </TableContainer>
-
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={filteredUsers.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
           </Paper>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+              <Pagination
+                count={totalPages}
+                page={currentPage}
+                onChange={(_, page) => setCurrentPage(page)}
+                color="primary"
+                showFirstButton
+                showLastButton
+              />
+            </Box>
+          )}
 
           {/* Create/Edit Dialog */}
           <Dialog 
@@ -702,13 +826,21 @@ const Users: React.FC = () => {
                     </Select>
                   </FormControl>
 
-                  <TextField
-                    label="Department"
+                  <FormControl fullWidth>
+                    <InputLabel>Department</InputLabel>
+                    <Select
                     value={formData.department}
+                      label="Department"
                     onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
-                    fullWidth
-                    required
-                  />
+                    >
+                      <MenuItem value="">Select Department</MenuItem>
+                      {departments.map(dept => (
+                        <MenuItem key={dept} value={dept}>
+                          {dept}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
                 </Box>
 
                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
@@ -778,16 +910,16 @@ const Users: React.FC = () => {
                       </Typography>
                       <Box sx={{ mt: 1 }}>
                         <Chip
-                          icon={getRoleIcon(selectedUser.role)}
-                          label={selectedUser.role.toUpperCase()}
+                          icon={getRoleIcon(selectedUser.role || 'employee')}
+                          label={(selectedUser.role || 'employee').toUpperCase()}
                           size="small"
-                          color={getRoleColor(selectedUser.role) as any}
+                          color={getRoleColor(selectedUser.role || 'employee') as any}
                           sx={{ mr: 1 }}
                         />
                         <Chip
-                          label={selectedUser.status}
+                          label={selectedUser.status || 'inactive'}
                           size="small"
-                          color={selectedUser.status === 'active' ? 'success' : 'default'}
+                          color={(selectedUser.status || 'inactive') === 'active' ? 'success' : 'default'}
                           sx={{ textTransform: 'capitalize' }}
                         />
                       </Box>
@@ -875,7 +1007,7 @@ const Users: React.FC = () => {
           </Snackbar>
         </Box>
       </Fade>
-    </Container>
+    </Box>
   );
 };
 
