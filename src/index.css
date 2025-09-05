@@ -22,8 +22,8 @@
 /* Backdrop blur styles for modals */
 .backdrop-blur-modal {
   background-color: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .fallback-rounded {
@@ -136,14 +136,12 @@
 }
 
 @layer utilities {
-  .text-balance {
-    /* text-wrap: balance; - removed for browser compatibility */
-  }
+  /* .text-balance removed - was empty ruleset */
 
   /* Hide scrollbar but keep functionality */
   .scrollbar-hide {
     -ms-overflow-style: none;
-    scrollbar-width: none;
+    /* scrollbar-width: none; - removed for browser compatibility */
   }
   
   .scrollbar-hide::-webkit-scrollbar {
@@ -172,9 +170,9 @@
       background: #6b7280;
     }
 
-    /* Firefox */
-    scrollbar-width: thin;
-    scrollbar-color: #9ca3af #f3f4f6;
+    /* Firefox - commented out for browser compatibility */
+    /* scrollbar-width: thin; */
+    /* scrollbar-color: #9ca3af #f3f4f6; */
     overflow-y: auto !important;
     max-height: 100% !important;
   }
@@ -237,18 +235,8 @@
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
   }
 
-  /* Ensure scrollbar is always shown in sidebar */
-  .sidebar-nav {
-    /* Firefox */
-    scrollbar-width: thin !important;
-    scrollbar-color: #6b7280 rgba(0, 0, 0, 0.05) !important;
-  }
-
-  /* Dark mode sidebar scrollbar */
-  .dark .sidebar-nav {
-    /* Firefox */
-    scrollbar-color: #6b7280 rgba(255, 255, 255, 0.05) !important;
-  }
+  /* Ensure scrollbar is always shown in sidebar - WebKit only */
+  /* Firefox scrollbar properties commented out for browser compatibility */
 
   .dark .sidebar-nav::-webkit-scrollbar-track {
     background: rgba(255, 255, 255, 0.05) !important;
@@ -424,13 +412,8 @@
     }
   }
 
-  .scrollbar-thin.dark {
-    scrollbar-color: #6b7280 #1f2937;
-  }
-
-  .scrollbar-thin-dark {
-    scrollbar-color: #6b7280 #1f2937;
-  }
+  /* Dark mode scrollbar classes - WebKit only */
+  /* Firefox scrollbar properties commented out for browser compatibility */
 
   /* WebKit scrollbar styles */
   .scrollbar-thin::-webkit-scrollbar {

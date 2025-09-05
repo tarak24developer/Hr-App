@@ -271,6 +271,70 @@ export interface IncidentStats {
   byPriority: Record<string, number>;
 }
 
+// Notification interfaces
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error' | 'system' | 'user' | 'work' | 'event' | 'assignment' | 'payment' | 'security';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: string;
+  senderId: string;
+  recipientId: string;
+  isRead: boolean;
+  isPinned: boolean;
+  isArchived: boolean;
+  createdAt: string;
+  readAt?: string;
+  expiresAt?: string;
+  metadata: Record<string, any>;
+  actions?: NotificationAction[];
+  isActive?: boolean;
+  updatedAt?: string;
+}
+
+export interface NotificationAction {
+  id: string;
+  label: string;
+  action: string;
+  url?: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+}
+
+export interface NotificationCategory {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface NotificationFormData {
+  title: string;
+  message: string;
+  type: string;
+  priority: string;
+  category: string;
+  recipientId: string;
+  expiresAt?: string;
+  metadata: Record<string, any>;
+  actions: NotificationAction[];
+}
+
+export interface NotificationStats {
+  total: number;
+  unread: number;
+  pinned: number;
+  today: number;
+  byType: Record<string, number>;
+  byPriority: Record<string, number>;
+  byCategory: Record<string, number>;
+  byStatus: Record<string, number>;
+}
+
 export type IncidentType = 'security' | 'safety' | 'harassment' | 'misconduct' | 'other';
 
 // Document Types
@@ -301,15 +365,65 @@ export type DocumentType = 'policy' | 'contract' | 'certificate' | 'report' | 'f
 // Notification Types
 export interface Notification {
   id: string;
-  type: NotificationType;
   title: string;
   message: string;
+  type: 'info' | 'success' | 'warning' | 'error' | 'system' | 'user' | 'work' | 'event' | 'assignment' | 'payment' | 'security';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: string;
+  senderId: string;
   recipientId: string;
-  senderId?: string;
+  isRead: boolean;
+  isPinned: boolean;
+  isArchived: boolean;
   createdAt: string;
   readAt?: string;
-  actionUrl?: string;
-  priority: 'low' | 'medium' | 'high';
+  expiresAt?: string;
+  metadata: Record<string, any>;
+  actions?: NotificationAction[];
+  isActive?: boolean;
+  updatedAt?: string;
+}
+
+export interface NotificationAction {
+  id: string;
+  label: string;
+  action: string;
+  url?: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+}
+
+export interface NotificationCategory {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface NotificationFormData {
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error' | 'system' | 'user' | 'work' | 'event' | 'assignment' | 'payment' | 'security';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: string;
+  recipientId: string;
+  expiresAt?: string;
+  metadata: Record<string, any>;
+  actions: NotificationAction[];
+}
+
+export interface NotificationStats {
+  total: number;
+  unread: number;
+  pinned: number;
+  today: number;
+  byType: Record<string, number>;
+  byPriority: Record<string, number>;
+  byCategory: Record<string, number>;
+  byStatus: Record<string, number>;
 }
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'reminder';

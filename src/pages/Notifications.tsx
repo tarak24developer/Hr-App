@@ -36,7 +36,9 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  ListItemAvatar
+  ListItemAvatar,
+  Grid,
+  InputAdornment
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -61,109 +63,53 @@ import {
   FilterList as FilterListIcon,
   Info as InfoIcon,
   Error as ErrorIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  PushPin as PushPinIcon
 } from '@mui/icons-material';
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: 'info' | 'success' | 'warning' | 'error' | 'system' | 'user' | 'work' | 'event' | 'assignment' | 'payment' | 'security';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  category: string;
-  senderId: string;
-  recipientId: string;
-  isRead: boolean;
-  isPinned: boolean;
-  isArchived: boolean;
-  createdAt: Date;
-  readAt?: Date;
-  expiresAt?: Date;
-  metadata: Record<string, any>;
-  actions?: NotificationAction[];
-}
-
-interface NotificationAction {
-  id: string;
-  label: string;
-  action: string;
-  url?: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-}
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  avatar?: string;
-}
-
-interface NotificationCategory {
-  id: string;
-  name: string;
-  description: string;
-  color: string;
-  icon: string;
-  isActive: boolean;
-}
-
-interface NotificationFilters {
-  search: string;
-  type: string;
-  priority: string;
-  category: string;
-  status: 'all' | 'read' | 'unread' | 'pinned';
-  dateRange: {
-    start: Date | null;
-    end: Date | null;
-  };
-}
-
-const initialFilters: NotificationFilters = {
-  search: '',
-  type: '',
-  priority: '',
-  category: '',
-  status: 'all',
-  dateRange: {
-    start: null,
-    end: null
-  }
-};
-
-const typeColors = {
-  info: '#2196f3',
-  success: '#4caf50',
-  warning: '#ff9800',
-  error: '#f44336',
-  system: '#9c27b0',
-  user: '#607d8b',
-  work: '#795548',
-  event: '#e91e63',
-  assignment: '#3f51b5',
-  payment: '#009688',
-  security: '#ff5722'
-};
-
-const priorityColors = {
-  low: '#4caf50',
-  medium: '#ff9800',
-  high: '#f44336',
-  urgent: '#9c27b0'
-};
+import notificationService from '../services/notificationService';
+import { Notification, NotificationCategory, NotificationFormData, NotificationStats, User } from '../types';
 
 const Notifications: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filteredNotifications, setFilteredNotifications] = useState<Notification[]>([]);
   const [categories, setCategories] = useState<NotificationCategory[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [filters, setFilters] = useState<NotificationFilters>(initialFilters);
+  const [stats, setStats] = useState<NotificationStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  
+  // Dialog states
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isViewMode, setIsViewMode] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState<Notification | null>(null);
+  
+  // Form data
+  const [formData, setFormData] = useState<NotificationFormData>({
+    title: '',
+    message: '',
+    type: 'info',
+    priority: 'medium',
+    category: '',
+    recipientId: '',
+    expiresAt: '',
+    metadata: {},
+    actions: []
+  });
+  
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  
+  // Snackbar
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -174,134 +120,142 @@ const Notifications: React.FC = () => {
     severity: 'info'
   });
 
-  // Mock data for development
-  const mockCategories: NotificationCategory[] = [
-    { id: '1', name: 'System', description: 'System notifications', color: '#9c27b0', icon: 'system', isActive: true },
-    { id: '2', name: 'User', description: 'User-related notifications', color: '#607d8b', icon: 'user', isActive: true },
-    { id: '3', name: 'Work', description: 'Work-related notifications', color: '#795548', icon: 'work', isActive: true },
-    { id: '4', name: 'Event', description: 'Event notifications', color: '#e91e63', icon: 'event', isActive: true },
-    { id: '5', name: 'Security', description: 'Security alerts', color: '#ff5722', icon: 'security', isActive: true }
-  ];
+  // Load data
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const [notificationsResult, categoriesResult, usersResult, statsResult] = await Promise.all([
+        notificationService.getNotifications(),
+        notificationService.getCategories(),
+        notificationService.getUsers(),
+        notificationService.getNotificationStats()
+      ]);
 
-  const mockUsers: User[] = [
-    { id: '1', name: 'John Doe', email: 'john@example.com', role: 'Manager' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com', role: 'Employee' },
-    { id: '3', name: 'Mike Johnson', email: 'mike@example.com', role: 'Director' }
-  ];
+      if (notificationsResult.success) {
+        setNotifications(notificationsResult.data || []);
+      } else {
+        console.error('Failed to load notifications:', notificationsResult.error);
+      }
 
-  const mockNotifications: Notification[] = [
-    {
-      id: '1',
-      title: 'System Maintenance',
-      message: 'Scheduled system maintenance will begin in 30 minutes. Please save your work.',
-      type: 'system',
-      priority: 'high',
-      category: 'System',
-      senderId: '3',
-      recipientId: '1',
-      isRead: false,
-      isPinned: true,
-      isArchived: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 2), // 2 hours from now
-      metadata: { maintenanceType: 'routine', duration: '2 hours' },
-      actions: [
-        { id: '1', label: 'Acknowledge', action: 'acknowledge' },
-        { id: '2', label: 'View Details', action: 'view', url: '/maintenance' }
-      ]
-    },
-    {
-      id: '2',
-      title: 'New Assignment',
-      message: 'You have been assigned to the Q4 Project Review task.',
-      type: 'assignment',
-      priority: 'medium',
-      category: 'Work',
-      senderId: '3',
-      recipientId: '2',
-      isRead: true,
-      isPinned: false,
-      isArchived: false,
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      readAt: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
-      metadata: { projectId: 'Q4-2024', dueDate: '2024-12-31' },
-      actions: [
-        { id: '3', label: 'View Task', action: 'view', url: '/tasks/Q4-2024' },
-        { id: '4', label: 'Accept', action: 'accept' }
-      ]
+      if (categoriesResult.success) {
+        setCategories(categoriesResult.data || []);
+      } else {
+        console.error('Failed to load categories:', categoriesResult.error);
+      }
+
+      if (usersResult.success) {
+        setUsers(usersResult.data || []);
+      } else {
+        console.error('Failed to load users:', usersResult.error);
+      }
+
+      if (statsResult.success) {
+        setStats(statsResult.data);
+      } else {
+        console.error('Failed to load stats:', statsResult.error);
+      }
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError('Failed to load notifications data');
+    } finally {
+      setLoading(false);
     }
-  ];
-
-  useEffect(() => {
-    // Load mock data
-    setCategories(mockCategories);
-    setUsers(mockUsers);
-    setNotifications(mockNotifications);
   }, []);
 
   useEffect(() => {
-    applyFilters();
-  }, [notifications, filters]);
+    loadData();
+  }, [loadData]);
 
-  const applyFilters = useCallback(() => {
+  // Apply filters
+  useEffect(() => {
     let filtered = [...notifications];
 
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(notification =>
         notification.title.toLowerCase().includes(searchLower) ||
-        notification.message.toLowerCase().includes(searchLower)
+        notification.message.toLowerCase().includes(searchLower) ||
+        notification.category.toLowerCase().includes(searchLower)
       );
     }
 
-    if (filters.type) {
-      filtered = filtered.filter(notification => notification.type === filters.type);
+    if (typeFilter) {
+      filtered = filtered.filter(notification => notification.type === typeFilter);
     }
 
-    if (filters.priority) {
-      filtered = filtered.filter(notification => notification.priority === filters.priority);
+    if (priorityFilter) {
+      filtered = filtered.filter(notification => notification.priority === priorityFilter);
     }
 
-    if (filters.category) {
-      filtered = filtered.filter(notification => notification.category === filters.category);
+    if (categoryFilter) {
+      filtered = filtered.filter(notification => notification.category === categoryFilter);
     }
 
-    if (filters.status === 'read') {
+    if (statusFilter === 'read') {
       filtered = filtered.filter(notification => notification.isRead);
-    } else if (filters.status === 'unread') {
+    } else if (statusFilter === 'unread') {
       filtered = filtered.filter(notification => !notification.isRead);
-    } else if (filters.status === 'pinned') {
+    } else if (statusFilter === 'pinned') {
       filtered = filtered.filter(notification => notification.isPinned);
-    }
-
-    if (filters.dateRange.start) {
-      filtered = filtered.filter(notification => notification.createdAt >= filters.dateRange.start!);
-    }
-
-    if (filters.dateRange.end) {
-      filtered = filtered.filter(notification => notification.createdAt <= filters.dateRange.end!);
     }
 
     setFilteredNotifications(filtered);
     setCurrentPage(1);
-  }, [notifications, filters]);
+  }, [notifications, searchTerm, typeFilter, priorityFilter, categoryFilter, statusFilter]);
 
-  const handleFilterChange = (field: keyof NotificationFilters, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const handleFilterChange = (field: string, value: any) => {
+    switch (field) {
+      case 'search':
+        setSearchTerm(value);
+        break;
+      case 'type':
+        setTypeFilter(value);
+        break;
+      case 'priority':
+        setPriorityFilter(value);
+        break;
+      case 'category':
+        setCategoryFilter(value);
+        break;
+      case 'status':
+        setStatusFilter(value);
+        break;
+    }
   };
 
   const handleCreateNotification = () => {
     setSelectedNotification(null);
     setIsViewMode(false);
+    setFormData({
+      title: '',
+      message: '',
+      type: 'info',
+      priority: 'medium',
+      category: '',
+      recipientId: '',
+      expiresAt: '',
+      metadata: {},
+      actions: []
+    });
     setIsDialogOpen(true);
   };
 
   const handleEditNotification = (notification: Notification) => {
     setSelectedNotification(notification);
     setIsViewMode(false);
+    setFormData({
+      title: notification.title,
+      message: notification.message,
+      type: notification.type,
+      priority: notification.priority,
+      category: notification.category,
+      recipientId: notification.recipientId,
+      expiresAt: notification.expiresAt || '',
+      metadata: notification.metadata || {},
+      actions: notification.actions || []
+    });
     setIsDialogOpen(true);
   };
 
@@ -311,67 +265,174 @@ const Notifications: React.FC = () => {
     setIsDialogOpen(true);
   };
 
-  const handleDeleteNotification = (notificationId: string) => {
-    setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
+  const handleDeleteNotification = (notification: Notification) => {
+    setNotificationToDelete(notification);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!notificationToDelete) return;
+
+    try {
+      const result = await notificationService.permanentDeleteNotification(notificationToDelete.id);
+      
+      if (result.success) {
     setSnackbar({
       open: true,
       message: 'Notification deleted successfully',
       severity: 'success'
     });
+        await loadData();
+      } else {
+        setSnackbar({
+          open: true,
+          message: 'Failed to delete notification',
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error deleting notification',
+        severity: 'error'
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setNotificationToDelete(null);
+    }
   };
 
   const handleMarkAsRead = async (notificationId: string) => {
-    setNotifications(prev => prev.map(notif =>
-      notif.id === notificationId
-        ? { ...notif, isRead: true, readAt: new Date() }
-        : notif
-    ));
+    try {
+      const result = await notificationService.markAsRead(notificationId);
+      
+      if (result.success) {
     setSnackbar({
       open: true,
       message: 'Notification marked as read',
       severity: 'success'
     });
-  };
-
-  const handleSaveNotification = (notificationData: Partial<Notification>) => {
-    if (selectedNotification) {
-      // Update existing notification
-      setNotifications(prev => prev.map(notif =>
-        notif.id === selectedNotification.id
-          ? { ...notif, ...notificationData }
-          : notif
-      ));
+        await loadData();
+      } else {
+        setSnackbar({
+          open: true,
+          message: 'Failed to mark notification as read',
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
       setSnackbar({
         open: true,
-        message: 'Notification updated successfully',
-        severity: 'success'
-      });
-    } else {
-      // Create new notification
-      const newNotification: Notification = {
-        id: Date.now().toString(),
-        title: notificationData.title || '',
-        message: notificationData.message || '',
-        type: notificationData.type || 'info',
-        priority: notificationData.priority || 'medium',
-        category: notificationData.category || '',
-        senderId: '1', // Current user ID
-        recipientId: notificationData.recipientId || '',
-        isRead: false,
-        isPinned: false,
-        isArchived: false,
-        createdAt: new Date(),
-        metadata: notificationData.metadata || {},
-        actions: notificationData.actions || []
-      };
-      setNotifications(prev => [newNotification, ...prev]);
-      setSnackbar({
-        open: true,
-        message: 'Notification created successfully',
-        severity: 'success'
+        message: 'Error marking notification as read',
+        severity: 'error'
       });
     }
-    setIsDialogOpen(false);
+  };
+
+  const handleTogglePin = async (notificationId: string, isPinned: boolean) => {
+    try {
+      const result = await notificationService.togglePin(notificationId, !isPinned);
+      
+      if (result.success) {
+        setSnackbar({
+          open: true,
+          message: isPinned ? 'Notification unpinned' : 'Notification pinned',
+          severity: 'success'
+        });
+        await loadData();
+      } else {
+        setSnackbar({
+          open: true,
+          message: 'Failed to toggle pin status',
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling pin status:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error toggling pin status',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleFormChange = (field: keyof NotificationFormData, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleFormSubmit = async () => {
+    try {
+      let result;
+      
+    if (selectedNotification) {
+      // Update existing notification
+        result = await notificationService.updateNotification(selectedNotification.id, formData);
+      } else {
+        // Create new notification
+        result = await notificationService.createNotification(formData);
+      }
+
+      if (result.success) {
+      setSnackbar({
+        open: true,
+          message: selectedNotification ? 'Notification updated successfully' : 'Notification created successfully',
+        severity: 'success'
+      });
+        setIsDialogOpen(false);
+        await loadData();
+    } else {
+        setSnackbar({
+          open: true,
+          message: selectedNotification ? 'Failed to update notification' : 'Failed to create notification',
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error saving notification:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error saving notification',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleRefresh = async () => {
+    await loadData();
+  };
+
+  const handleArchiveAll = async () => {
+    try {
+      const result = await notificationService.archiveAll();
+      
+      if (result.success) {
+      setSnackbar({
+        open: true,
+          message: 'All notifications archived',
+        severity: 'success'
+      });
+        await loadData();
+      } else {
+        setSnackbar({
+          open: true,
+          message: 'Failed to archive notifications',
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('Error archiving notifications:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error archiving notifications',
+        severity: 'error'
+      });
+    }
   };
 
   const getNotificationIcon = (type: string) => {
@@ -404,36 +465,35 @@ const Notifications: React.FC = () => {
   };
 
   const getPriorityColor = (priority: string) => {
-    return priorityColors[priority as keyof typeof priorityColors] || '#9e9e9e';
+    const colors = {
+      low: '#4caf50',
+      medium: '#ff9800',
+      high: '#f44336',
+      urgent: '#9c27b0'
+    };
+    return colors[priority as keyof typeof colors] || '#9e9e9e';
   };
 
   const getTypeColor = (type: string) => {
-    return typeColors[type as keyof typeof typeColors] || '#9e9e9e';
+    const colors = {
+      info: '#2196f3',
+      success: '#4caf50',
+      warning: '#ff9800',
+      error: '#f44336',
+      system: '#9c27b0',
+      user: '#607d8b',
+      work: '#795548',
+      event: '#e91e63',
+      assignment: '#3f51b5',
+      payment: '#009688',
+      security: '#ff5722'
+    };
+    return colors[type as keyof typeof colors] || '#9e9e9e';
   };
 
   const getUserName = (userId: string) => {
     const user = users.find(u => u.id === userId);
-    return user ? user.name : 'Unknown User';
-  };
-
-  const getUnreadCount = () => {
-    return notifications.filter(notification => !notification.isRead).length;
-  };
-
-  const getPinnedCount = () => {
-    return notifications.filter(notification => notification.isPinned).length;
-  };
-
-  const getTotalCount = () => {
-    return notifications.length;
-  };
-
-  const getTodayCount = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return notifications.filter(notification => 
-      notification.createdAt >= today
-    ).length;
+    return user ? `${user.firstName} ${user.lastName}` : 'Unknown User';
   };
 
   const paginatedNotifications = filteredNotifications.slice(
@@ -443,8 +503,17 @@ const Notifications: React.FC = () => {
 
   const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
 
+  if (loading) {
+    return (
+      <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <Typography>Loading notifications...</Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3 }}>
+      {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Notifications
@@ -453,6 +522,7 @@ const Notifications: React.FC = () => {
           <Button
             variant="outlined"
             startIcon={<ArchiveIcon />}
+            onClick={handleArchiveAll}
             sx={{ mr: 1 }}
           >
             Archive All
@@ -460,6 +530,7 @@ const Notifications: React.FC = () => {
           <Button
             variant="outlined"
             startIcon={<RefreshIcon />}
+            onClick={handleRefresh}
             sx={{ mr: 1 }}
           >
             Refresh
@@ -474,84 +545,108 @@ const Notifications: React.FC = () => {
         </Box>
       </Box>
 
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+
       {/* Statistics Cards */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 3, mb: 3 }}>
+      {stats && (
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <Card>
           <CardContent>
             <Typography color="textSecondary" gutterBottom>
               Total Notifications
             </Typography>
             <Typography variant="h4" component="div">
-              {getTotalCount()}
+                  {stats.total}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               All time
             </Typography>
           </CardContent>
         </Card>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <Card>
           <CardContent>
             <Typography color="textSecondary" gutterBottom>
               Unread
             </Typography>
             <Typography variant="h4" component="div" color="error">
-              {getUnreadCount()}
+                  {stats.unread}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               Require attention
             </Typography>
           </CardContent>
         </Card>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <Card>
           <CardContent>
             <Typography color="textSecondary" gutterBottom>
               Pinned
             </Typography>
             <Typography variant="h4" component="div" color="warning.main">
-              {getPinnedCount()}
+                  {stats.pinned}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               Important notifications
             </Typography>
           </CardContent>
         </Card>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <Card>
           <CardContent>
             <Typography color="textSecondary" gutterBottom>
               Today
             </Typography>
             <Typography variant="h4" component="div" color="primary.main">
-              {getTodayCount()}
+                  {stats.today}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               New today
             </Typography>
           </CardContent>
         </Card>
-      </Box>
+          </Grid>
+        </Grid>
+      )}
 
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterIcon sx={{ mr: 1 }} />
-          <Typography variant="h6">Filters</Typography>
-        </Box>
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(5, 1fr)' }, gap: 2 }}>
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <FilterIcon />
+          Filters
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 4 }}>
           <TextField
             fullWidth
-            label="Search"
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
+              placeholder="Search notifications..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-            }}
-          />
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
           <FormControl fullWidth>
             <InputLabel>Type</InputLabel>
             <Select
-              value={filters.type}
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
               label="Type"
-              onChange={(e) => handleFilterChange('type', e.target.value)}
             >
               <MenuItem value="">All Types</MenuItem>
               <MenuItem value="info">Info</MenuItem>
@@ -567,12 +662,14 @@ const Notifications: React.FC = () => {
               <MenuItem value="security">Security</MenuItem>
             </Select>
           </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
           <FormControl fullWidth>
             <InputLabel>Priority</InputLabel>
             <Select
-              value={filters.priority}
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
               label="Priority"
-              onChange={(e) => handleFilterChange('priority', e.target.value)}
             >
               <MenuItem value="">All Priorities</MenuItem>
               <MenuItem value="low">Low</MenuItem>
@@ -581,12 +678,14 @@ const Notifications: React.FC = () => {
               <MenuItem value="urgent">Urgent</MenuItem>
             </Select>
           </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
           <FormControl fullWidth>
             <InputLabel>Category</InputLabel>
             <Select
-              value={filters.category}
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
               label="Category"
-              onChange={(e) => handleFilterChange('category', e.target.value)}
             >
               <MenuItem value="">All Categories</MenuItem>
               {categories.map(category => (
@@ -596,12 +695,14 @@ const Notifications: React.FC = () => {
               ))}
             </Select>
           </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
           <FormControl fullWidth>
             <InputLabel>Status</InputLabel>
             <Select
-              value={filters.status}
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
               label="Status"
-              onChange={(e) => handleFilterChange('status', e.target.value)}
             >
               <MenuItem value="all">All</MenuItem>
               <MenuItem value="unread">Unread</MenuItem>
@@ -609,7 +710,8 @@ const Notifications: React.FC = () => {
               <MenuItem value="pinned">Pinned</MenuItem>
             </Select>
           </FormControl>
-        </Box>
+          </Grid>
+        </Grid>
       </Paper>
 
       {/* Notifications Table */}
@@ -622,7 +724,7 @@ const Notifications: React.FC = () => {
                 <TableCell>Title</TableCell>
                 <TableCell>Priority</TableCell>
                 <TableCell>Category</TableCell>
-                <TableCell>Sender</TableCell>
+                <TableCell>Recipient</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell>Created</TableCell>
                 <TableCell>Actions</TableCell>
@@ -686,7 +788,7 @@ const Notifications: React.FC = () => {
                         <PersonIcon />
                       </Avatar>
                       <Typography variant="body2">
-                        {getUserName(notification.senderId)}
+                        {getUserName(notification.recipientId)}
                       </Typography>
                     </Box>
                   </TableCell>
@@ -707,10 +809,10 @@ const Notifications: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {notification.createdAt.toLocaleDateString()}
+                      {new Date(notification.createdAt).toLocaleDateString()}
                     </Typography>
                     <Typography variant="caption" color="textSecondary">
-                      {notification.createdAt.toLocaleTimeString()}
+                      {new Date(notification.createdAt).toLocaleTimeString()}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -735,6 +837,15 @@ const Notifications: React.FC = () => {
                           </IconButton>
                         </Tooltip>
                       )}
+                      <Tooltip title={notification.isPinned ? "Unpin" : "Pin"}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleTogglePin(notification.id, notification.isPinned)}
+                          color={notification.isPinned ? "warning" : "default"}
+                        >
+                          <PushPinIcon />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="Edit Notification">
                         <IconButton
                           size="small"
@@ -747,7 +858,7 @@ const Notifications: React.FC = () => {
                       <Tooltip title="Delete Notification">
                         <IconButton
                           size="small"
-                          onClick={() => handleDeleteNotification(notification.id)}
+                          onClick={() => handleDeleteNotification(notification)}
                           color="error"
                         >
                           <DeleteIcon />
@@ -775,6 +886,203 @@ const Notifications: React.FC = () => {
           />
         </Box>
       )}
+
+      {/* Create/Edit/View Dialog */}
+      <Dialog 
+        open={isDialogOpen} 
+        onClose={() => setIsDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            backdropFilter: 'blur(8px)',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)'
+          }
+        }}
+      >
+        <DialogTitle>
+          {isViewMode ? 'View Notification' : selectedNotification ? 'Edit Notification' : 'Create Notification'}
+        </DialogTitle>
+        <DialogContent>
+          {isViewMode ? (
+            <Box>
+              <Typography variant="h6" gutterBottom>{selectedNotification?.title}</Typography>
+              <Typography variant="body1" paragraph>{selectedNotification?.message}</Typography>
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="subtitle2">Type: {selectedNotification?.type}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="subtitle2">Priority: {selectedNotification?.priority}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="subtitle2">Category: {selectedNotification?.category}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="subtitle2">Recipient: {getUserName(selectedNotification?.recipientId || '')}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="subtitle2">Status: {selectedNotification?.isRead ? 'Read' : 'Unread'}</Typography>
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <Typography variant="subtitle2">Created: {selectedNotification?.createdAt ? new Date(selectedNotification.createdAt).toLocaleString() : ''}</Typography>
+                </Grid>
+              </Grid>
+            </Box>
+          ) : (
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label="Title"
+                  value={formData.title}
+                  onChange={(e) => handleFormChange('title', e.target.value)}
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label="Message"
+                  value={formData.message}
+                  onChange={(e) => handleFormChange('message', e.target.value)}
+                  multiline
+                  rows={3}
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <FormControl fullWidth required>
+                  <InputLabel>Type</InputLabel>
+                  <Select
+                    value={formData.type}
+                    onChange={(e) => handleFormChange('type', e.target.value)}
+                    label="Type"
+                  >
+                    <MenuItem value="info">Info</MenuItem>
+                    <MenuItem value="success">Success</MenuItem>
+                    <MenuItem value="warning">Warning</MenuItem>
+                    <MenuItem value="error">Error</MenuItem>
+                    <MenuItem value="system">System</MenuItem>
+                    <MenuItem value="user">User</MenuItem>
+                    <MenuItem value="work">Work</MenuItem>
+                    <MenuItem value="event">Event</MenuItem>
+                    <MenuItem value="assignment">Assignment</MenuItem>
+                    <MenuItem value="payment">Payment</MenuItem>
+                    <MenuItem value="security">Security</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <FormControl fullWidth required>
+                  <InputLabel>Priority</InputLabel>
+                  <Select
+                    value={formData.priority}
+                    onChange={(e) => handleFormChange('priority', e.target.value)}
+                    label="Priority"
+                  >
+                    <MenuItem value="low">Low</MenuItem>
+                    <MenuItem value="medium">Medium</MenuItem>
+                    <MenuItem value="high">High</MenuItem>
+                    <MenuItem value="urgent">Urgent</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <FormControl fullWidth required>
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    value={formData.category}
+                    onChange={(e) => handleFormChange('category', e.target.value)}
+                    label="Category"
+                  >
+                    {categories.map((category) => (
+                      <MenuItem key={category.id} value={category.name}>
+                        {category.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <FormControl fullWidth required>
+                  <InputLabel>Recipient</InputLabel>
+                  <Select
+                    value={formData.recipientId}
+                    onChange={(e) => handleFormChange('recipientId', e.target.value)}
+                    label="Recipient"
+                  >
+                    {users.map((user) => (
+                      <MenuItem key={user.id} value={user.id}>
+                        {user.firstName} {user.lastName}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label="Expires At (Optional)"
+                  type="datetime-local"
+                  value={formData.expiresAt}
+                  onChange={(e) => handleFormChange('expiresAt', e.target.value)}
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                />
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsDialogOpen(false)}>
+            {isViewMode ? 'Close' : 'Cancel'}
+          </Button>
+          {!isViewMode && (
+            <Button onClick={handleFormSubmit} variant="contained">
+              {selectedNotification ? 'Update' : 'Create'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        PaperProps={{
+          sx: {
+            backdropFilter: 'blur(8px)',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)'
+          }
+        }}
+      >
+        <DialogTitle>Delete Notification</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to permanently delete this notification? This action cannot be undone.
+          </Typography>
+          {notificationToDelete && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+              <Typography variant="subtitle2" fontWeight="bold">
+                {notificationToDelete.title}
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                {notificationToDelete.message}
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setIsDeleteDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmDelete} color="error" variant="contained">
+            Delete Permanently
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar */}
       <Snackbar
