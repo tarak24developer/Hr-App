@@ -206,16 +206,69 @@ export interface Assessment {
 export interface Incident {
   id: string;
   title: string;
-  type: IncidentType;
-  severity: 'low' | 'medium' | 'high' | 'critical';
   description: string;
-  reportedBy: string;
-  reportedAt: string;
-  assignedTo?: string;
+  category: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
   status: 'open' | 'investigating' | 'resolved' | 'closed';
-  resolution?: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  reporterId: string;
+  assigneeId?: string;
+  location: string;
+  reportedAt: string;
+  updatedAt: string;
   resolvedAt?: string;
-  attachments?: string[];
+  attachments: string[];
+  tags: string[];
+  notes: IncidentNote[];
+  isActive?: boolean;
+  createdAt?: string;
+}
+
+export interface IncidentNote {
+  id: string;
+  content: string;
+  authorId: string;
+  createdAt: string;
+  isInternal: boolean;
+}
+
+export interface IncidentCategory {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface IncidentFormData {
+  title: string;
+  description: string;
+  category: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  assigneeId: string;
+  location: string;
+  tags: string[];
+}
+
+export interface IncidentStats {
+  total: number;
+  open: number;
+  investigating: number;
+  resolved: number;
+  closed: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  urgent: number;
+  resolvedToday: number;
+  byCategory: Record<string, number>;
+  bySeverity: Record<string, number>;
+  byStatus: Record<string, number>;
+  byPriority: Record<string, number>;
 }
 
 export type IncidentType = 'security' | 'safety' | 'harassment' | 'misconduct' | 'other';

@@ -31,7 +31,13 @@ import {
   Divider,
   Tooltip,
   Avatar,
-  Badge
+  Badge,
+  Container,
+  Stack,
+  Grid,
+  InputAdornment,
+  CircularProgress,
+  Fade
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -45,205 +51,99 @@ import {
   Schedule as ScheduleIcon,
   Person as PersonIcon,
   LocationOn as LocationIcon,
-  Description as DescriptionIcon
+  Description as DescriptionIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
-import { useDataService } from '../hooks/useDataService';
-
-interface Incident {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  status: 'open' | 'investigating' | 'resolved' | 'closed';
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  reporterId: string;
-  assigneeId?: string;
-  location: string;
-  reportedAt: Date;
-  updatedAt: Date;
-  resolvedAt?: Date;
-  attachments: string[];
-  tags: string[];
-  notes: IncidentNote[];
-}
-
-interface IncidentNote {
-  id: string;
-  content: string;
-  authorId: string;
-  createdAt: Date;
-  isInternal: boolean;
-}
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  avatar?: string;
-}
-
-interface IncidentCategory {
-  id: string;
-  name: string;
-  description: string;
-  color: string;
-}
-
-interface IncidentFilters {
-  search: string;
-  category: string;
-  severity: string;
-  status: string;
-  priority: string;
-  dateRange: {
-    start: Date | null;
-    end: Date | null;
-  };
-  assignedTo: string;
-}
-
-const initialFilters: IncidentFilters = {
-  search: '',
-  category: '',
-  severity: '',
-  status: '',
-  priority: '',
-  dateRange: {
-    start: null,
-    end: null
-  },
-  assignedTo: ''
-};
-
-const severityColors = {
-  low: '#4caf50',
-  medium: '#ff9800',
-  high: '#f44336',
-  critical: '#9c27b0'
-};
-
-const statusColors = {
-  open: '#f44336',
-  investigating: '#ff9800',
-  resolved: '#4caf50',
-  closed: '#9e9e9e'
-};
-
-const priorityColors = {
-  low: '#4caf50',
-  medium: '#ff9800',
-  high: '#f44336',
-  urgent: '#9c27b0'
-};
+import incidentService, { Incident, IncidentCategory, IncidentFormData, IncidentStats } from '../services/incidentService';
+import { User } from '../types';
 
 const IncidentManagement: React.FC = () => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [filteredIncidents, setFilteredIncidents] = useState<Incident[]>([]);
   const [categories, setCategories] = useState<IncidentCategory[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [filters, setFilters] = useState<IncidentFilters>(initialFilters);
+  const [stats, setStats] = useState<IncidentStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  
+  // Dialog states
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isViewMode, setIsViewMode] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [incidentToDelete, setIncidentToDelete] = useState<Incident | null>(null);
+  
+  // Form state
+  const [formData, setFormData] = useState<IncidentFormData>({
+    title: '',
+    description: '',
+    category: '',
+    severity: 'medium',
+    priority: 'medium',
+    assigneeId: '',
+    location: '',
+    tags: []
+  });
+  
+  // Filter and pagination
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [severityFilter, setSeverityFilter] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'info' | 'warning';
-  }>({
+  const [rowsPerPage] = useState(10);
+  
+  // Snackbar
+  const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
-    severity: 'info'
+    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
   });
 
-  // Mock data for development
-  const mockCategories: IncidentCategory[] = [
-    { id: '1', name: 'Security Breach', description: 'Unauthorized access or security violations', color: '#f44336' },
-    { id: '2', name: 'System Failure', description: 'Hardware or software system failures', color: '#ff9800' },
-    { id: '3', name: 'Data Loss', description: 'Loss or corruption of important data', color: '#9c27b0' },
-    { id: '4', name: 'Network Issue', description: 'Network connectivity or performance problems', color: '#2196f3' },
-    { id: '5', name: 'User Error', description: 'Mistakes made by system users', color: '#4caf50' }
-  ];
+  // Load data
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const [incidentsResult, categoriesResult, statsResult] = await Promise.all([
+        incidentService.getIncidents(),
+        incidentService.getCategories(),
+        incidentService.getIncidentStats()
+      ]);
 
-  const mockUsers: User[] = [
-    { id: '1', name: 'John Doe', email: 'john@example.com', role: 'IT Manager' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com', role: 'Security Analyst' },
-    { id: '3', name: 'Mike Johnson', email: 'mike@example.com', role: 'System Admin' }
-  ];
+      if (incidentsResult.success && incidentsResult.data) {
+        setIncidents(incidentsResult.data);
+        setFilteredIncidents(incidentsResult.data);
+      } else {
+        setError('Failed to load incidents');
+      }
 
-  const mockIncidents: Incident[] = [
-    {
-      id: '1',
-      title: 'Unauthorized Access Attempt',
-      description: 'Multiple failed login attempts detected from unknown IP address',
-      category: 'Security Breach',
-      severity: 'high',
-      status: 'investigating',
-      priority: 'high',
-      reporterId: '1',
-      assigneeId: '2',
-      location: 'Main Office',
-      reportedAt: new Date('2024-01-15T10:30:00'),
-      updatedAt: new Date('2024-01-15T14:20:00'),
-      attachments: ['security_log.pdf'],
-      tags: ['security', 'login', 'investigation'],
-      notes: [
-        {
-          id: '1',
-          content: 'Initial investigation started. Checking firewall logs.',
-          authorId: '2',
-          createdAt: new Date('2024-01-15T11:00:00'),
-          isInternal: true
-        }
-      ]
-    },
-    {
-      id: '2',
-      title: 'Server Room Temperature Alert',
-      description: 'Temperature in server room exceeded safe limits',
-      category: 'System Failure',
-      severity: 'medium',
-      status: 'resolved',
-      priority: 'medium',
-      reporterId: '3',
-      assigneeId: '3',
-      location: 'Server Room',
-      reportedAt: new Date('2024-01-14T16:45:00'),
-      updatedAt: new Date('2024-01-14T18:30:00'),
-      resolvedAt: new Date('2024-01-14T18:30:00'),
-      attachments: ['temp_log.csv'],
-      tags: ['hardware', 'environment', 'resolved'],
-      notes: [
-        {
-          id: '2',
-          content: 'AC unit repaired and temperature normalized.',
-          authorId: '3',
-          createdAt: new Date('2024-01-14T18:30:00'),
-          isInternal: false
-        }
-      ]
+      if (categoriesResult.success && categoriesResult.data) {
+        setCategories(categoriesResult.data);
+      }
+
+      if (statsResult.success && statsResult.data) {
+        setStats(statsResult.data);
+      }
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError('Failed to load data');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   useEffect(() => {
-    // Load mock data
-    setCategories(mockCategories);
-    setUsers(mockUsers);
-    setIncidents(mockIncidents);
+    loadData();
   }, []);
 
+  // Apply filters
   useEffect(() => {
-    applyFilters();
-  }, [incidents, filters]);
-
-  const applyFilters = useCallback(() => {
     let filtered = [...incidents];
 
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(incident =>
         incident.title.toLowerCase().includes(searchLower) ||
         incident.description.toLowerCase().includes(searchLower) ||
@@ -251,113 +151,156 @@ const IncidentManagement: React.FC = () => {
       );
     }
 
-    if (filters.category) {
-      filtered = filtered.filter(incident => incident.category === filters.category);
+    if (statusFilter) {
+      filtered = filtered.filter(incident => incident.status === statusFilter);
     }
 
-    if (filters.severity) {
-      filtered = filtered.filter(incident => incident.severity === filters.severity);
+    if (severityFilter) {
+      filtered = filtered.filter(incident => incident.severity === severityFilter);
     }
 
-    if (filters.status) {
-      filtered = filtered.filter(incident => incident.status === filters.status);
-    }
-
-    if (filters.priority) {
-      filtered = filtered.filter(incident => incident.priority === filters.priority);
-    }
-
-    if (filters.assignedTo) {
-      filtered = filtered.filter(incident => incident.assigneeId === filters.assignedTo);
-    }
-
-    if (filters.dateRange.start) {
-      filtered = filtered.filter(incident => incident.reportedAt >= filters.dateRange.start!);
-    }
-
-    if (filters.dateRange.end) {
-      filtered = filtered.filter(incident => incident.reportedAt <= filters.dateRange.end!);
+    if (categoryFilter) {
+      filtered = filtered.filter(incident => incident.category === categoryFilter);
     }
 
     setFilteredIncidents(filtered);
     setCurrentPage(1);
-  }, [incidents, filters]);
+  }, [incidents, searchTerm, statusFilter, severityFilter, categoryFilter]);
 
-  const handleFilterChange = (field: keyof IncidentFilters, value: any) => {
-    setFilters(prev => ({
+  // Pagination
+  const paginatedIncidents = filteredIncidents.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredIncidents.length / rowsPerPage);
+
+  // Handlers
+  const handleCreateIncident = () => {
+    setSelectedIncident(null);
+    setViewMode(false);
+    setFormData({
+      title: '',
+      description: '',
+      category: '',
+      severity: 'medium',
+      priority: 'medium',
+      assigneeId: '',
+      location: '',
+      tags: []
+    });
+    setDialogOpen(true);
+  };
+
+  const handleEditIncident = (incident: Incident) => {
+    setSelectedIncident(incident);
+    setViewMode(false);
+    setFormData({
+      title: incident.title,
+      description: incident.description,
+      category: incident.category,
+      severity: incident.severity,
+      priority: incident.priority,
+      assigneeId: incident.assigneeId || '',
+      location: incident.location,
+      tags: incident.tags
+    });
+    setDialogOpen(true);
+  };
+
+  const handleViewIncident = (incident: Incident) => {
+    setSelectedIncident(incident);
+    setViewMode(true);
+    setDialogOpen(true);
+  };
+
+  const handleDeleteClick = (incident: Incident) => {
+    setIncidentToDelete(incident);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!incidentToDelete) return;
+
+    try {
+      const result = await incidentService.permanentDeleteIncident(incidentToDelete.id);
+      
+      if (result.success) {
+        setSnackbar({
+          open: true,
+          message: `Incident "${incidentToDelete.title}" deleted successfully`,
+          severity: 'success'
+        });
+        await loadData();
+      } else {
+        throw new Error(result.message || 'Failed to delete incident');
+      }
+    } catch (err) {
+      console.error('Error deleting incident:', err);
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to delete incident',
+        severity: 'error'
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setIncidentToDelete(null);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setIncidentToDelete(null);
+  };
+
+  const handleSaveIncident = async () => {
+    try {
+      if (selectedIncident) {
+        // Update existing incident
+        const result = await incidentService.updateIncident(selectedIncident.id, formData);
+        if (result.success) {
+          setSnackbar({
+            open: true,
+            message: 'Incident updated successfully',
+            severity: 'success'
+          });
+          await loadData();
+        } else {
+          throw new Error(result.message || 'Failed to update incident');
+        }
+      } else {
+        // Create new incident
+        const result = await incidentService.createIncident(formData);
+        if (result.success) {
+          setSnackbar({
+            open: true,
+            message: 'Incident created successfully',
+            severity: 'success'
+          });
+          await loadData();
+        } else {
+          throw new Error(result.message || 'Failed to create incident');
+        }
+      }
+      setDialogOpen(false);
+    } catch (err) {
+      console.error('Error saving incident:', err);
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to save incident',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleFormChange = (field: keyof IncidentFormData, value: any) => {
+    setFormData(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const handleCreateIncident = () => {
-    setSelectedIncident(null);
-    setIsViewMode(false);
-    setIsDialogOpen(true);
-  };
-
-  const handleEditIncident = (incident: Incident) => {
-    setSelectedIncident(incident);
-    setIsViewMode(false);
-    setIsDialogOpen(true);
-  };
-
-  const handleViewIncident = (incident: Incident) => {
-    setSelectedIncident(incident);
-    setIsViewMode(true);
-    setIsDialogOpen(true);
-  };
-
-  const handleDeleteIncident = (incidentId: string) => {
-    setIncidents(prev => prev.filter(inc => inc.id !== incidentId));
-    setSnackbar({
-      open: true,
-      message: 'Incident deleted successfully',
-      severity: 'success'
-    });
-  };
-
-  const handleSaveIncident = (incidentData: Partial<Incident>) => {
-    if (selectedIncident) {
-      // Update existing incident
-      setIncidents(prev => prev.map(inc =>
-        inc.id === selectedIncident.id
-          ? { ...inc, ...incidentData, updatedAt: new Date() }
-          : inc
-      ));
-      setSnackbar({
-        open: true,
-        message: 'Incident updated successfully',
-        severity: 'success'
-      });
-    } else {
-      // Create new incident
-      const newIncident: Incident = {
-        id: Date.now().toString(),
-        title: incidentData.title || '',
-        description: incidentData.description || '',
-        category: incidentData.category || '',
-        severity: incidentData.severity || 'medium',
-        status: 'open',
-        priority: incidentData.priority || 'medium',
-        reporterId: '1', // Current user ID
-        location: incidentData.location || '',
-        reportedAt: new Date(),
-        updatedAt: new Date(),
-        attachments: incidentData.attachments || [],
-        tags: incidentData.tags || [],
-        notes: []
-      };
-      setIncidents(prev => [newIncident, ...prev]);
-      setSnackbar({
-        open: true,
-        message: 'Incident created successfully',
-        severity: 'success'
-      });
-    }
-    setIsDialogOpen(false);
-  };
-
+  // Helper functions
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'open':
@@ -373,9 +316,34 @@ const IncidentManagement: React.FC = () => {
     }
   };
 
-  const getUserName = (userId: string) => {
-    const user = users.find(u => u.id === userId);
-    return user ? user.name : 'Unknown User';
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'low': return '#4caf50';
+      case 'medium': return '#ff9800';
+      case 'high': return '#f44336';
+      case 'critical': return '#9c27b0';
+      default: return '#9e9e9e';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'open': return '#f44336';
+      case 'investigating': return '#ff9800';
+      case 'resolved': return '#4caf50';
+      case 'closed': return '#9e9e9e';
+      default: return '#9e9e9e';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'low': return '#4caf50';
+      case 'medium': return '#ff9800';
+      case 'high': return '#f44336';
+      case 'urgent': return '#9c27b0';
+      default: return '#9e9e9e';
+    }
   };
 
   const getCategoryColor = (categoryName: string) => {
@@ -383,100 +351,186 @@ const IncidentManagement: React.FC = () => {
     return category ? category.color : '#9e9e9e';
   };
 
-  const paginatedIncidents = filteredIncidents.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
 
-  const totalPages = Math.ceil(filteredIncidents.length / itemsPerPage);
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  if (loading) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <CircularProgress size={60} />
+      </Container>
+    );
+  }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
+    <Container maxWidth="xl" sx={{ py: 3 }}>
+      {/* Header */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1" fontWeight="bold">
           Incident Management
         </Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={handleCreateIncident}
-          sx={{ bgcolor: 'primary.main' }}
+          sx={{ borderRadius: 2 }}
         >
           Create Incident
         </Button>
       </Box>
 
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+
       {/* Statistics Cards */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-        gap: 3, 
-        mb: 3 
-      }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Incidents
-            </Typography>
-            <Typography variant="h4" component="div">
-              {incidents.length}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Open Incidents
-            </Typography>
-            <Typography variant="h4" component="div" color="warning.main">
-              {incidents.filter(incident => incident.status === 'open').length}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Critical Incidents
-            </Typography>
-            <Typography variant="h4" component="div" color="error.main">
-              {incidents.filter(incident => incident.severity === 'critical').length}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Resolved Today
-            </Typography>
-            <Typography variant="h4" component="div" color="success.main">
-              {incidents.filter(incident => 
-                incident.status === 'resolved' && 
-                incident.resolvedAt && 
-                incident.resolvedAt.toDateString() === new Date().toDateString()
-              ).length}
-            </Typography>
-          </CardContent>
-        </Card>
-      </Box>
+      {stats && (
+        <Grid container spacing={3} sx={{ mb: 3 }}>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Card>
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Total Incidents
+                </Typography>
+                <Typography variant="h4" component="div">
+                  {stats.total}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Card>
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Open Incidents
+                </Typography>
+                <Typography variant="h4" component="div" color="warning.main">
+                  {stats.open}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Card>
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Critical Incidents
+                </Typography>
+                <Typography variant="h4" component="div" color="error.main">
+                  {stats.critical}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <Card>
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Resolved Today
+                </Typography>
+                <Typography variant="h4" component="div" color="success.main">
+                  {stats.resolvedToday}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      )}
 
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterIcon sx={{ mr: 1 }} />
-          <Typography variant="h6">Filters</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterIcon sx={{ mr: 1 }} />
-          <Typography variant="h6">Filters</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterIcon sx={{ mr: 1 }} />
-          <Typography variant="h6">Filters</Typography>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterIcon sx={{ mr: 1 }} />
-          <Typography variant="h6">Filters</Typography>
-        </Box>
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <FilterIcon />
+          Filters
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 4 }}>
+            <TextField
+              fullWidth
+              placeholder="Search incidents..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                label="Status"
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="open">Open</MenuItem>
+                <MenuItem value="investigating">Investigating</MenuItem>
+                <MenuItem value="resolved">Resolved</MenuItem>
+                <MenuItem value="closed">Closed</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>Severity</InputLabel>
+              <Select
+                value={severityFilter}
+                onChange={(e) => setSeverityFilter(e.target.value)}
+                label="Severity"
+              >
+                <MenuItem value="">All</MenuItem>
+                <MenuItem value="low">Low</MenuItem>
+                <MenuItem value="medium">Medium</MenuItem>
+                <MenuItem value="high">High</MenuItem>
+                <MenuItem value="critical">Critical</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>Category</InputLabel>
+              <Select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                label="Category"
+              >
+                <MenuItem value="">All</MenuItem>
+                {categories.map((category) => (
+                  <MenuItem key={category.id} value={category.name}>
+                    {category.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid size={{ xs: 12, md: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('');
+                setSeverityFilter('');
+                setCategoryFilter('');
+              }}
+              fullWidth
+            >
+              Clear Filters
+            </Button>
+          </Grid>
+        </Grid>
       </Paper>
 
       {/* Incidents Table */}
@@ -493,7 +547,7 @@ const IncidentManagement: React.FC = () => {
                 <TableCell>Assignee</TableCell>
                 <TableCell>Location</TableCell>
                 <TableCell>Reported</TableCell>
-                <TableCell>Actions</TableCell>
+                <TableCell align="center">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -525,7 +579,7 @@ const IncidentManagement: React.FC = () => {
                       label={incident.severity}
                       size="small"
                       sx={{
-                        bgcolor: severityColors[incident.severity],
+                        bgcolor: getSeverityColor(incident.severity),
                         color: 'white',
                         fontWeight: 'bold'
                       }}
@@ -538,7 +592,7 @@ const IncidentManagement: React.FC = () => {
                         label={incident.status}
                         size="small"
                         sx={{
-                          bgcolor: statusColors[incident.status],
+                          bgcolor: getStatusColor(incident.status),
                           color: 'white',
                           fontWeight: 'bold'
                         }}
@@ -550,7 +604,7 @@ const IncidentManagement: React.FC = () => {
                       label={incident.priority}
                       size="small"
                       sx={{
-                        bgcolor: priorityColors[incident.priority],
+                        bgcolor: getPriorityColor(incident.priority),
                         color: 'white',
                         fontWeight: 'bold'
                       }}
@@ -563,7 +617,7 @@ const IncidentManagement: React.FC = () => {
                           <PersonIcon />
                         </Avatar>
                         <Typography variant="body2">
-                          {getUserName(incident.assigneeId)}
+                          User {incident.assigneeId}
                         </Typography>
                       </Box>
                     ) : (
@@ -582,14 +636,14 @@ const IncidentManagement: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {incident.reportedAt.toLocaleDateString()}
+                      {formatDate(incident.reportedAt)}
                     </Typography>
                     <Typography variant="caption" color="textSecondary">
-                      {incident.reportedAt.toLocaleTimeString()}
+                      {formatDateTime(incident.reportedAt)}
                     </Typography>
                   </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <TableCell align="center">
+                    <Stack direction="row" spacing={1} justifyContent="center">
                       <Tooltip title="View Details">
                         <IconButton
                           size="small"
@@ -611,13 +665,13 @@ const IncidentManagement: React.FC = () => {
                       <Tooltip title="Delete Incident">
                         <IconButton
                           size="small"
-                          onClick={() => handleDeleteIncident(incident.id)}
+                          onClick={() => handleDeleteClick(incident)}
                           color="error"
                         >
                           <DeleteIcon />
                         </IconButton>
                       </Tooltip>
-                    </Box>
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
@@ -640,6 +694,167 @@ const IncidentManagement: React.FC = () => {
         </Box>
       )}
 
+      {/* Create/Edit Dialog */}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          {viewMode ? 'View Incident' : selectedIncident ? 'Edit Incident' : 'Create Incident'}
+        </DialogTitle>
+        <DialogContent>
+          {viewMode ? (
+            <Box>
+              <Typography variant="h6" gutterBottom>{selectedIncident?.title}</Typography>
+              <Typography variant="body1" paragraph>{selectedIncident?.description}</Typography>
+                          <Grid container spacing={2}>
+              <Grid size={{ xs: 6 }}>
+                <Typography variant="subtitle2">Category: {selectedIncident?.category}</Typography>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <Typography variant="subtitle2">Severity: {selectedIncident?.severity}</Typography>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <Typography variant="subtitle2">Status: {selectedIncident?.status}</Typography>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <Typography variant="subtitle2">Priority: {selectedIncident?.priority}</Typography>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <Typography variant="subtitle2">Location: {selectedIncident?.location}</Typography>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <Typography variant="subtitle2">Reported: {selectedIncident?.reportedAt}</Typography>
+              </Grid>
+            </Grid>
+            </Box>
+          ) : (
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label="Title"
+                  value={formData.title}
+                  onChange={(e) => handleFormChange('title', e.target.value)}
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label="Description"
+                  value={formData.description}
+                  onChange={(e) => handleFormChange('description', e.target.value)}
+                  multiline
+                  rows={3}
+                  required
+                />
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <FormControl fullWidth required>
+                  <InputLabel>Category</InputLabel>
+                  <Select
+                    value={formData.category}
+                    onChange={(e) => handleFormChange('category', e.target.value)}
+                    label="Category"
+                  >
+                    {categories.map((category) => (
+                      <MenuItem key={category.id} value={category.name}>
+                        {category.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <FormControl fullWidth required>
+                  <InputLabel>Severity</InputLabel>
+                  <Select
+                    value={formData.severity}
+                    onChange={(e) => handleFormChange('severity', e.target.value)}
+                    label="Severity"
+                  >
+                    <MenuItem value="low">Low</MenuItem>
+                    <MenuItem value="medium">Medium</MenuItem>
+                    <MenuItem value="high">High</MenuItem>
+                    <MenuItem value="critical">Critical</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <FormControl fullWidth required>
+                  <InputLabel>Priority</InputLabel>
+                  <Select
+                    value={formData.priority}
+                    onChange={(e) => handleFormChange('priority', e.target.value)}
+                    label="Priority"
+                  >
+                    <MenuItem value="low">Low</MenuItem>
+                    <MenuItem value="medium">Medium</MenuItem>
+                    <MenuItem value="high">High</MenuItem>
+                    <MenuItem value="urgent">Urgent</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <FormControl fullWidth>
+                  <InputLabel>Assignee</InputLabel>
+                  <Select
+                    value={formData.assigneeId}
+                    onChange={(e) => handleFormChange('assigneeId', e.target.value)}
+                    label="Assignee"
+                  >
+                    <MenuItem value="">Unassigned</MenuItem>
+                    {users.map((user) => (
+                      <MenuItem key={user.id} value={user.id}>
+                        {user.firstName} {user.lastName}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  label="Location"
+                  value={formData.location}
+                  onChange={(e) => handleFormChange('location', e.target.value)}
+                  required
+                />
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDialogOpen(false)}>
+            {viewMode ? 'Close' : 'Cancel'}
+          </Button>
+          {!viewMode && (
+            <Button
+              variant="contained"
+              onClick={handleSaveIncident}
+              disabled={!formData.title || !formData.description || !formData.category}
+            >
+              {selectedIncident ? 'Update' : 'Create'}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete}>
+        <DialogTitle>Delete Incident</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete "{incidentToDelete?.title}"?
+            This action cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDelete}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleConfirmDelete}>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* Snackbar */}
       <Snackbar
         open={snackbar.open}
@@ -654,7 +869,7 @@ const IncidentManagement: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </Container>
   );
 };
 
