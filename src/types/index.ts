@@ -230,10 +230,17 @@ export interface Document {
   uploadedAt: string;
   fileSize: number;
   fileType: string;
+  fileName?: string;
+  fileData?: string; // Base64 encoded file data
   url: string;
   tags: string[];
   accessLevel: 'public' | 'private' | 'restricted';
   expiryDate?: string;
+  description?: string;
+  version?: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type DocumentType = 'policy' | 'contract' | 'certificate' | 'report' | 'form' | 'other';
@@ -349,7 +356,7 @@ export interface DeviceInfo {
   userAgent: string;
 }
 
-export interface Location {
+export interface LocationData {
   latitude: number;
   longitude: number;
   accuracy: number;

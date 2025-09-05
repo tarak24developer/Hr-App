@@ -184,12 +184,16 @@ class FirebaseService {
     data: Partial<T>
   ): Promise<ApiResponse<T>> {
     try {
+      console.log('Updating document:', { collectionName, docId, data });
       const docRef = this.getDocumentRef(collectionName, docId);
       if (!docRef) {
+        console.error('Document reference not found');
         return { success: false, error: 'Firebase not available' };
       }
 
+      console.log('Document reference:', docRef);
       await updateDoc(docRef, data as any);
+      console.log('Document updated successfully');
       
       // Get updated document
       const updatedDoc = await getDoc(docRef);

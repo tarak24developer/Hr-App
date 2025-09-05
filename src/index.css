@@ -19,6 +19,13 @@
   padding: 1rem;
 }
 
+/* Backdrop blur styles for modals */
+.backdrop-blur-modal {
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 .fallback-rounded {
   border-radius: 0.25rem;
 }
