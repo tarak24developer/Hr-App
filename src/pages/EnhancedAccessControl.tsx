@@ -822,12 +822,7 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSuccess }) => {
   return (
     <>
       <div 
-        className="fixed inset-0 z-40"
-        style={{ 
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)'
-        }}
+        className="fixed inset-0 z-40 backdrop-blur-modal"
         onClick={onClose}
       />
       
@@ -843,6 +838,8 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSuccess }) => {
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              title="Close dialog"
+              aria-label="Close dialog"
             >
               <X className="h-6 w-6" />
             </button>
@@ -851,10 +848,11 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSuccess }) => {
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   First Name
                 </label>
                 <input
+                  id="firstName"
                   type="text"
                   value={formData.firstName}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, firstName: e.target.value }))}
@@ -863,10 +861,11 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSuccess }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Last Name
                 </label>
                 <input
+                  id="lastName"
                   type="text"
                   value={formData.lastName}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, lastName: e.target.value }))}
@@ -877,10 +876,11 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSuccess }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Email
               </label>
               <input
+                id="email"
                 type="email"
                 value={formData.email}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, email: e.target.value }))}
@@ -890,11 +890,12 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSuccess }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Password
               </label>
               <div className="relative">
                 <input
+                  id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, password: e.target.value }))}
@@ -904,6 +905,8 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSuccess }) => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center"
                 >
                   {showPassword ? (
@@ -917,13 +920,15 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSuccess }) => {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="role" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Role
                 </label>
                 <select
+                  id="role"
                   value={formData.role}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, role: e.target.value as UserRole }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  aria-label="Select user role"
                 >
                   <option value="employee">Employee</option>
                   <option value="manager">Manager</option>
@@ -931,13 +936,15 @@ const AddUserModal: React.FC<AddUserModalProps> = ({ onClose, onSuccess }) => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="status" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Status
                 </label>
                 <select
+                  id="status"
                   value={formData.status}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, status: e.target.value as 'active' | 'inactive' }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  aria-label="Select user status"
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
@@ -1018,12 +1025,7 @@ const AddRoleModal: React.FC<AddRoleModalProps> = ({ permissions, onClose, onSuc
   return (
     <>
       <div 
-        className="fixed inset-0 z-40"
-        style={{ 
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)'
-        }}
+        className="fixed inset-0 z-40 backdrop-blur-modal"
         onClick={onClose}
       />
       
@@ -1039,6 +1041,8 @@ const AddRoleModal: React.FC<AddRoleModalProps> = ({ permissions, onClose, onSuc
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              title="Close dialog"
+              aria-label="Close dialog"
             >
               <X className="h-6 w-6" />
             </button>
@@ -1046,10 +1050,11 @@ const AddRoleModal: React.FC<AddRoleModalProps> = ({ permissions, onClose, onSuc
 
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="roleName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Role Name
               </label>
               <input
+                id="roleName"
                 type="text"
                 value={formData.name}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, name: e.target.value }))}
@@ -1059,10 +1064,11 @@ const AddRoleModal: React.FC<AddRoleModalProps> = ({ permissions, onClose, onSuc
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Description
               </label>
               <textarea
+                id="description"
                 value={formData.description}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, description: e.target.value }))}
                 rows={3}
@@ -1079,6 +1085,7 @@ const AddRoleModal: React.FC<AddRoleModalProps> = ({ permissions, onClose, onSuc
                   <label key={permission.id} className="flex items-center space-x-2 p-1">
                     <input
                       type="checkbox"
+                      id={`permission-${permission.id}`}
                       checked={formData.permissions.includes(permission.id)}
                       onChange={(e) => {
                         if (e.target.checked) {
@@ -1097,10 +1104,11 @@ const AddRoleModal: React.FC<AddRoleModalProps> = ({ permissions, onClose, onSuc
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Priority
                 </label>
                 <input
+                  id="priority"
                   type="number"
                   min="1"
                   value={formData.priority}
@@ -1110,12 +1118,13 @@ const AddRoleModal: React.FC<AddRoleModalProps> = ({ permissions, onClose, onSuc
               </div>
               <div className="flex items-center space-x-2 pt-6">
                 <input
+                  id="isActive"
                   type="checkbox"
                   checked={formData.isActive}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, isActive: e.target.checked }))}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</label>
+                <label htmlFor="isActive" className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</label>
               </div>
             </div>
 
@@ -1190,12 +1199,7 @@ const AddPermissionModal: React.FC<AddPermissionModalProps> = ({ onClose, onSucc
   return (
     <>
       <div 
-        className="fixed inset-0 z-40"
-        style={{ 
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)'
-        }}
+        className="fixed inset-0 z-40 backdrop-blur-modal"
         onClick={onClose}
       />
       
@@ -1211,6 +1215,8 @@ const AddPermissionModal: React.FC<AddPermissionModalProps> = ({ onClose, onSucc
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              title="Close dialog"
+              aria-label="Close dialog"
             >
               <X className="h-6 w-6" />
             </button>
@@ -1218,10 +1224,11 @@ const AddPermissionModal: React.FC<AddPermissionModalProps> = ({ onClose, onSucc
 
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="permissionName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Permission Name
               </label>
               <input
+                id="permissionName"
                 type="text"
                 value={formData.name}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, name: e.target.value }))}
@@ -1231,10 +1238,11 @@ const AddPermissionModal: React.FC<AddPermissionModalProps> = ({ onClose, onSucc
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="permissionDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Description
               </label>
               <textarea
+                id="permissionDescription"
                 value={formData.description}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, description: e.target.value }))}
                 rows={2}
@@ -1244,10 +1252,11 @@ const AddPermissionModal: React.FC<AddPermissionModalProps> = ({ onClose, onSucc
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="resource" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Resource
                 </label>
                 <input
+                  id="resource"
                   type="text"
                   value={formData.resource}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, resource: e.target.value }))}
@@ -1256,10 +1265,11 @@ const AddPermissionModal: React.FC<AddPermissionModalProps> = ({ onClose, onSucc
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="action" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Action
                 </label>
                 <input
+                  id="action"
                   type="text"
                   value={formData.action}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, action: e.target.value }))}
@@ -1270,10 +1280,11 @@ const AddPermissionModal: React.FC<AddPermissionModalProps> = ({ onClose, onSucc
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Category
               </label>
               <input
+                id="category"
                 type="text"
                 value={formData.category}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, category: e.target.value }))}
@@ -1284,12 +1295,13 @@ const AddPermissionModal: React.FC<AddPermissionModalProps> = ({ onClose, onSucc
 
             <div className="flex items-center space-x-2">
               <input
+                id="permissionIsActive"
                 type="checkbox"
                 checked={formData.isActive}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, isActive: e.target.checked }))}
                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</label>
+              <label htmlFor="permissionIsActive" className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</label>
             </div>
 
             <div className="flex items-center justify-end space-x-3 pt-4">
@@ -1356,12 +1368,7 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
   return (
     <>
       <div 
-        className="fixed inset-0 z-40"
-        style={{ 
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)'
-        }}
+        className="fixed inset-0 z-40 backdrop-blur-modal"
         onClick={onClose}
       />
       
@@ -1377,6 +1384,8 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              title="Close dialog"
+              aria-label="Close dialog"
             >
               <X className="h-6 w-6" />
             </button>
@@ -1387,10 +1396,11 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="editFirstName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       First Name
                     </label>
                     <input
+                      id="editFirstName"
                       type="text"
                       value={formData.firstName || ''}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, firstName: e.target.value }))}
@@ -1398,10 +1408,11 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="editLastName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Last Name
                     </label>
                     <input
+                      id="editLastName"
                       type="text"
                       value={formData.lastName || ''}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, lastName: e.target.value }))}
@@ -1410,25 +1421,28 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="editEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Email
                   </label>
                   <input
+                    id="editEmail"
                     type="email"
                     value={formData.email || ''}
-                      onChange={(e) => setFormData((prev: any) => ({ ...prev, email: e.target.value }))}
+                    onChange={(e) => setFormData((prev: any) => ({ ...prev, email: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="editRole" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Role
                     </label>
                     <select
+                      id="editRole"
                       value={formData.role || 'employee'}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, role: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      aria-label="Select user role"
                     >
                       <option value="employee">Employee</option>
                       <option value="manager">Manager</option>
@@ -1436,13 +1450,15 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="editStatus" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Status
                     </label>
                     <select
+                      id="editStatus"
                       value={formData.status || 'active'}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, status: e.target.value }))}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      aria-label="Select user status"
                     >
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
@@ -1455,10 +1471,11 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
             {type === 'role' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="editRoleName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Role Name
                   </label>
                   <input
+                    id="editRoleName"
                     type="text"
                     value={formData.name || ''}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, name: e.target.value }))}
@@ -1466,35 +1483,38 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="editRoleDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Description
                   </label>
                   <textarea
+                    id="editRoleDescription"
                     value={formData.description || ''}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, description: e.target.value }))}
                     rows={3}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.isActive}
+                                  <div className="flex items-center space-x-2">
+                    <input
+                      id="editRoleIsActive"
+                      type="checkbox"
+                      checked={formData.isActive}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, isActive: e.target.checked }))}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</label>
-                </div>
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="editRoleIsActive" className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</label>
+                  </div>
               </>
             )}
 
             {type === 'permission' && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="editPermissionName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Permission Name
                   </label>
                   <input
+                    id="editPermissionName"
                     type="text"
                     value={formData.name || ''}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, name: e.target.value }))}
@@ -1502,10 +1522,11 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="editPermissionDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Description
                   </label>
                   <textarea
+                    id="editPermissionDescription"
                     value={formData.description || ''}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, description: e.target.value }))}
                     rows={2}
@@ -1514,10 +1535,11 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="editResource" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Resource
                     </label>
                     <input
+                      id="editResource"
                       type="text"
                       value={formData.resource || ''}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, resource: e.target.value }))}
@@ -1525,10 +1547,11 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    <label htmlFor="editAction" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Action
                     </label>
                     <input
+                      id="editAction"
                       type="text"
                       value={formData.action || ''}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, action: e.target.value }))}
@@ -1538,12 +1561,13 @@ const EditModal: React.FC<EditModalProps> = ({ item, type, onClose, onSuccess })
                 </div>
                 <div className="flex items-center space-x-2">
                   <input
+                    id="editPermissionIsActive"
                     type="checkbox"
                     checked={formData.isActive}
                       onChange={(e) => setFormData((prev: any) => ({ ...prev, isActive: e.target.checked }))}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</label>
+                  <label htmlFor="editPermissionIsActive" className="text-sm font-medium text-gray-700 dark:text-gray-300">Active</label>
                 </div>
               </>
             )}

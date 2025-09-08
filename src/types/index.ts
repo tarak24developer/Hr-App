@@ -206,16 +206,133 @@ export interface Assessment {
 export interface Incident {
   id: string;
   title: string;
-  type: IncidentType;
-  severity: 'low' | 'medium' | 'high' | 'critical';
   description: string;
-  reportedBy: string;
-  reportedAt: string;
-  assignedTo?: string;
+  category: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
   status: 'open' | 'investigating' | 'resolved' | 'closed';
-  resolution?: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  reporterId: string;
+  assigneeId?: string;
+  location: string;
+  reportedAt: string;
+  updatedAt: string;
   resolvedAt?: string;
-  attachments?: string[];
+  attachments: string[];
+  tags: string[];
+  notes: IncidentNote[];
+  isActive?: boolean;
+  createdAt?: string;
+}
+
+export interface IncidentNote {
+  id: string;
+  content: string;
+  authorId: string;
+  createdAt: string;
+  isInternal: boolean;
+}
+
+export interface IncidentCategory {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface IncidentFormData {
+  title: string;
+  description: string;
+  category: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  assigneeId: string;
+  location: string;
+  tags: string[];
+}
+
+export interface IncidentStats {
+  total: number;
+  open: number;
+  investigating: number;
+  resolved: number;
+  closed: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  urgent: number;
+  resolvedToday: number;
+  byCategory: Record<string, number>;
+  bySeverity: Record<string, number>;
+  byStatus: Record<string, number>;
+  byPriority: Record<string, number>;
+}
+
+// Notification interfaces
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error' | 'system' | 'user' | 'work' | 'event' | 'assignment' | 'payment' | 'security';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: string;
+  senderId: string;
+  recipientId: string;
+  isRead: boolean;
+  isPinned: boolean;
+  isArchived: boolean;
+  createdAt: string;
+  readAt?: string;
+  expiresAt?: string;
+  metadata: Record<string, any>;
+  actions?: NotificationAction[];
+  isActive?: boolean;
+  updatedAt?: string;
+}
+
+export interface NotificationAction {
+  id: string;
+  label: string;
+  action: string;
+  url?: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+}
+
+export interface NotificationCategory {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface NotificationFormData {
+  title: string;
+  message: string;
+  type: string;
+  priority: string;
+  category: string;
+  recipientId: string;
+  expiresAt?: string;
+  metadata: Record<string, any>;
+  actions: NotificationAction[];
+}
+
+export interface NotificationStats {
+  total: number;
+  unread: number;
+  pinned: number;
+  today: number;
+  byType: Record<string, number>;
+  byPriority: Record<string, number>;
+  byCategory: Record<string, number>;
+  byStatus: Record<string, number>;
 }
 
 export type IncidentType = 'security' | 'safety' | 'harassment' | 'misconduct' | 'other';
@@ -230,29 +347,87 @@ export interface Document {
   uploadedAt: string;
   fileSize: number;
   fileType: string;
+  fileName?: string;
+  fileData?: string; // Base64 encoded file data
   url: string;
   tags: string[];
   accessLevel: 'public' | 'private' | 'restricted';
   expiryDate?: string;
+  description?: string;
+  version?: number;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type DocumentType = 'policy' | 'contract' | 'certificate' | 'report' | 'form' | 'other';
 
-// Notification Types
-export interface Notification {
+// Announcement Types
+export interface Announcement {
   id: string;
-  type: NotificationType;
   title: string;
-  message: string;
-  recipientId: string;
-  senderId?: string;
+  content: string;
+  summary: string;
+  type: 'info' | 'warning' | 'error' | 'success' | 'general' | 'urgent' | 'maintenance' | 'update';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: string;
+  authorId: string;
+  targetAudience: string[];
+  isPublished: boolean;
+  isPinned: boolean;
+  isArchived: boolean;
+  publishDate: string;
+  expiryDate?: string;
   createdAt: string;
-  readAt?: string;
-  actionUrl?: string;
-  priority: 'low' | 'medium' | 'high';
+  updatedAt: string;
+  attachments: string[];
+  tags: string[];
+  readCount: number;
+  likeCount: number;
+  commentCount: number;
+  isActive?: boolean;
 }
 
-export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'reminder';
+export interface AnnouncementCategory {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AnnouncementFormData {
+  title: string;
+  content: string;
+  summary: string;
+  type: 'info' | 'warning' | 'error' | 'success' | 'general' | 'urgent' | 'maintenance' | 'update';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: string;
+  targetAudience: string[];
+  isPublished: boolean;
+  isPinned: boolean;
+  publishDate: string;
+  expiryDate?: string;
+  attachments: string[];
+  tags: string[];
+}
+
+export interface AnnouncementStats {
+  total: number;
+  published: number;
+  drafts: number;
+  pinned: number;
+  archived: number;
+  today: number;
+  byType: Record<string, number>;
+  byPriority: Record<string, number>;
+  byCategory: Record<string, number>;
+  byStatus: Record<string, number>;
+}
+
 
 // API Response Types
 export interface ApiResponse<T = any> {
@@ -306,6 +481,8 @@ export interface UserSettings {
   privacy: PrivacySettings;
 }
 
+export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'system' | 'user' | 'work' | 'event' | 'assignment' | 'payment' | 'security';
+
 export interface NotificationSettings {
   email: boolean;
   push: boolean;
@@ -349,7 +526,7 @@ export interface DeviceInfo {
   userAgent: string;
 }
 
-export interface Location {
+export interface LocationData {
   latitude: number;
   longitude: number;
   accuracy: number;

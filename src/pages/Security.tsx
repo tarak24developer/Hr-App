@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Shield, Users, Key, Lock, RefreshCw, Edit, X, Eye, EyeOff, Save, AlertTriangle } from 'lucide-react';
+import { Shield, Users, Key, Lock, RefreshCw, Edit, Eye, EyeOff, Save, AlertTriangle } from 'lucide-react';
 import { collection, onSnapshot, orderBy, query, updateDoc, doc, limit as fsLimit } from 'firebase/firestore';
 import type { User, UserRole } from '@/types';
 import authService from '@/services/authService';
@@ -231,6 +231,8 @@ const Security: React.FC = () => {
                         onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
                         disabled={workingUserId === u.id}
                         className="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md px-2 py-1 text-sm text-gray-900 dark:text-gray-100"
+                        title={`Change role for ${u.firstName || u.lastName ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() : 'user'}`}
+                        aria-label={`Change role for ${u.firstName || u.lastName ? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim() : 'user'}`}
                       >
                         {(['admin','hr','manager','employee'] as UserRole[]).map(r => (
                           <option value={r} key={r}>{r}</option>
@@ -260,17 +262,8 @@ const Security: React.FC = () => {
                 <button
                         onClick={() => handleEditUser(u)}
                         disabled={workingUserId === u.id}
-                        className="px-3 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-2 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed min-w-[60px] min-h-[28px] border border-blue-700"
                         title="Edit user settings"
-                        style={{ 
-                          minWidth: '60px', 
-                          minHeight: '28px',
-                          backgroundColor: '#2563eb',
-                          border: '1px solid #1d4ed8',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}
                       >
                         <Edit className="w-3 h-3" />
                         <span>Edit</span>
@@ -389,12 +382,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose
     <>
       {/* Backdrop with blur */}
       <div 
-        className="fixed inset-0 z-40"
-        style={{ 
-          backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)'
-        }}
+        className="fixed inset-0 z-40 backdrop-blur-modal"
         onClick={onClose}
       />
       
@@ -445,11 +433,15 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Enter new password (min 6 characters)"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      id="newPassword"
+                      aria-label="Enter new password (minimum 6 characters)"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      title={showPassword ? "Hide password" : "Show password"}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? (
                         <EyeOff className="h-5 w-5 text-gray-400" />
@@ -508,6 +500,8 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose
                   value={userRole}
                   onChange={(e) => setUserRole(e.target.value as UserRole)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  title="Select user role"
+                  aria-label="Select user role"
                 >
                   <option value="admin">Admin</option>
                   <option value="hr">HR</option>
@@ -524,6 +518,8 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose
                   value={userStatus}
                   onChange={(e) => setUserStatus(e.target.value as 'active' | 'inactive')}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  title="Select user status"
+                  aria-label="Select user status"
                 >
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
@@ -532,12 +528,14 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose
             </div>
 
             <div>
-              <label className="flex items-center space-x-3">
+              <label className="flex items-center space-x-3" htmlFor="has2FA">
                 <input
                   type="checkbox"
+                  id="has2FA"
                   checked={has2FA}
                   onChange={(e) => setHas2FA(e.target.checked)}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  aria-label="Enable two-factor authentication"
                 />
                 <span className="text-sm font-medium text-gray-700">
                   Enable Two-Factor Authentication

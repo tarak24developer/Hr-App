@@ -1,22 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Paper,
+  Typography,
+  Button,
+  TextField,
+  Alert,
+  Snackbar,
+  Container,
+  Stack,
+  Avatar,
+  Chip,
+  IconButton,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Switch
+} from '@mui/material';
 import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  Building, 
   Edit, 
   Save, 
   X, 
   Camera,
   Shield,
   Bell,
-  Key,
-  Trash2
+  UserCircle,
+  Settings as SettingsIcon
 } from 'lucide-react';
-import { cn } from '@/utils/cn';
 import { useUser } from '@/stores/authStore';
+import userService from '@/services/userService';
+import { User as UserType } from '@/types';
 
 interface ProfileFormData {
   firstName: string;
@@ -24,37 +39,85 @@ interface ProfileFormData {
   email: string;
   phone: string;
   address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  dateOfBirth: string;
   department: string;
   position: string;
-  employeeId: string;
-  startDate: string;
+  hireDate: string;
+  status: 'active' | 'inactive' | 'terminated';
+  emergencyContact: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
 }
 
 const Profile: React.FC = () => {
-  const user = useUser();
+  const currentUser = useUser();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications' | 'preferences'>('profile');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [snackbar, setSnackbar] = useState({ 
+    open: false, 
+    message: '', 
+    severity: 'success' as 'success' | 'error' 
+  });
 
   const [formData, setFormData] = useState<ProfileFormData>({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    email: user?.email || '',
-    phone: '+1 (555) 123-4567',
-    address: '123 Main Street',
-    city: 'New York',
-    state: 'NY',
-    zipCode: '10001',
-    dateOfBirth: '1990-01-01',
-    department: 'Engineering',
-    position: 'Senior Developer',
-    employeeId: 'EMP001',
-    startDate: '2020-01-15'
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    address: '',
+    department: '',
+    position: '',
+    hireDate: '',
+    status: 'active',
+    emergencyContact: {
+      name: '',
+      phone: '',
+      relationship: ''
+    }
   });
+
+  // Load user data from Firebase
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!currentUser?.id) return;
+      
+      try {
+        setLoading(true);
+        const result = await userService.getUser(currentUser.id);
+        if (result.success && result.data) {
+          const userData = result.data as UserType;
+          setFormData({
+            firstName: userData.firstName || '',
+            lastName: userData.lastName || '',
+            email: userData.email || '',
+            phone: userData.phone || '',
+            address: userData.address || '',
+            department: userData.department || '',
+            position: userData.position || '',
+            hireDate: userData.hireDate || '',
+            status: userData.status || 'active',
+            emergencyContact: userData.emergencyContact || {
+              name: '',
+              phone: '',
+              relationship: ''
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error loading user data:', err);
+        setError('Failed to load profile data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [currentUser?.id]);
 
   const handleInputChange = (field: keyof ProfileFormData, value: string) => {
     setFormData(prev => ({
@@ -63,29 +126,79 @@ const Profile: React.FC = () => {
     }));
   };
 
-  const handleSave = () => {
-    // In real app, this would save to Firebase
-    console.log('Saving profile data:', formData);
+  const handleEmergencyContactChange = (field: keyof ProfileFormData['emergencyContact'], value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      emergencyContact: {
+        ...prev.emergencyContact,
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSave = async () => {
+    if (!currentUser?.id) return;
+    
+    try {
+      setSaving(true);
+      setError('');
+      
+      const updateData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        address: formData.address,
+        department: formData.department,
+        position: formData.position,
+        emergencyContact: formData.emergencyContact,
+        updatedAt: new Date().toISOString()
+      };
+
+      const result = await userService.updateUser(currentUser.id, updateData);
+      
+      if (result.success) {
+        setSnackbar({
+          open: true,
+          message: 'Profile updated successfully',
+          severity: 'success'
+        });
     setIsEditing(false);
+      } else {
+        throw new Error(result.error || 'Failed to update profile');
+      }
+    } catch (err: any) {
+      console.error('Error saving profile:', err);
+      setError(err.message || 'Failed to save profile');
+      setSnackbar({
+        open: true,
+        message: err.message || 'Failed to save profile',
+        severity: 'error'
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
     // Reset form data to original values
+    if (currentUser) {
     setFormData({
-      firstName: user?.firstName || '',
-      lastName: user?.lastName || '',
-      email: user?.email || '',
-      phone: '+1 (555) 123-4567',
-      address: '123 Main Street',
-      city: 'New York',
-      state: 'NY',
-      zipCode: '10001',
-      dateOfBirth: '1990-01-01',
-      department: 'Engineering',
-      position: 'Senior Developer',
-      employeeId: 'EMP001',
-      startDate: '2020-01-15'
-    });
+        firstName: currentUser.firstName || '',
+        lastName: currentUser.lastName || '',
+        email: currentUser.email || '',
+        phone: currentUser.phone || '',
+        address: currentUser.address || '',
+        department: currentUser.department || '',
+        position: currentUser.position || '',
+        hireDate: currentUser.hireDate || '',
+        status: currentUser.status || 'active',
+        emergencyContact: currentUser.emergencyContact || {
+          name: '',
+          phone: '',
+          relationship: ''
+        }
+      });
+    }
     setIsEditing(false);
   };
 
@@ -97,491 +210,480 @@ const Profile: React.FC = () => {
   };
 
   const tabs = [
-    { id: 'profile', name: 'Profile', icon: User },
+    { id: 'profile', name: 'Profile', icon: UserCircle },
     { id: 'security', name: 'Security', icon: Shield },
     { id: 'notifications', name: 'Notifications', icon: Bell },
-    { id: 'preferences', name: 'Preferences', icon: Key }
+    { id: 'preferences', name: 'Preferences', icon: SettingsIcon }
   ] as const;
 
+  const handleSnackbarClose = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
+
+  if (loading) {
+    return (
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
+
   return (
-    <div className="space-y-6 p-4 sm:p-6">
+    <Container maxWidth="lg" sx={{ py: 4 }}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
-        <p className="text-gray-600">Manage your personal information and preferences</p>
-      </div>
+      <Box sx={{ mb: 4 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
+          <Box>
+            <Typography variant="h4" component="h1" gutterBottom>
+              Profile
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              Manage your personal information and preferences
+            </Typography>
+          </Box>
         {!isEditing && (
-          <button
+            <Button
+              variant="contained"
+              startIcon={<Edit size={20} />}
             onClick={() => setIsEditing(true)}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
+              sx={{ minWidth: 140 }}
           >
-            <Edit className="w-4 h-4" />
-            <span>Edit Profile</span>
-          </button>
+              Edit Profile
+            </Button>
         )}
-      </div>
+        </Box>
 
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button
+                <Button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors',
-                  activeTab === tab.id
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{tab.name}</span>
-              </button>
+                  startIcon={<Icon size={18} />}
+                  variant={activeTab === tab.id ? 'contained' : 'text'}
+                  sx={{
+                    borderRadius: 0,
+                    borderBottom: activeTab === tab.id ? 2 : 0,
+                    borderColor: 'primary.main',
+                    minWidth: 120,
+                    justifyContent: 'flex-start'
+                  }}
+                >
+                  {tab.name}
+                </Button>
             );
           })}
-        </nav>
-      </div>
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
 
       {/* Profile Tab */}
       {activeTab === 'profile' && (
-        <div className="space-y-6">
+        <Stack spacing={3}>
           {/* Avatar Section */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6">
-              <div className="relative">
-                <div className="w-24 h-24 bg-primary-100 rounded-full flex items-center justify-center">
-                  {avatarFile ? (
-                    <img
-                      src={URL.createObjectURL(avatarFile)}
-                      alt="Profile avatar"
-                      className="w-24 h-24 rounded-full object-cover"
-                    />
-                  ) : (
-                    <User className="w-12 h-12 text-primary-600" />
-                  )}
-                </div>
+          <Paper sx={{ p: 3 }}>
+            <Box display="flex" alignItems="center" gap={3}>
+              <Box position="relative">
+                <Avatar
+                  src={avatarFile ? URL.createObjectURL(avatarFile) : ''}
+                  sx={{ width: 80, height: 80, bgcolor: 'primary.main' }}
+                >
+                  <UserCircle size={40} />
+                </Avatar>
                 {isEditing && (
-                  <label className="absolute bottom-0 right-0 bg-primary-600 text-white p-2 rounded-full cursor-pointer hover:bg-primary-700 transition-colors">
-                    <Camera className="w-4 h-4" />
+                  <IconButton
+                    component="label"
+                    sx={{
+                      position: 'absolute',
+                      bottom: -5,
+                      right: -5,
+                      bgcolor: 'primary.main',
+                      color: 'white',
+                      '&:hover': { bgcolor: 'primary.dark' },
+                      width: 32,
+                      height: 32
+                    }}
+                  >
+                    <Camera size={16} />
                     <input
                       type="file"
                       accept="image/*"
                       onChange={handleAvatarChange}
-                      className="hidden"
+                      hidden
                     />
-                  </label>
+                  </IconButton>
                 )}
-              </div>
-              <div className="text-center sm:text-left">
-                <h2 className="text-xl font-semibold text-gray-900">
+              </Box>
+              <Box>
+                <Typography variant="h5" component="h2" gutterBottom>
                   {formData.firstName} {formData.lastName}
-                </h2>
-                <p className="text-gray-600">{formData.position}</p>
-                <p className="text-sm text-gray-500">{formData.department}</p>
-              </div>
-            </div>
-          </div>
+                </Typography>
+                <Typography variant="body1" color="text.secondary" gutterBottom>
+                  {formData.position}
+                </Typography>
+                <Chip 
+                  label={formData.department} 
+                  size="small" 
+                  color="primary" 
+                  variant="outlined"
+                />
+              </Box>
+            </Box>
+          </Paper>
 
           {/* Personal Information */}
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  First Name
-                </label>
-                                 <input
-                   type="text"
-                   value={formData.firstName}
-                   onChange={(e) => handleInputChange('firstName', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="First Name"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Last Name
-                </label>
-                                 <input
-                   type="text"
-                   value={formData.lastName}
-                   onChange={(e) => handleInputChange('lastName', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="Last Name"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   Email
-                 </label>
-                 <input
-                   type="email"
-                   value={formData.email}
-                   onChange={(e) => handleInputChange('email', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="Email"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   Phone
-                 </label>
-                 <input
-                   type="tel"
-                   value={formData.phone}
-                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="Phone"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   Date of Birth
-                 </label>
-                 <input
-                   type="date"
-                   value={formData.dateOfBirth}
-                   onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="Date of Birth"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-             </div>
-           </div>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
+              Personal Information
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <TextField
+                  label="First Name"
+                  value={formData.firstName}
+                  onChange={(e) => handleInputChange('firstName', e.target.value)}
+                  disabled={!isEditing}
+                  sx={{ flex: 1, minWidth: 200 }}
+                  required
+                />
+                <TextField
+                  label="Last Name"
+                  value={formData.lastName}
+                  onChange={(e) => handleInputChange('lastName', e.target.value)}
+                  disabled={!isEditing}
+                  sx={{ flex: 1, minWidth: 200 }}
+                  required
+                />
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <TextField
+                  label="Email"
+                  type="email"
+                  value={formData.email}
+                  disabled
+                  sx={{ flex: 1, minWidth: 200 }}
+                  helperText="Email cannot be changed"
+                />
+                <TextField
+                  label="Phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  disabled={!isEditing}
+                  sx={{ flex: 1, minWidth: 200 }}
+                />
+              </Box>
+              <TextField
+                label="Address"
+                value={formData.address}
+                onChange={(e) => handleInputChange('address', e.target.value)}
+                disabled={!isEditing}
+                fullWidth
+                multiline
+                rows={2}
+              />
+            </Box>
+          </Paper>
 
-           {/* Address Information */}
-           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-             <h3 className="text-lg font-medium text-gray-900 mb-4">Address Information</h3>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div className="md:col-span-2">
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   Street Address
-                 </label>
-                 <input
-                   type="text"
-                   value={formData.address}
-                   onChange={(e) => handleInputChange('address', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="Street Address"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   City
-                 </label>
-                 <input
-                   type="text"
-                   value={formData.city}
-                   onChange={(e) => handleInputChange('city', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="City"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   State
-                 </label>
-                 <input
-                   type="text"
-                   value={formData.state}
-                   onChange={(e) => handleInputChange('state', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="State"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   ZIP Code
-                 </label>
-                 <input
-                   type="text"
-                   value={formData.zipCode}
-                   onChange={(e) => handleInputChange('zipCode', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="ZIP Code"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-             </div>
-           </div>
 
-           {/* Employment Information */}
-           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-             <h3 className="text-lg font-medium text-gray-900 mb-4">Employment Information</h3>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   Employee ID
-                 </label>
-                 <input
-                   type="text"
-                   value={formData.employeeId}
-                   onChange={(e) => handleInputChange('employeeId', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="Employee ID"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   Start Date
-                 </label>
-                 <input
-                   type="date"
-                   value={formData.startDate}
-                   onChange={(e) => handleInputChange('startDate', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="Start Date"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   Department
-                 </label>
-                 <input
-                   type="text"
-                   value={formData.department}
-                   onChange={(e) => handleInputChange('department', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="Department"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                   Position
-                 </label>
-                 <input
-                   type="text"
-                   value={formData.position}
-                   onChange={(e) => handleInputChange('position', e.target.value)}
-                   disabled={!isEditing}
-                   aria-label="Position"
-                   className={cn(
-                     'w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent',
-                     isEditing 
-                       ? 'border-gray-300' 
-                       : 'border-gray-200 bg-gray-50 text-gray-500'
-                   )}
-                 />
-               </div>
-             </div>
-           </div>
+          {/* Employment Information */}
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
+              Employment Information
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <TextField
+                  label="Department"
+                  value={formData.department}
+                  onChange={(e) => handleInputChange('department', e.target.value)}
+                  disabled={!isEditing}
+                  sx={{ flex: 1, minWidth: 200 }}
+                  required
+                />
+                <TextField
+                  label="Position"
+                  value={formData.position}
+                  onChange={(e) => handleInputChange('position', e.target.value)}
+                  disabled={!isEditing}
+                  sx={{ flex: 1, minWidth: 200 }}
+                  required
+                />
+              </Box>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <TextField
+                  label="Hire Date"
+                  type="date"
+                  value={formData.hireDate}
+                  disabled
+                  sx={{ flex: 1, minWidth: 200 }}
+                  InputLabelProps={{ shrink: true }}
+                  helperText="Hire date cannot be changed"
+                />
+                <FormControl sx={{ flex: 1, minWidth: 200 }} disabled>
+                  <InputLabel>Status</InputLabel>
+                  <Select
+                    value={formData.status}
+                    label="Status"
+                  >
+                    <MenuItem value="active">Active</MenuItem>
+                    <MenuItem value="inactive">Inactive</MenuItem>
+                    <MenuItem value="terminated">Terminated</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+            </Box>
+          </Paper>
+
+          {/* Emergency Contact */}
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
+              Emergency Contact
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <TextField
+                  label="Contact Name"
+                  value={formData.emergencyContact.name}
+                  onChange={(e) => handleEmergencyContactChange('name', e.target.value)}
+                  disabled={!isEditing}
+                  sx={{ flex: 1, minWidth: 200 }}
+                />
+                <TextField
+                  label="Phone Number"
+                  type="tel"
+                  value={formData.emergencyContact.phone}
+                  onChange={(e) => handleEmergencyContactChange('phone', e.target.value)}
+                  disabled={!isEditing}
+                  sx={{ flex: 1, minWidth: 200 }}
+                />
+              </Box>
+              <TextField
+                label="Relationship"
+                value={formData.emergencyContact.relationship}
+                onChange={(e) => handleEmergencyContactChange('relationship', e.target.value)}
+                disabled={!isEditing}
+                fullWidth
+              />
+            </Box>
+          </Paper>
 
           {/* Action Buttons */}
           {isEditing && (
-            <div className="flex justify-end space-x-3">
-              <button
+            <Box display="flex" justifyContent="flex-end" gap={2} sx={{ mt: 3 }}>
+              <Button
+                variant="outlined"
+                startIcon={<X size={18} />}
                 onClick={handleCancel}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
+                disabled={saving}
               >
-                <X className="w-4 h-4" />
-                <span>Cancel</span>
-              </button>
-              <button
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={saving ? <CircularProgress size={18} /> : <Save size={18} />}
                 onClick={handleSave}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2"
+                disabled={saving}
               >
-                <Save className="w-4 h-4" />
-                <span>Save Changes</span>
-              </button>
-            </div>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </Box>
           )}
-        </div>
+        </Stack>
       )}
 
       {/* Security Tab */}
       {activeTab === 'security' && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Security Settings</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <h4 className="font-medium text-gray-900">Change Password</h4>
-                <p className="text-sm text-gray-600">Update your password regularly for security</p>
-              </div>
-              <button className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-                Change
-              </button>
-            </div>
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <h4 className="font-medium text-gray-900">Two-Factor Authentication</h4>
-                <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
-              </div>
-              <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                Enable
-              </button>
-            </div>
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <h4 className="font-medium text-gray-900">Login Sessions</h4>
-                <p className="text-sm text-gray-600">Manage your active login sessions</p>
-              </div>
-              <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                View
-              </button>
-            </div>
-          </div>
-        </div>
+        <Stack spacing={3}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
+              Security Settings
+            </Typography>
+            <Stack spacing={2}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="medium">
+                    Change Password
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Update your password regularly for security
+                  </Typography>
+                </Box>
+                <Button variant="contained" size="small">
+                  Change
+                </Button>
+              </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="medium">
+                    Two-Factor Authentication
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Add an extra layer of security to your account
+                  </Typography>
+                </Box>
+                <Button variant="outlined" size="small">
+                  Enable
+                </Button>
+              </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="medium">
+                    Login Sessions
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Manage your active login sessions
+                  </Typography>
+                </Box>
+                <Button variant="outlined" size="small">
+                  View
+                </Button>
+              </Box>
+            </Stack>
+          </Paper>
+        </Stack>
       )}
 
       {/* Notifications Tab */}
       {activeTab === 'notifications' && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Notification Preferences</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <h4 className="font-medium text-gray-900">Email Notifications</h4>
-                <p className="text-sm text-gray-600">Receive notifications via email</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" defaultChecked />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-              </label>
-            </div>
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <h4 className="font-medium text-gray-900">Push Notifications</h4>
-                <p className="text-sm text-gray-600">Receive push notifications in the app</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" defaultChecked />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-              </label>
-            </div>
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <h4 className="font-medium text-gray-900">SMS Notifications</h4>
-                <p className="text-sm text-gray-600">Receive notifications via SMS</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-              </label>
-            </div>
-          </div>
-        </div>
+        <Stack spacing={3}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
+              Notification Preferences
+            </Typography>
+            <Stack spacing={2}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="medium">
+                    Email Notifications
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Receive notifications via email
+                  </Typography>
+                </Box>
+                <Switch defaultChecked />
+              </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="medium">
+                    Push Notifications
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Receive push notifications on your device
+                  </Typography>
+                </Box>
+                <Switch />
+              </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="medium">
+                    SMS Notifications
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Receive notifications via SMS
+                  </Typography>
+                </Box>
+                <Switch />
+              </Box>
+            </Stack>
+          </Paper>
+        </Stack>
       )}
 
       {/* Preferences Tab */}
       {activeTab === 'preferences' && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Account Preferences</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <h4 className="font-medium text-gray-900">Language</h4>
-                <p className="text-sm text-gray-600">Choose your preferred language</p>
-              </div>
-              <select className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                <option>English</option>
-                <option>Spanish</option>
-                <option>French</option>
-                <option>German</option>
-              </select>
-            </div>
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <h4 className="font-medium text-gray-900">Time Zone</h4>
-                <p className="text-sm text-gray-600">Set your local time zone</p>
-              </div>
-              <select className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                <option>UTC-5 (Eastern Time)</option>
-                <option>UTC-6 (Central Time)</option>
-                <option>UTC-7 (Mountain Time)</option>
-                <option>UTC-8 (Pacific Time)</option>
-              </select>
-            </div>
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <h4 className="font-medium text-gray-900">Date Format</h4>
-                <p className="text-sm text-gray-600">Choose your preferred date format</p>
-              </div>
-              <select className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                <option>MM/DD/YYYY</option>
-                <option>DD/MM/YYYY</option>
-                <option>YYYY-MM-DD</option>
-              </select>
-            </div>
-      </div>
-        </div>
+        <Stack spacing={3}>
+          <Paper sx={{ p: 3 }}>
+            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
+              Account Preferences
+            </Typography>
+            <Stack spacing={2}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="medium">
+                    Language
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Choose your preferred language
+                  </Typography>
+                </Box>
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <Select defaultValue="english">
+                    <MenuItem value="english">English</MenuItem>
+                    <MenuItem value="spanish">Spanish</MenuItem>
+                    <MenuItem value="french">French</MenuItem>
+                    <MenuItem value="german">German</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="medium">
+                    Time Zone
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Set your local time zone
+                  </Typography>
+                </Box>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <Select defaultValue="utc-5">
+                    <MenuItem value="utc-5">UTC-5 (Eastern Time)</MenuItem>
+                    <MenuItem value="utc-6">UTC-6 (Central Time)</MenuItem>
+                    <MenuItem value="utc-7">UTC-7 (Mountain Time)</MenuItem>
+                    <MenuItem value="utc-8">UTC-8 (Pacific Time)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
+                <Box>
+                  <Typography variant="subtitle1" fontWeight="medium">
+                    Date Format
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Choose your preferred date format
+                  </Typography>
+                </Box>
+                <FormControl size="small" sx={{ minWidth: 120 }}>
+                  <Select defaultValue="mm-dd-yyyy">
+                    <MenuItem value="mm-dd-yyyy">MM/DD/YYYY</MenuItem>
+                    <MenuItem value="dd-mm-yyyy">DD/MM/YYYY</MenuItem>
+                    <MenuItem value="yyyy-mm-dd">YYYY-MM-DD</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
+            </Stack>
+          </Paper>
+        </Stack>
       )}
-    </div>
+
+      {/* Snackbar for notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleSnackbarClose} 
+          severity={snackbar.severity} 
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Container>
   );
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -15,7 +15,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  IconButton,
   Chip,
   Alert,
   Card,
@@ -28,306 +27,420 @@ import {
   Snackbar,
   Tooltip,
   Stack,
-  Divider,
   Container,
   Fade,
-  Tabs,
-  Tab,
-  TablePagination,
+  Pagination,
+  Avatar,
   Switch,
   FormControlLabel,
-  useTheme,
-  alpha
+  InputAdornment,
+  IconButton
 } from '@mui/material';
 import {
   Add as AddIcon,
+  Search as SearchIcon,
+  Download as DownloadIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Download as DownloadIcon,
-  Upload as UploadIcon,
-  Search as SearchIcon,
-  FilterList as FilterIcon,
-  Visibility as ViewIcon,
-  Description as DocumentIcon,
-  Folder as FolderIcon,
-  Share as ShareIcon,
+  FileUpload as FileUploadIcon,
+  Description as DescriptionIcon,
   Security as SecurityIcon,
   Schedule as ScheduleIcon,
-  Close as CloseIcon,
-  CloudUpload as CloudUploadIcon,
-  AttachFile as AttachFileIcon,
-  Assignment as AssignmentIcon
+  CloudUpload as CloudUploadIcon
 } from '@mui/icons-material';
-
-// Types
-interface Document {
-  id: string;
-  title: string;
-  type: DocumentType;
-  category: string;
-  uploadedBy: string;
-  uploadedAt: string;
-  fileSize: number;
-  fileType: string;
-  url: string;
-  tags: string[];
-  accessLevel: 'public' | 'private' | 'restricted';
-  expiryDate?: string;
-  description?: string;
-  version: number;
-  isActive: boolean;
-}
-
-type DocumentType = 'policy' | 'contract' | 'certificate' | 'report' | 'form' | 'other';
-
-interface DocumentFormData {
-  title: string;
-  type: DocumentType;
-  category: string;
-  description: string;
-  tags: string[];
-  accessLevel: 'public' | 'private' | 'restricted';
-  expiryDate: string;
-}
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`document-tabpanel-${index}`}
-      aria-labelledby={`document-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
-    </div>
-  );
-}
+import documentService from '../services/documentService';
+import { Document, DocumentFormData } from '../types';
 
 const DocumentManagement: React.FC = () => {
-  const theme = useTheme();
+  // State management
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<DocumentType | 'all'>('all');
-  const [accessFilter, setAccessFilter] = useState<'all' | 'public' | 'private' | 'restricted'>('all');
-  const [tabValue, setTabValue] = useState(0);
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
-  const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [filterType, setFilterType] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterAccessLevel, setFilterAccessLevel] = useState('');
+  const [sortBy, setSortBy] = useState('uploadedAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
+  const [rowsPerPage] = useState(10);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [editingDocument, setEditingDocument] = useState<Document | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileCache, setFileCache] = useState<Map<string, File>>(new Map());
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+  
+  // Form state
   const [formData, setFormData] = useState<DocumentFormData>({
     title: '',
-    type: 'other',
+    type: '',
     category: '',
     description: '',
-    tags: [],
-    accessLevel: 'private',
+    accessLevel: 'public',
     expiryDate: ''
   });
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  // Sample data
-  const sampleDocuments: Document[] = [
-    {
-      id: '1',
-      title: 'Employee Handbook 2024',
-      type: 'policy',
-      category: 'HR Policies',
-      uploadedBy: 'John Doe',
-      uploadedAt: '2024-01-15T10:30:00Z',
-      fileSize: 2048576,
-      fileType: 'pdf',
-      url: '/documents/handbook-2024.pdf',
-      tags: ['handbook', 'policy', 'employees'],
-      accessLevel: 'public',
-      description: 'Updated employee handbook for 2024',
-      version: 2,
-      isActive: true
-    },
-    {
-      id: '2',
-      title: 'Q4 Financial Report',
-      type: 'report',
-      category: 'Finance',
-      uploadedBy: 'Jane Smith',
-      uploadedAt: '2024-01-10T14:20:00Z',
-      fileSize: 1536000,
-      fileType: 'pdf',
-      url: '/documents/q4-report.pdf',
-      tags: ['finance', 'quarterly', 'report'],
-      accessLevel: 'restricted',
-      description: 'Quarterly financial performance report',
-      version: 1,
-      isActive: true
-    },
-    {
-      id: '3',
-      title: 'Safety Training Certificate',
-      type: 'certificate',
-      category: 'Training',
-      uploadedBy: 'Mike Johnson',
-      uploadedAt: '2024-01-08T09:15:00Z',
-      fileSize: 512000,
-      fileType: 'pdf',
-      url: '/documents/safety-cert.pdf',
-      tags: ['safety', 'training', 'certificate'],
-      accessLevel: 'private',
-      expiryDate: '2024-12-31T23:59:59Z',
-      description: 'Annual safety training certification',
-      version: 1,
-      isActive: true
-    }
-  ];
+  // Stats state
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    restricted: 0,
+    expired: 0
+  });
 
+  // Load data on component mount
   useEffect(() => {
-    loadDocuments();
+    loadData();
   }, []);
 
-  const loadDocuments = async () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setDocuments(sampleDocuments);
+      await Promise.all([loadDocuments(), loadStats()]);
     } catch (err) {
-      setError('Failed to load documents');
+      console.error('Error loading data:', err);
+      setError('Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
+  const loadDocuments = async () => {
+    try {
+      console.log('Loading documents...');
+      const result = await documentService.getDocuments({
+        sortBy,
+        sortOrder,
+        limit: rowsPerPage * 10 // Load more for pagination
+      });
+      
+      console.log('Documents loaded:', result);
+      
+      if (result.success && result.data) {
+        const documentsArray = Array.isArray(result.data) ? result.data : [];
+        console.log('Setting documents to:', documentsArray.length, 'documents');
+        setDocuments(documentsArray);
+        setError('');
+      } else {
+        console.warn('Failed to load documents:', result);
+        setDocuments([]);
+        setError('Failed to load documents');
+      }
+    } catch (err) {
+      console.error('Error loading documents:', err);
+      setDocuments([]);
+      setError('Failed to load documents');
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      console.log('Loading document stats...');
+      const result = await documentService.getDocumentStats();
+      console.log('Stats result:', result);
+      
+      if (result.success) {
+        const statsData = {
+          total: result.data?.total || 0,
+          active: result.data?.active || 0,
+          restricted: result.data?.accessLevels?.restricted || 0,
+          expired: result.data?.expired || 0
+        };
+        console.log('Setting stats to:', statsData);
+        setStats(statsData);
+      } else {
+        console.warn('Stats loading failed:', result);
+        setStats({ total: 0, active: 0, restricted: 0, expired: 0 });
+      }
+    } catch (err) {
+      console.error('Error loading stats:', err);
+      setStats({ total: 0, active: 0, restricted: 0, expired: 0 });
+    }
+  };
+
+  // Filter documents based on search and filters
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         doc.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         doc.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesType = typeFilter === 'all' || doc.type === typeFilter;
-    const matchesAccess = accessFilter === 'all' || doc.accessLevel === accessFilter;
-    return matchesSearch && matchesType && matchesAccess;
+                         doc.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         doc.type.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesType = !filterType || doc.type === filterType;
+    const matchesCategory = !filterCategory || doc.category === filterCategory;
+    const matchesAccessLevel = !filterAccessLevel || doc.accessLevel === filterAccessLevel;
+    
+    return matchesSearch && matchesType && matchesCategory && matchesAccessLevel;
   });
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
+  // Pagination
+  const startIndex = (page - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(filteredDocuments.length / rowsPerPage);
 
-  const handleUploadClick = () => {
-    setFormData({
-      title: '',
-      type: 'other',
-      category: '',
-      description: '',
-      tags: [],
-      accessLevel: 'private',
-      expiryDate: ''
-    });
-    setUploadFile(null);
-    setShowUploadDialog(true);
-  };
-
-  const handleEditClick = (document: Document) => {
-    setSelectedDocument(document);
-    setFormData({
-      title: document.title,
-      type: document.type,
-      category: document.category,
-      description: document.description || '',
-      tags: document.tags,
-      accessLevel: document.accessLevel,
-      expiryDate: document.expiryDate || ''
-    });
-    setShowEditDialog(true);
-  };
-
-  const handleDeleteClick = (document: Document) => {
-    setSelectedDocument(document);
-    setShowDeleteDialog(true);
-  };
-
+  // File upload handler
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setUploadFile(file);
-      if (!formData.title) {
-        setFormData(prev => ({ ...prev, title: file.name.split('.')[0] }));
+      setSelectedFile(file);
+      // Auto-fill type based on file extension
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      const typeMap: { [key: string]: string } = {
+        'pdf': 'PDF',
+        'doc': 'Word Document',
+        'docx': 'Word Document',
+        'xls': 'Excel Spreadsheet',
+        'xlsx': 'Excel Spreadsheet',
+        'ppt': 'PowerPoint Presentation',
+        'pptx': 'PowerPoint Presentation',
+        'jpg': 'Image',
+        'jpeg': 'Image',
+        'png': 'Image',
+        'gif': 'Image',
+        'txt': 'Text Document'
+      };
+      if (extension && typeMap[extension]) {
+        setFormData(prev => ({ ...prev, type: typeMap[extension] }));
       }
     }
   };
 
+  // Form submission
   const handleFormSubmit = async () => {
+    // Only require file for new documents, not for updates
+    if (!editingDocument && !selectedFile) {
+      setSnackbar({ open: true, message: 'Please select a file to upload', severity: 'error' });
+      return;
+    }
+
+    if (!formData.title.trim()) {
+      setSnackbar({ open: true, message: 'Please enter a title', severity: 'error' });
+      return;
+    }
+
     try {
-      if (showUploadDialog) {
-        if (!uploadFile) {
-          setSnackbar({ open: true, message: 'Please select a file to upload', severity: 'error' });
-          return;
-        }
-        
-        // Simulate upload
-        const newDocument: Document = {
-          id: Date.now().toString(),
-          title: formData.title,
-          type: formData.type,
-          category: formData.category,
-          uploadedBy: 'Current User',
-          uploadedAt: new Date().toISOString(),
-          fileSize: uploadFile.size,
-          fileType: uploadFile.name.split('.').pop() || 'unknown',
-          url: `/documents/${uploadFile.name}`,
-          tags: formData.tags,
-          accessLevel: formData.accessLevel,
-          expiryDate: formData.expiryDate || undefined,
-          description: formData.description,
-          version: 1,
-          isActive: true
+      setLoading(true);
+      
+      if (editingDocument) {
+        // Update existing document
+        const updateData: any = {
+          title: formData.title.trim(),
+          type: formData.type || 'Other',
+          category: formData.category || 'Other',
+          description: formData.description?.trim() || '',
+          accessLevel: formData.accessLevel || 'public',
+          expiryDate: formData.expiryDate || ''
         };
         
-        setDocuments(prev => [newDocument, ...prev]);
-        setSnackbar({ open: true, message: 'Document uploaded successfully', severity: 'success' });
-        setShowUploadDialog(false);
-      } else if (showEditDialog && selectedDocument) {
-        // Simulate update
-        setDocuments(prev => prev.map(doc => 
-          doc.id === selectedDocument.id 
-            ? { ...doc, ...formData, version: doc.version + 1 }
-            : doc
-        ));
-        setSnackbar({ open: true, message: 'Document updated successfully', severity: 'success' });
-        setShowEditDialog(false);
+        // Only include file if a new one is selected
+        if (selectedFile) {
+          updateData.file = selectedFile;
+        }
+        
+        console.log('Updating document with data:', updateData);
+        const result = await documentService.updateDocument(editingDocument.id, updateData);
+        
+        if (result.success) {
+          setSnackbar({ open: true, message: 'Document updated successfully!', severity: 'success' });
+          loadDocuments();
+          loadStats();
+          handleCloseUploadDialog();
+        } else {
+          throw new Error(result.message || 'Failed to update document');
+        }
+      } else {
+        // Create new document
+        const documentData = {
+          title: formData.title.trim(),
+          type: formData.type || 'Other',
+          category: formData.category || 'Other',
+          description: formData.description?.trim() || '',
+          accessLevel: formData.accessLevel || 'public',
+          expiryDate: formData.expiryDate || '',
+          file: selectedFile
+        };
+        
+        console.log('Submitting document data:', documentData);
+        const result = await documentService.createDocument(documentData);
+        
+        if (result.success && result.data?.id) {
+          // Cache the file for download
+          setFileCache(prev => new Map(prev).set(result.data.id, selectedFile));
+          setSnackbar({ open: true, message: 'Document uploaded successfully!', severity: 'success' });
+          loadDocuments();
+          loadStats();
+          handleCloseUploadDialog();
+        } else {
+          throw new Error(result.message || 'Failed to upload document');
+        }
       }
     } catch (err) {
-      setSnackbar({ open: true, message: 'Operation failed', severity: 'error' });
+      console.error('Error submitting form:', err);
+      setSnackbar({ 
+        open: true, 
+        message: err instanceof Error ? err.message : 'Failed to process document', 
+        severity: 'error' 
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = async () => {
+  // Close upload dialog
+  const handleCloseUploadDialog = () => {
+    setUploadDialogOpen(false);
+    setEditingDocument(null);
+    setSelectedFile(null);
+    setFormData({
+      title: '',
+      type: '',
+      category: '',
+      description: '',
+      accessLevel: 'public',
+      expiryDate: ''
+    });
+  };
+
+  // Download document
+  const handleDownload = (doc: Document) => {
     try {
-      if (selectedDocument) {
-        setDocuments(prev => prev.filter(doc => doc.id !== selectedDocument.id));
-        setSnackbar({ open: true, message: 'Document deleted successfully', severity: 'success' });
-        setShowDeleteDialog(false);
-        setSelectedDocument(null);
+      const cachedFile = fileCache.get(doc.id);
+      
+      if (cachedFile) {
+        // Download the actual cached file
+        const url = window.URL.createObjectURL(cachedFile);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = cachedFile.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        setSnackbar({ open: true, message: `Downloaded ${doc.title}`, severity: 'success' });
+      } else if ((doc as any).fileData && (doc as any).fileData.trim() !== '') {
+        // Download from base64 data stored in Firestore
+        const base64Data = (doc as any).fileData;
+        const fileName = (doc as any).fileName || `${doc.title}.${doc.type.toLowerCase()}`;
+        
+        // Convert base64 to blob
+        const byteCharacters = atob(base64Data.split(',')[1]);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: (doc as any).fileType || 'application/octet-stream' });
+        
+        // Download the file
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        setSnackbar({ open: true, message: `Downloaded ${doc.title}`, severity: 'success' });
+      } else if (doc.url && doc.url.trim() !== '' && !doc.url.includes('dashboard')) {
+        // Open URL in new tab
+        window.open(doc.url, '_blank');
+      } else {
+        // Fallback: Create metadata file
+        const content = `DOCUMENT INFORMATION
+====================
+Title: ${doc.title}
+Type: ${doc.type}
+Category: ${doc.category}
+Description: ${doc.description || 'No description'}
+Access Level: ${doc.accessLevel}
+Uploaded: ${new Date(doc.uploadedAt).toLocaleString()}
+Expiry: ${doc.expiryDate ? new Date(doc.expiryDate).toLocaleString() : 'No expiry'}
+
+Note: Original file not available for download.`;
+        
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${doc.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        setSnackbar({ open: true, message: `Downloaded ${doc.title} information`, severity: 'info' });
       }
     } catch (err) {
-      setSnackbar({ open: true, message: 'Failed to delete document', severity: 'error' });
+      console.error('Error downloading document:', err);
+      setSnackbar({ open: true, message: 'Failed to download document', severity: 'error' });
     }
   };
 
-  const handleDownload = (document: Document) => {
-    // Simulate download
-    setSnackbar({ open: true, message: `Downloading ${document.title}...`, severity: 'success' });
+  // Edit document
+  const handleEdit = (doc: Document) => {
+    setEditingDocument(doc);
+    setFormData({
+      title: doc.title,
+      type: doc.type,
+      category: doc.category,
+      description: doc.description || '',
+      accessLevel: doc.accessLevel,
+      expiryDate: doc.expiryDate || ''
+    });
+    setUploadDialogOpen(true);
   };
 
-  const formatFileSize = (bytes: number): string => {
+  // Show delete confirmation dialog
+  const handleDeleteClick = (doc: Document) => {
+    setDocumentToDelete(doc);
+    setDeleteDialogOpen(true);
+  };
+
+  // Confirm delete - now does permanent deletion
+  const handleConfirmDelete = async () => {
+    if (!documentToDelete) return;
+
+    try {
+      console.log('Permanently deleting document:', documentToDelete.title, 'ID:', documentToDelete.id);
+      const result = await documentService.permanentDeleteDocument(documentToDelete.id);
+      console.log('Permanent delete result:', result);
+
+      if (result.success) {
+        // Remove from file cache
+        setFileCache(prev => {
+          const newCache = new Map(prev);
+          newCache.delete(documentToDelete.id);
+          return newCache;
+        });
+        setSnackbar({ open: true, message: `Document "${documentToDelete.title}" permanently deleted`, severity: 'success' });
+
+        // Reload both documents and stats
+        console.log('Reloading documents and stats...');
+        await Promise.all([loadDocuments(), loadStats()]);
+      } else {
+        throw new Error(result.message || 'Failed to delete document');
+      }
+    } catch (err) {
+      console.error('Error deleting document:', err);
+      setSnackbar({
+        open: true,
+        message: err instanceof Error ? err.message : 'Failed to delete document',
+        severity: 'error'
+      });
+    } finally {
+      setDeleteDialogOpen(false);
+      setDocumentToDelete(null);
+    }
+  };
+
+  // Cancel delete
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setDocumentToDelete(null);
+  };
+
+
+  // Format file size
+  const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -335,188 +448,192 @@ const DocumentManagement: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getDocumentIcon = (type: DocumentType) => {
-    switch (type) {
-      case 'policy': return <AssignmentIcon />;
-      case 'contract': return <DocumentIcon />;
-      case 'certificate': return <SecurityIcon />;
-      case 'report': return <DocumentIcon />;
-      case 'form': return <DocumentIcon />;
-      default: return <DocumentIcon />;
-    }
-  };
-
-  const getAccessColor = (level: string) => {
-    switch (level) {
-      case 'public': return 'success';
-      case 'private': return 'warning';
-      case 'restricted': return 'error';
-      default: return 'default';
-    }
-  };
-
-  const handleChangePage = (_event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+  // Format date
+  const formatDate = (date: string | number) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center' }}>
-        <CircularProgress />
-      </Container>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+        <CircularProgress size={60} />
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Fade in timeout={300}>
-        <Box>
-          {/* Header */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
-              Document Management
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<UploadIcon />}
-              onClick={handleUploadClick}
-              sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                },
-              }}
-            >
-              Upload Document
-            </Button>
-          </Box>
+    <Container maxWidth="xl" sx={{ py: 3 }}>
+                {/* Header */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h4" component="h1" fontWeight="bold">
+          Document Management
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => setUploadDialogOpen(true)}
+          sx={{ borderRadius: 2 }}
+        >
+          Upload Document
+        </Button>
+      </Box>
 
+      {/* Error Alert */}
           {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
+        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
               {error}
             </Alert>
           )}
 
           {/* Stats Cards */}
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 2, mb: 3 }}>
+      <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3} mb={4}>
             <Card>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <DocumentIcon sx={{ mr: 2, color: 'primary.main' }} />
+            <Box display="flex" alignItems="center" justifyContent="space-between">
                   <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {documents.length}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                <Typography color="textSecondary" gutterBottom>
                       Total Documents
                     </Typography>
+                <Typography variant="h4" fontWeight="bold">
+                  {stats.total}
+                </Typography>
                   </Box>
+              <Avatar sx={{ bgcolor: 'primary.main' }}>
+                <DescriptionIcon />
+              </Avatar>
                 </Box>
               </CardContent>
             </Card>
 
             <Card>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <FolderIcon sx={{ mr: 2, color: 'success.main' }} />
+            <Box display="flex" alignItems="center" justifyContent="space-between">
                   <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {new Set(documents.map(d => d.category)).size}
+                <Typography color="textSecondary" gutterBottom>
+                  Active Documents
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Categories
+                <Typography variant="h4" fontWeight="bold" color="success.main">
+                  {stats.active}
                     </Typography>
                   </Box>
+              <Avatar sx={{ bgcolor: 'success.main' }}>
+                <CloudUploadIcon />
+              </Avatar>
                 </Box>
               </CardContent>
             </Card>
 
             <Card>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <SecurityIcon sx={{ mr: 2, color: 'warning.main' }} />
+            <Box display="flex" alignItems="center" justifyContent="space-between">
                   <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {documents.filter(d => d.accessLevel === 'restricted').length}
+                <Typography color="textSecondary" gutterBottom>
+                  Restricted Access
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Restricted
+                <Typography variant="h4" fontWeight="bold" color="warning.main">
+                  {stats.restricted}
                     </Typography>
                   </Box>
+              <Avatar sx={{ bgcolor: 'warning.main' }}>
+                <SecurityIcon />
+              </Avatar>
                 </Box>
               </CardContent>
             </Card>
 
             <Card>
               <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <ScheduleIcon sx={{ mr: 2, color: 'error.main' }} />
+            <Box display="flex" alignItems="center" justifyContent="space-between">
                   <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 600 }}>
-                      {documents.filter(d => d.expiryDate && new Date(d.expiryDate) < new Date()).length}
+                <Typography color="textSecondary" gutterBottom>
+                  Expired Documents
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Expired
+                <Typography variant="h4" fontWeight="bold" color="error.main">
+                  {stats.expired}
                     </Typography>
                   </Box>
+              <Avatar sx={{ bgcolor: 'error.main' }}>
+                <ScheduleIcon />
+              </Avatar>
                 </Box>
               </CardContent>
             </Card>
           </Box>
 
           {/* Filters */}
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+      <Paper sx={{ p: 3, mb: 3 }}>
+        <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
               <TextField
                 placeholder="Search documents..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 InputProps={{
-                  startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-                }}
-                size="small"
-                sx={{ minWidth: 300 }}
-              />
-              
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }}
+            sx={{ minWidth: 250 }}
+          />
+          
+          <FormControl sx={{ minWidth: 150 }}>
                 <InputLabel>Type</InputLabel>
                 <Select
-                  value={typeFilter}
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
                   label="Type"
-                  onChange={(e) => setTypeFilter(e.target.value as DocumentType | 'all')}
-                >
-                  <MenuItem value="all">All Types</MenuItem>
-                  <MenuItem value="policy">Policy</MenuItem>
-                  <MenuItem value="contract">Contract</MenuItem>
-                  <MenuItem value="certificate">Certificate</MenuItem>
-                  <MenuItem value="report">Report</MenuItem>
-                  <MenuItem value="form">Form</MenuItem>
-                  <MenuItem value="other">Other</MenuItem>
+            >
+              <MenuItem value="">All Types</MenuItem>
+              <MenuItem value="PDF">PDF</MenuItem>
+              <MenuItem value="Word Document">Word Document</MenuItem>
+              <MenuItem value="Excel Spreadsheet">Excel Spreadsheet</MenuItem>
+              <MenuItem value="PowerPoint Presentation">PowerPoint Presentation</MenuItem>
+              <MenuItem value="Image">Image</MenuItem>
+              <MenuItem value="Text Document">Text Document</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl sx={{ minWidth: 150 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              label="Category"
+            >
+              <MenuItem value="">All Categories</MenuItem>
+              <MenuItem value="HR Policies">HR Policies</MenuItem>
+              <MenuItem value="Training Materials">Training Materials</MenuItem>
+              <MenuItem value="Forms">Forms</MenuItem>
+              <MenuItem value="Reports">Reports</MenuItem>
+              <MenuItem value="Legal">Legal</MenuItem>
+              <MenuItem value="Other">Other</MenuItem>
                 </Select>
               </FormControl>
 
-              <FormControl size="small" sx={{ minWidth: 150 }}>
+          <FormControl sx={{ minWidth: 150 }}>
                 <InputLabel>Access Level</InputLabel>
                 <Select
-                  value={accessFilter}
+              value={filterAccessLevel}
+              onChange={(e) => setFilterAccessLevel(e.target.value)}
                   label="Access Level"
-                  onChange={(e) => setAccessFilter(e.target.value as 'all' | 'public' | 'private' | 'restricted')}
                 >
-                  <MenuItem value="all">All Levels</MenuItem>
+              <MenuItem value="">All Levels</MenuItem>
                   <MenuItem value="public">Public</MenuItem>
-                  <MenuItem value="private">Private</MenuItem>
                   <MenuItem value="restricted">Restricted</MenuItem>
+              <MenuItem value="confidential">Confidential</MenuItem>
                 </Select>
               </FormControl>
             </Box>
           </Paper>
 
-          {/* Document Table */}
+      {/* Documents Table */}
           <Paper>
             <TableContainer>
               <Table>
@@ -526,186 +643,156 @@ const DocumentManagement: React.FC = () => {
                     <TableCell>Type</TableCell>
                     <TableCell>Category</TableCell>
                     <TableCell>Access Level</TableCell>
-                    <TableCell>Uploaded By</TableCell>
-                    <TableCell>Upload Date</TableCell>
-                    <TableCell>Size</TableCell>
+                <TableCell>Uploaded</TableCell>
+                <TableCell>Expiry</TableCell>
                     <TableCell align="center">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filteredDocuments
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((document) => (
-                      <TableRow key={document.id} hover>
+              {paginatedDocuments.map((doc) => (
+                <TableRow key={doc.id} hover>
+                                          <TableCell>
+                    <Box>
+                      <Typography variant="subtitle2" fontWeight="bold">
+                        {doc.title}
+                      </Typography>
+                      {doc.description && (
+                        <Typography variant="body2" color="textSecondary" noWrap>
+                          {doc.description}
+                        </Typography>
+                      )}
+                    </Box>
+                  </TableCell>
                         <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            {getDocumentIcon(document.type)}
-                            <Box sx={{ ml: 2 }}>
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                {document.title}
-                              </Typography>
-                              {document.description && (
-                                <Typography variant="caption" color="text.secondary">
-                                  {document.description}
-                                </Typography>
-                              )}
-                              <Box sx={{ mt: 0.5 }}>
-                                {document.tags.map((tag, index) => (
-                                  <Chip
-                                    key={index}
-                                    label={tag}
-                                    size="small"
-                                    sx={{ mr: 0.5, mb: 0.5 }}
-                                  />
-                                ))}
-                              </Box>
-                            </Box>
-                          </Box>
+                    <Chip label={doc.type} size="small" color="primary" />
+                  </TableCell>
+                  <TableCell>
+                    <Chip label={doc.category} size="small" color="secondary" />
                         </TableCell>
-                        <TableCell>
-                          <Chip label={document.type} size="small" variant="outlined" />
-                        </TableCell>
-                        <TableCell>{document.category}</TableCell>
                         <TableCell>
                           <Chip
-                            label={document.accessLevel}
+                      label={doc.accessLevel} 
                             size="small"
-                            color={getAccessColor(document.accessLevel) as any}
+                      color={doc.accessLevel === 'public' ? 'success' : 'warning'} 
                           />
                         </TableCell>
-                        <TableCell>{document.uploadedBy}</TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {formatDate(doc.uploadedAt)}
+                    </Typography>
+                  </TableCell>
                         <TableCell>
-                          {new Date(document.uploadedAt).toLocaleDateString()}
+                    <Typography variant="body2">
+                      {doc.expiryDate ? formatDate(doc.expiryDate) : 'No expiry'}
+                    </Typography>
                         </TableCell>
-                        <TableCell>{formatFileSize(document.fileSize)}</TableCell>
-                        <TableCell align="center">
-                          <Stack direction="row" spacing={1} justifyContent="center">
-                            <Tooltip title="View">
-                              <IconButton size="small" onClick={() => handleDownload(document)}>
-                                <ViewIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Download">
-                              <IconButton size="small" onClick={() => handleDownload(document)}>
-                                <DownloadIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Edit">
-                              <IconButton size="small" onClick={() => handleEditClick(document)}>
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete">
-                              <IconButton size="small" onClick={() => handleDeleteClick(document)}>
-                                <DeleteIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
-                        </TableCell>
+                                          <TableCell align="center">
+                    <Stack direction="row" spacing={1} justifyContent="center">
+                      <Tooltip title="Download">
+                        <IconButton onClick={() => handleDownload(doc)} size="small">
+                          <DownloadIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Edit">
+                        <IconButton onClick={() => handleEdit(doc)} size="small">
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton onClick={() => handleDeleteClick(doc)} size="small" color="error">
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </Stack>
+                  </TableCell>
                       </TableRow>
                     ))}
                 </TableBody>
               </Table>
             </TableContainer>
 
-            <TablePagination
-              rowsPerPageOptions={[5, 10, 25]}
-              component="div"
-              count={filteredDocuments.length}
-              rowsPerPage={rowsPerPage}
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <Box display="flex" justifyContent="center" p={2}>
+            <Pagination
+              count={totalPages}
               page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
+              onChange={(_, newPage) => setPage(newPage)}
+              color="primary"
             />
+          </Box>
+        )}
           </Paper>
 
-          {/* Upload Dialog */}
-          <Dialog open={showUploadDialog} onClose={() => setShowUploadDialog(false)} maxWidth="md" fullWidth>
-            <DialogTitle>Upload Document</DialogTitle>
+      {/* Upload/Edit Dialog */}
+      <Dialog open={uploadDialogOpen} onClose={handleCloseUploadDialog} maxWidth="md" fullWidth>
+        <DialogTitle>
+          {editingDocument ? 'Edit Document' : 'Upload New Document'}
+        </DialogTitle>
             <DialogContent>
-              <Stack spacing={3} sx={{ mt: 1 }}>
-                <Box sx={{ 
-                  border: '2px dashed',
-                  borderColor: 'divider',
-                  borderRadius: 2,
-                  p: 3,
-                  textAlign: 'center',
-                  bgcolor: alpha(theme.palette.primary.main, 0.02)
-                }}>
-                  <input
-                    accept="*/*"
-                    style={{ display: 'none' }}
-                    id="file-upload"
-                    type="file"
-                    onChange={handleFileUpload}
-                  />
-                  <label htmlFor="file-upload">
-                    <Button
-                      variant="outlined"
-                      component="span"
-                      startIcon={<CloudUploadIcon />}
-                      sx={{ mb: 2 }}
-                    >
-                      Choose File
-                    </Button>
-                  </label>
-                  {uploadFile && (
-                    <Typography variant="body2" color="text.secondary">
-                      Selected: {uploadFile.name} ({formatFileSize(uploadFile.size)})
-                    </Typography>
-                  )}
-                </Box>
-
+          <Box display="flex" flexDirection="column" gap={3} pt={1}>
                 <TextField
-                  label="Title"
+              label="Document Title"
                   value={formData.title}
                   onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                   fullWidth
                   required
                 />
 
+            <Box display="flex" gap={2}>
                 <FormControl fullWidth>
                   <InputLabel>Type</InputLabel>
                   <Select
                     value={formData.type}
+                  onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
                     label="Type"
-                    onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as DocumentType }))}
-                  >
-                    <MenuItem value="policy">Policy</MenuItem>
-                    <MenuItem value="contract">Contract</MenuItem>
-                    <MenuItem value="certificate">Certificate</MenuItem>
-                    <MenuItem value="report">Report</MenuItem>
-                    <MenuItem value="form">Form</MenuItem>
-                    <MenuItem value="other">Other</MenuItem>
+                >
+                  <MenuItem value="PDF">PDF</MenuItem>
+                  <MenuItem value="Word Document">Word Document</MenuItem>
+                  <MenuItem value="Excel Spreadsheet">Excel Spreadsheet</MenuItem>
+                  <MenuItem value="PowerPoint Presentation">PowerPoint Presentation</MenuItem>
+                  <MenuItem value="Image">Image</MenuItem>
+                  <MenuItem value="Text Document">Text Document</MenuItem>
                   </Select>
                 </FormControl>
 
-                <TextField
-                  label="Category"
+              <FormControl fullWidth>
+                <InputLabel>Category</InputLabel>
+                <Select
                   value={formData.category}
                   onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                  fullWidth
-                />
+                  label="Category"
+                >
+                  <MenuItem value="HR Policies">HR Policies</MenuItem>
+                  <MenuItem value="Training Materials">Training Materials</MenuItem>
+                  <MenuItem value="Forms">Forms</MenuItem>
+                  <MenuItem value="Reports">Reports</MenuItem>
+                  <MenuItem value="Legal">Legal</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
 
                 <TextField
                   label="Description"
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              fullWidth
                   multiline
                   rows={3}
-                  fullWidth
                 />
 
+            <Box display="flex" gap={2}>
                 <FormControl fullWidth>
                   <InputLabel>Access Level</InputLabel>
                   <Select
                     value={formData.accessLevel}
+                  onChange={(e) => setFormData(prev => ({ ...prev, accessLevel: e.target.value }))}
                     label="Access Level"
-                    onChange={(e) => setFormData(prev => ({ ...prev, accessLevel: e.target.value as 'public' | 'private' | 'restricted' }))}
                   >
                     <MenuItem value="public">Public</MenuItem>
-                    <MenuItem value="private">Private</MenuItem>
                     <MenuItem value="restricted">Restricted</MenuItem>
+                  <MenuItem value="confidential">Confidential</MenuItem>
                   </Select>
                 </FormControl>
 
@@ -717,118 +804,82 @@ const DocumentManagement: React.FC = () => {
                   InputLabelProps={{ shrink: true }}
                   fullWidth
                 />
-              </Stack>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setShowUploadDialog(false)}>Cancel</Button>
-              <Button variant="contained" onClick={handleFormSubmit}>Upload</Button>
-            </DialogActions>
-          </Dialog>
+            </Box>
 
-          {/* Edit Dialog */}
-          <Dialog open={showEditDialog} onClose={() => setShowEditDialog(false)} maxWidth="md" fullWidth>
-            <DialogTitle>Edit Document</DialogTitle>
-            <DialogContent>
-              <Stack spacing={3} sx={{ mt: 1 }}>
-                <TextField
-                  label="Title"
-                  value={formData.title}
-                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+            <Box>
+              <Button
+                variant="outlined"
+                component="label"
+                startIcon={<FileUploadIcon />}
                   fullWidth
-                  required
+                sx={{ py: 2 }}
+              >
+                {selectedFile 
+                  ? selectedFile.name 
+                  : editingDocument 
+                    ? 'Select New File (optional)' 
+                    : 'Select File'
+                }
+                <input
+                  type="file"
+                  hidden
+                  onChange={handleFileUpload}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.txt"
                 />
-
-                <FormControl fullWidth>
-                  <InputLabel>Type</InputLabel>
-                  <Select
-                    value={formData.type}
-                    label="Type"
-                    onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as DocumentType }))}
-                  >
-                    <MenuItem value="policy">Policy</MenuItem>
-                    <MenuItem value="contract">Contract</MenuItem>
-                    <MenuItem value="certificate">Certificate</MenuItem>
-                    <MenuItem value="report">Report</MenuItem>
-                    <MenuItem value="form">Form</MenuItem>
-                    <MenuItem value="other">Other</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <TextField
-                  label="Category"
-                  value={formData.category}
-                  onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                  fullWidth
-                />
-
-                <TextField
-                  label="Description"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  multiline
-                  rows={3}
-                  fullWidth
-                />
-
-                <FormControl fullWidth>
-                  <InputLabel>Access Level</InputLabel>
-                  <Select
-                    value={formData.accessLevel}
-                    label="Access Level"
-                    onChange={(e) => setFormData(prev => ({ ...prev, accessLevel: e.target.value as 'public' | 'private' | 'restricted' }))}
-                  >
-                    <MenuItem value="public">Public</MenuItem>
-                    <MenuItem value="private">Private</MenuItem>
-                    <MenuItem value="restricted">Restricted</MenuItem>
-                  </Select>
-                </FormControl>
-
-                <TextField
-                  label="Expiry Date"
-                  type="date"
-                  value={formData.expiryDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, expiryDate: e.target.value }))}
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
-                />
-              </Stack>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setShowEditDialog(false)}>Cancel</Button>
-              <Button variant="contained" onClick={handleFormSubmit}>Update</Button>
-            </DialogActions>
-          </Dialog>
-
-          {/* Delete Confirmation Dialog */}
-          <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)}>
-            <DialogTitle>Delete Document</DialogTitle>
-            <DialogContent>
-              <Typography>
-                Are you sure you want to delete "{selectedDocument?.title}"? This action cannot be undone.
+              </Button>
+              {editingDocument && !selectedFile && (
+                <Typography variant="body2" color="textSecondary" sx={{ mt: 1, textAlign: 'center' }}>
+                  Current file will be kept if no new file is selected
               </Typography>
+              )}
+            </Box>
+          </Box>
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
-              <Button variant="contained" color="error" onClick={handleDelete}>
-                Delete
+          <Button onClick={handleCloseUploadDialog}>Cancel</Button>
+          <Button 
+            onClick={handleFormSubmit} 
+            variant="contained"
+            disabled={(!editingDocument && !selectedFile) || !formData.title.trim()}
+          >
+            {editingDocument ? 'Update Document' : 'Upload Document'}
               </Button>
             </DialogActions>
           </Dialog>
+
+                {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete}>
+        <DialogTitle>Permanently Delete Document</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to permanently delete "{documentToDelete?.title}"?
+            This action will remove the document from the database completely and cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDelete}>Cancel</Button>
+          <Button variant="contained" color="error" onClick={handleConfirmDelete}>
+            Permanently Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
 
           {/* Snackbar */}
           <Snackbar
             open={snackbar.open}
             autoHideDuration={6000}
             onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
           >
-            <Alert severity={snackbar.severity} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}>
+            <Alert 
+              onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
+              severity={snackbar.severity}
+            >
               {snackbar.message}
             </Alert>
           </Snackbar>
-        </Box>
-      </Fade>
-    </Container>
-  );
-};
+        </Container>
+      );
+    };
 
-export default DocumentManagement;
+    export default DocumentManagement;
