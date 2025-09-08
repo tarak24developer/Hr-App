@@ -84,6 +84,7 @@
   /* Responsive text */
   .text-responsive {
     @apply text-sm sm:text-base lg:text-lg;
+    
   }
 
   .heading-responsive {

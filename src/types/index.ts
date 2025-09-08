@@ -481,6 +481,8 @@ export interface UserSettings {
   privacy: PrivacySettings;
 }
 
+export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'system' | 'user' | 'work' | 'event' | 'assignment' | 'payment' | 'security';
+
 export interface NotificationSettings {
   email: boolean;
   push: boolean;

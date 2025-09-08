@@ -5,6 +5,7 @@ import {
   getDoc, 
   addDoc, 
   updateDoc, 
+  setDoc,
   deleteDoc, 
   query, 
   where, 
@@ -209,6 +210,36 @@ class FirebaseService {
       }
     } catch (error: any) {
       console.error('Error updating document:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  async setDocument<T = DocumentData>(
+    collectionName: string, 
+    docId: string, 
+    data: T,
+    merge: boolean = true
+  ): Promise<ApiResponse<T>> {
+    try {
+      const docRef = this.getDocumentRef(collectionName, docId);
+      if (!docRef) {
+        return { success: false, error: 'Firebase not available' };
+      }
+
+      console.log('Setting document:', { collectionName, docId, data, merge });
+      console.log('Document reference:', docRef);
+
+      await setDoc(docRef, data as DocumentData, { merge });
+      
+      return {
+        success: true,
+        data: data
+      };
+    } catch (error: any) {
+      console.error('Error setting document:', error);
       return {
         success: false,
         error: error.message
