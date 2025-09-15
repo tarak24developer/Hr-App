@@ -78,10 +78,10 @@ class AnnouncementService {
           });
         }
 
-        return { ...result, data: announcements };
+        return { ...result, data: announcements as any };
       }
       
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error getting announcements:', error);
       return { success: false, error: error.message };
@@ -92,7 +92,7 @@ class AnnouncementService {
   async getAnnouncement(id: string): Promise<ApiResponse<Announcement>> {
     try {
       const result = await firebaseService.getDocument(this.collection, id);
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error getting announcement:', error);
       return { success: false, error: error.message };
@@ -121,7 +121,7 @@ class AnnouncementService {
       });
 
       const result = await firebaseService.addDocument(this.collection, firestoreData);
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error creating announcement:', error);
       return { success: false, error: error.message };
@@ -144,7 +144,7 @@ class AnnouncementService {
       });
 
       const result = await firebaseService.updateDocument(this.collection, id, firestoreData);
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error updating announcement:', error);
       return { success: false, error: error.message };
@@ -158,7 +158,7 @@ class AnnouncementService {
         isActive: false,
         updatedAt: new Date().toISOString()
       });
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error deleting announcement:', error);
       return { success: false, error: error.message };
@@ -169,7 +169,7 @@ class AnnouncementService {
   async permanentDeleteAnnouncement(id: string): Promise<ApiResponse<void>> {
     try {
       const result = await firebaseService.deleteDocument(this.collection, id);
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error permanently deleting announcement:', error);
       return { success: false, error: error.message };
@@ -183,7 +183,7 @@ class AnnouncementService {
         isPinned,
         updatedAt: new Date().toISOString()
       });
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error toggling pin status:', error);
       return { success: false, error: error.message };
@@ -203,7 +203,7 @@ class AnnouncementService {
       }
 
       const result = await firebaseService.updateDocument(this.collection, id, updateData);
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error toggling publish status:', error);
       return { success: false, error: error.message };
@@ -217,7 +217,7 @@ class AnnouncementService {
         isArchived: true,
         updatedAt: new Date().toISOString()
       });
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error archiving announcement:', error);
       return { success: false, error: error.message };
@@ -230,7 +230,7 @@ class AnnouncementService {
       const result = await firebaseService.getCollection(this.categoriesCollection, {
         where: [{ field: 'isActive', operator: '==', value: true }]
       });
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error getting categories:', error);
       return { success: false, error: error.message };
@@ -248,7 +248,7 @@ class AnnouncementService {
       };
 
       const result = await firebaseService.addDocument(this.categoriesCollection, firestoreData);
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error creating category:', error);
       return { success: false, error: error.message };
@@ -290,17 +290,17 @@ class AnnouncementService {
         stats.byCategory[ann.category] = (stats.byCategory[ann.category] || 0) + 1;
         
         if (ann.isPublished) {
-          stats.byStatus.published = (stats.byStatus.published || 0) + 1;
+          stats.byStatus['published'] = (stats.byStatus['published'] || 0) + 1;
         } else {
-          stats.byStatus.draft = (stats.byStatus.draft || 0) + 1;
+          stats.byStatus['draft'] = (stats.byStatus['draft'] || 0) + 1;
         }
         
         if (ann.isPinned) {
-          stats.byStatus.pinned = (stats.byStatus.pinned || 0) + 1;
+          stats.byStatus['pinned'] = (stats.byStatus['pinned'] || 0) + 1;
         }
         
         if (ann.isArchived) {
-          stats.byStatus.archived = (stats.byStatus.archived || 0) + 1;
+          stats.byStatus['archived'] = (stats.byStatus['archived'] || 0) + 1;
         }
       });
 
@@ -324,7 +324,7 @@ class AnnouncementService {
         readCount: currentReadCount + 1,
         updatedAt: new Date().toISOString()
       });
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error incrementing read count:', error);
       return { success: false, error: error.message };
@@ -344,7 +344,7 @@ class AnnouncementService {
         likeCount: currentLikeCount + 1,
         updatedAt: new Date().toISOString()
       });
-      return result;
+      return result as any;
     } catch (error: any) {
       console.error('Error incrementing like count:', error);
       return { success: false, error: error.message };

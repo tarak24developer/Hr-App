@@ -1,5 +1,12 @@
 import firebaseService from './firebaseService';
-import { ApiResponse, QueryOptions } from '../types';
+import { ApiResponse } from '../types';
+
+interface QueryOptions {
+  where?: Array<{ field: string; operator: string; value: any }>;
+  orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
+  limit?: number;
+  [key: string]: any;
+}
 
 export interface Incident {
   id: string;
@@ -87,24 +94,24 @@ class IncidentService {
         const activeIncidents = incidents.filter((incident: any) => incident.isActive !== false);
         
         // Client-side sorting to avoid Firebase index issues
-        if (options.sortBy) {
+        if (options['sortBy']) {
           activeIncidents.sort((a: any, b: any) => {
-            const aValue = a[options.sortBy!];
-            const bValue = b[options.sortBy!];
+            const aValue = a[options['sortBy']!];
+            const bValue = b[options['sortBy']!];
             
-            if (aValue < bValue) return options.sortOrder === 'asc' ? -1 : 1;
-            if (aValue > bValue) return options.sortOrder === 'asc' ? 1 : -1;
+            if (aValue < bValue) return options['sortOrder'] === 'asc' ? -1 : 1;
+            if (aValue > bValue) return options['sortOrder'] === 'asc' ? 1 : -1;
             return 0;
           });
         }
 
         return {
           success: true,
-          data: activeIncidents
+          data: activeIncidents as any
         };
       }
 
-      return result;
+      return result as any;
     } catch (error) {
       console.error('Error fetching incidents:', error);
       throw error;
@@ -127,6 +134,7 @@ class IncidentService {
       const now = new Date().toISOString();
       const incident: Omit<Incident, 'id'> = {
         ...incidentData,
+        status: 'open',
         reporterId: 'current-user-id', // This should be replaced with actual current user ID
         reportedAt: now,
         updatedAt: now,
@@ -151,7 +159,7 @@ class IncidentService {
         updatedAt: new Date().toISOString()
       };
 
-      return await firebaseService.updateDocument(this.collection, id, updateData);
+      return await firebaseService.updateDocument(this.collection, id, updateData) as any;
     } catch (error) {
       console.error('Error updating incident:', error);
       throw error;
@@ -166,7 +174,7 @@ class IncidentService {
         updatedAt: new Date().toISOString()
       };
 
-      return await firebaseService.updateDocument(this.collection, id, updateData);
+      return await firebaseService.updateDocument(this.collection, id, updateData) as any;
     } catch (error) {
       console.error('Error deleting incident:', error);
       throw error;
@@ -193,11 +201,11 @@ class IncidentService {
         const activeCategories = categories.filter((category: any) => category.isActive !== false);
         return {
           success: true,
-          data: activeCategories
+          data: activeCategories as any
         };
       }
 
-      return result;
+      return result as any;
     } catch (error) {
       console.error('Error fetching categories:', error);
       throw error;
@@ -298,7 +306,7 @@ class IncidentService {
         return { success: true, data: newNote };
       }
 
-      return updateResult;
+      return updateResult as any;
     } catch (error) {
       console.error('Error adding incident note:', error);
       throw error;
@@ -320,7 +328,7 @@ class IncidentService {
         }
       }
 
-      return await firebaseService.updateDocument(this.collection, id, updateData);
+      return await firebaseService.updateDocument(this.collection, id, updateData) as any;
     } catch (error) {
       console.error('Error updating incident status:', error);
       throw error;

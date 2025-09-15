@@ -1,5 +1,5 @@
 import firebaseService from './firebaseService';
-import { Notification, NotificationCategory, NotificationFormData, NotificationStats, User } from '../types';
+import { NotificationFormData, NotificationStats } from '../types';
 
 interface QueryOptions {
   where?: Array<{ field: string; operator: string; value: any }>;

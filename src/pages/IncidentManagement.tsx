@@ -1,67 +1,31 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Card,
-  CardContent,
-  Alert,
-  Snackbar,
-  Pagination,
-  FormControlLabel,
-  Switch,
-  Divider,
-  Tooltip,
-  Avatar,
-  Badge,
-  Container,
-  Stack,
-  Grid,
-  InputAdornment,
-  CircularProgress,
-  Fade
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Visibility as ViewIcon,
-  Search as SearchIcon,
-  FilterList as FilterIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Person as PersonIcon,
-  LocationOn as LocationIcon,
-  Description as DescriptionIcon,
-  Close as CloseIcon
-} from '@mui/icons-material';
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  Search,
+  Filter,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  User,
+  MapPin,
+  FileText,
+  X,
+  AlertCircle
+} from 'lucide-react';
+import { cn } from '../utils/cn';
 import incidentService, { Incident, IncidentCategory, IncidentFormData, IncidentStats } from '../services/incidentService';
-import { User } from '../types';
+import { User as UserType } from '../types';
+import { showNotification } from '../utils/notification';
+import DashboardCard from '../components/DashboardCard';
 
 const IncidentManagement: React.FC = () => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [filteredIncidents, setFilteredIncidents] = useState<Incident[]>([]);
   const [categories, setCategories] = useState<IncidentCategory[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users] = useState<UserType[]>([]);
   const [stats, setStats] = useState<IncidentStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -92,13 +56,6 @@ const IncidentManagement: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage] = useState(10);
-  
-  // Snackbar
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
-  });
 
   // Load data
   const loadData = async () => {
@@ -226,22 +183,14 @@ const IncidentManagement: React.FC = () => {
       const result = await incidentService.permanentDeleteIncident(incidentToDelete.id);
       
       if (result.success) {
-        setSnackbar({
-          open: true,
-          message: `Incident "${incidentToDelete.title}" deleted successfully`,
-          severity: 'success'
-        });
+        showNotification(`Incident "${incidentToDelete.title}" deleted successfully`, 'success');
         await loadData();
       } else {
         throw new Error(result.message || 'Failed to delete incident');
       }
     } catch (err) {
       console.error('Error deleting incident:', err);
-      setSnackbar({
-        open: true,
-        message: err instanceof Error ? err.message : 'Failed to delete incident',
-        severity: 'error'
-      });
+      showNotification(err instanceof Error ? err.message : 'Failed to delete incident', 'error');
     } finally {
       setDeleteDialogOpen(false);
       setIncidentToDelete(null);
@@ -259,11 +208,7 @@ const IncidentManagement: React.FC = () => {
         // Update existing incident
         const result = await incidentService.updateIncident(selectedIncident.id, formData);
         if (result.success) {
-          setSnackbar({
-            open: true,
-            message: 'Incident updated successfully',
-            severity: 'success'
-          });
+          showNotification('Incident updated successfully', 'success');
           await loadData();
         } else {
           throw new Error(result.message || 'Failed to update incident');
@@ -272,11 +217,7 @@ const IncidentManagement: React.FC = () => {
         // Create new incident
         const result = await incidentService.createIncident(formData);
         if (result.success) {
-          setSnackbar({
-            open: true,
-            message: 'Incident created successfully',
-            severity: 'success'
-          });
+          showNotification('Incident created successfully', 'success');
           await loadData();
         } else {
           throw new Error(result.message || 'Failed to create incident');
@@ -285,11 +226,7 @@ const IncidentManagement: React.FC = () => {
       setDialogOpen(false);
     } catch (err) {
       console.error('Error saving incident:', err);
-      setSnackbar({
-        open: true,
-        message: err instanceof Error ? err.message : 'Failed to save incident',
-        severity: 'error'
-      });
+      showNotification(err instanceof Error ? err.message : 'Failed to save incident', 'error');
     }
   };
 
@@ -304,15 +241,15 @@ const IncidentManagement: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'open':
-        return <WarningIcon color="error" />;
+        return <AlertTriangle className="w-4 h-4 text-red-600" />;
       case 'investigating':
-        return <ScheduleIcon color="warning" />;
+        return <Clock className="w-4 h-4 text-yellow-600" />;
       case 'resolved':
-        return <CheckCircleIcon color="success" />;
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
       case 'closed':
-        return <CheckCircleIcon color="action" />;
+        return <CheckCircle className="w-4 h-4 text-gray-600" />;
       default:
-        return <WarningIcon />;
+        return <AlertTriangle className="w-4 h-4 text-gray-600" />;
     }
   };
 
@@ -359,517 +296,682 @@ const IncidentManagement: React.FC = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  // Loading state
   if (loading) {
     return (
-      <Container maxWidth="xl" sx={{ py: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <CircularProgress size={60} />
-      </Container>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading incidents...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
+    <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1" fontWeight="bold">
-          Incident Management
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Incident Management</h1>
+          <p className="text-gray-600">Track and manage security incidents and issues</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button
           onClick={handleCreateIncident}
-          sx={{ borderRadius: 2 }}
-        >
-          Create Incident
-        </Button>
-      </Box>
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create Incident</span>
+          </button>
+        </div>
+      </div>
 
       {/* Error Alert */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-600 mr-3" />
+            <p className="text-red-800">{error}</p>
+          </div>
+          <button onClick={() => setError('')} className="text-red-600 hover:text-red-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       )}
 
-      {/* Statistics Cards */}
+      {/* Stats Cards */}
       {stats && (
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Total Incidents
-                </Typography>
-                <Typography variant="h4" component="div">
-                  {stats.total}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Open Incidents
-                </Typography>
-                <Typography variant="h4" component="div" color="warning.main">
-                  {stats.open}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Critical Incidents
-                </Typography>
-                <Typography variant="h4" component="div" color="error.main">
-                  {stats.critical}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Resolved Today
-                </Typography>
-                <Typography variant="h4" component="div" color="success.main">
-                  {stats.resolvedToday}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <DashboardCard
+            name="Total Incidents"
+            value={stats.total}
+            icon={FileText}
+            color="blue"
+          />
+          <DashboardCard
+            name="Open Incidents"
+            value={stats.open}
+            icon={AlertTriangle}
+            color="yellow"
+          />
+          <DashboardCard
+            name="Critical Incidents"
+            value={stats.critical}
+            icon={AlertCircle}
+            color="red"
+          />
+          <DashboardCard
+            name="Resolved Today"
+            value={stats.resolvedToday}
+            icon={CheckCircle}
+            color="green"
+          />
+        </div>
       )}
 
-      {/* Filters */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <FilterIcon />
-          Filters
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 4 }}>
-            <TextField
-              fullWidth
+      {/* Search and Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
               placeholder="Search incidents..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 2 }}>
-            <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+            <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                label="Status"
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="open">Open</MenuItem>
-                <MenuItem value="investigating">Investigating</MenuItem>
-                <MenuItem value="resolved">Resolved</MenuItem>
-                <MenuItem value="closed">Closed</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid size={{ xs: 12, md: 2 }}>
-            <FormControl fullWidth>
-              <InputLabel>Severity</InputLabel>
-              <Select
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Status</option>
+              <option value="open">Open</option>
+              <option value="investigating">Investigating</option>
+              <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
+            </select>
+
+            <select
                 value={severityFilter}
                 onChange={(e) => setSeverityFilter(e.target.value)}
-                label="Severity"
-              >
-                <MenuItem value="">All</MenuItem>
-                <MenuItem value="low">Low</MenuItem>
-                <MenuItem value="medium">Medium</MenuItem>
-                <MenuItem value="high">High</MenuItem>
-                <MenuItem value="critical">Critical</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid size={{ xs: 12, md: 2 }}>
-            <FormControl fullWidth>
-              <InputLabel>Category</InputLabel>
-              <Select
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Severity</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+
+            <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                label="Category"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <MenuItem value="">All</MenuItem>
+              <option value="">All Categories</option>
                 {categories.map((category) => (
-                  <MenuItem key={category.id} value={category.name}>
+                <option key={category.id} value={category.name}>
                     {category.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid size={{ xs: 12, md: 2 }}>
-            <Button
-              variant="outlined"
+                </option>
+              ))}
+            </select>
+
+            <button
               onClick={() => {
                 setSearchTerm('');
                 setStatusFilter('');
                 setSeverityFilter('');
                 setCategoryFilter('');
               }}
-              fullWidth
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
             >
-              Clear Filters
-            </Button>
-          </Grid>
-        </Grid>
-      </Paper>
+              <Filter className="w-4 h-4" />
+              <span>Clear</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Incidents Table */}
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-        <TableContainer>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell>Title</TableCell>
-                <TableCell>Category</TableCell>
-                <TableCell>Severity</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Priority</TableCell>
-                <TableCell>Assignee</TableCell>
-                <TableCell>Location</TableCell>
-                <TableCell>Reported</TableCell>
-                <TableCell align="center">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assignee</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reported</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
               {paginatedIncidents.map((incident) => (
-                <TableRow key={incident.id} hover>
-                  <TableCell>
-                    <Box>
-                      <Typography variant="subtitle2" fontWeight="bold">
+                <tr key={incident.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
                         {incident.title}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary" noWrap sx={{ maxWidth: 200 }}>
+                      </div>
+                      <div className="text-sm text-gray-500 max-w-xs truncate">
                         {incident.description}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={incident.category}
-                      size="small"
-                      sx={{
-                        bgcolor: getCategoryColor(incident.category),
-                        color: 'white',
-                        fontWeight: 'bold'
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={incident.severity}
-                      size="small"
-                      sx={{
-                        bgcolor: getSeverityColor(incident.severity),
-                        color: 'white',
-                        fontWeight: 'bold'
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span 
+                      className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white"
+                      style={{ backgroundColor: getCategoryColor(incident.category) }}
+                    >
+                      {incident.category}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span 
+                      className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white"
+                      style={{ backgroundColor: getSeverityColor(incident.severity) }}
+                    >
+                      {incident.severity}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-2">
                       {getStatusIcon(incident.status)}
-                      <Chip
-                        label={incident.status}
-                        size="small"
-                        sx={{
-                          bgcolor: getStatusColor(incident.status),
-                          color: 'white',
-                          fontWeight: 'bold'
-                        }}
-                      />
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={incident.priority}
-                      size="small"
-                      sx={{
-                        bgcolor: getPriorityColor(incident.priority),
-                        color: 'white',
-                        fontWeight: 'bold'
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
+                      <span 
+                        className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white"
+                        style={{ backgroundColor: getStatusColor(incident.status) }}
+                      >
+                        {incident.status}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span 
+                      className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white"
+                      style={{ backgroundColor: getPriorityColor(incident.priority) }}
+                    >
+                      {incident.priority}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     {incident.assigneeId ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Avatar sx={{ width: 24, height: 24 }}>
-                          <PersonIcon />
-                        </Avatar>
-                        <Typography variant="body2">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                          <User className="w-4 h-4 text-gray-600" />
+                        </div>
+                        <span className="text-sm text-gray-900">
                           User {incident.assigneeId}
-                        </Typography>
-                      </Box>
+                        </span>
+                      </div>
                     ) : (
-                      <Typography variant="body2" color="textSecondary">
-                        Unassigned
-                      </Typography>
+                      <span className="text-sm text-gray-500">Unassigned</span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <LocationIcon fontSize="small" color="action" />
-                      <Typography variant="body2">
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-900">
                         {incident.location}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
                       {formatDate(incident.reportedAt)}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary">
+                    </div>
+                    <div className="text-xs text-gray-500">
                       {formatDateTime(incident.reportedAt)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    <Stack direction="row" spacing={1} justifyContent="center">
-                      <Tooltip title="View Details">
-                        <IconButton
-                          size="small"
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center space-x-2">
+                      <button
                           onClick={() => handleViewIncident(incident)}
-                          color="primary"
-                        >
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit Incident">
-                        <IconButton
-                          size="small"
+                        className="text-blue-600 hover:text-blue-900"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
                           onClick={() => handleEditIncident(incident)}
-                          color="primary"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete Incident">
-                        <IconButton
-                          size="small"
+                        className="text-green-600 hover:text-green-900"
+                        title="Edit Incident"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
                           onClick={() => handleDeleteClick(incident)}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete Incident"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(_, page) => setCurrentPage(page)}
-            color="primary"
-            showFirstButton
-            showLastButton
-          />
-        </Box>
+        <div className="flex justify-center mt-6">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              First
+            </button>
+            <button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  "px-3 py-2 text-sm font-medium border-t border-b border-gray-300",
+                  page === currentPage
+                    ? "bg-blue-50 text-blue-600 border-blue-300"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                )}
+              >
+                {page}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Last
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
+      {dialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setDialogOpen(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
           {viewMode ? 'View Incident' : selectedIncident ? 'Edit Incident' : 'Create Incident'}
-        </DialogTitle>
-        <DialogContent>
+              </h3>
+              <button
+                onClick={() => setDialogOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           {viewMode ? (
-            <Box>
-              <Typography variant="h6" gutterBottom>{selectedIncident?.title}</Typography>
-              <Typography variant="body1" paragraph>{selectedIncident?.description}</Typography>
-                          <Grid container spacing={2}>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="subtitle2">Category: {selectedIncident?.category}</Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="subtitle2">Severity: {selectedIncident?.severity}</Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="subtitle2">Status: {selectedIncident?.status}</Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="subtitle2">Priority: {selectedIncident?.priority}</Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="subtitle2">Location: {selectedIncident?.location}</Typography>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <Typography variant="subtitle2">Reported: {selectedIncident?.reportedAt}</Typography>
-              </Grid>
-            </Grid>
-            </Box>
-          ) : (
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Title"
+                // View Mode - grouped sections, read-only
+                <div className="p-4">
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-2.5">
+                      <div className="p-1.5 bg-primary-100 rounded-lg">
+                        <Eye className="w-5 h-5 text-primary-600" />
+                      </div>
+                      <h3 className="text-base font-semibold text-gray-900">Incident Details</h3>
+                    </div>
+                    <button
+                      onClick={() => setDialogOpen(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Incident Details Content */}
+                  <div className="space-y-6">
+                    {/* Incident Header */}
+                    <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+                        <AlertTriangle className="w-8 h-8 text-primary-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-xl font-semibold text-gray-900">{selectedIncident?.title}</h4>
+                        <p className="text-gray-600">{selectedIncident?.category}</p>
+                        <div className="flex items-center space-x-4 mt-2">
+                          <span className={cn(
+                            "px-2 py-1 text-xs font-medium rounded-full",
+                            selectedIncident?.status === 'open' ? 'bg-red-100 text-red-800' :
+                            selectedIncident?.status === 'investigating' ? 'bg-yellow-100 text-yellow-800' :
+                            selectedIncident?.status === 'resolved' ? 'bg-green-100 text-green-800' :
+                            'bg-gray-100 text-gray-800'
+                          )}>
+                            {selectedIncident?.status?.replace('_', ' ')}
+                          </span>
+                          <span className={cn(
+                            "px-2 py-1 text-xs font-medium rounded-full",
+                            selectedIncident?.severity === 'low' ? 'bg-green-100 text-green-800' :
+                            selectedIncident?.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                            selectedIncident?.severity === 'high' ? 'bg-orange-100 text-orange-800' :
+                            'bg-red-100 text-red-800'
+                          )}>
+                            {selectedIncident?.severity}
+                          </span>
+                          <span className="text-sm text-gray-500">{selectedIncident?.location}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Incident Information */}
+                      <div className="space-y-4">
+                        <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Incident Information</h5>
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <FileText className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Category</p>
+                              <p className="text-sm text-gray-600">{selectedIncident?.category}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                              <AlertCircle className="w-4 h-4 text-red-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Severity</p>
+                              <span className={cn(
+                                "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                                selectedIncident?.severity === 'low' ? 'bg-green-100 text-green-800' :
+                                selectedIncident?.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                selectedIncident?.severity === 'high' ? 'bg-orange-100 text-orange-800' :
+                                'bg-red-100 text-red-800'
+                              )}>
+                                {selectedIncident?.severity}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                              <AlertTriangle className="w-4 h-4 text-purple-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Priority</p>
+                              <span className={cn(
+                                "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                                selectedIncident?.priority === 'low' ? 'bg-green-100 text-green-800' :
+                                selectedIncident?.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                selectedIncident?.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                                'bg-red-100 text-red-800'
+                              )}>
+                                {selectedIncident?.priority}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status & Assignment */}
+                      <div className="space-y-4">
+                        <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Status & Assignment</h5>
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Status</p>
+                              <span className={cn(
+                                "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                                selectedIncident?.status === 'open' ? 'bg-red-100 text-red-800' :
+                                selectedIncident?.status === 'investigating' ? 'bg-yellow-100 text-yellow-800' :
+                                selectedIncident?.status === 'resolved' ? 'bg-green-100 text-green-800' :
+                                'bg-gray-100 text-gray-800'
+                              )}>
+                                {selectedIncident?.status?.replace('_', ' ')}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                              <MapPin className="w-4 h-4 text-indigo-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Location</p>
+                              <p className="text-sm text-gray-600">{selectedIncident?.location || '—'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <User className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Reported At</p>
+                              <p className="text-sm text-gray-600">{selectedIncident?.reportedAt || '—'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Description Section */}
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Description</h5>
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-900">{selectedIncident?.description || '—'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+                    <button
+                      onClick={() => setDialogOpen(false)}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input
+                      type="text"
                   value={formData.title}
                   onChange={(e) => handleFormChange('title', e.target.value)}
                   required
-                />
-              </Grid>
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Description"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
                   value={formData.description}
                   onChange={(e) => handleFormChange('description', e.target.value)}
-                  multiline
                   rows={3}
                   required
-                />
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Category</InputLabel>
-                  <Select
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                      <select
                     value={formData.category}
                     onChange={(e) => handleFormChange('category', e.target.value)}
-                    label="Category"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                        <option value="">Select Category</option>
                     {categories.map((category) => (
-                      <MenuItem key={category.id} value={category.name}>
+                          <option key={category.id} value={category.name}>
                         {category.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Severity</InputLabel>
-                  <Select
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Severity</label>
+                      <select
                     value={formData.severity}
                     onChange={(e) => handleFormChange('severity', e.target.value)}
-                    label="Severity"
-                  >
-                    <MenuItem value="low">Low</MenuItem>
-                    <MenuItem value="medium">Medium</MenuItem>
-                    <MenuItem value="high">High</MenuItem>
-                    <MenuItem value="critical">Critical</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Priority</InputLabel>
-                  <Select
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                      <select
                     value={formData.priority}
                     onChange={(e) => handleFormChange('priority', e.target.value)}
-                    label="Priority"
-                  >
-                    <MenuItem value="low">Low</MenuItem>
-                    <MenuItem value="medium">Medium</MenuItem>
-                    <MenuItem value="high">High</MenuItem>
-                    <MenuItem value="urgent">Urgent</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <FormControl fullWidth>
-                  <InputLabel>Assignee</InputLabel>
-                  <Select
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Assignee</label>
+                      <select
                     value={formData.assigneeId}
                     onChange={(e) => handleFormChange('assigneeId', e.target.value)}
-                    label="Assignee"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <MenuItem value="">Unassigned</MenuItem>
+                        <option value="">Unassigned</option>
                     {users.map((user) => (
-                      <MenuItem key={user.id} value={user.id}>
+                          <option key={user.id} value={user.id}>
                         {user.firstName} {user.lastName}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Location"
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                    <input
+                      type="text"
                   value={formData.location}
                   onChange={(e) => handleFormChange('location', e.target.value)}
                   required
-                />
-              </Grid>
-            </Grid>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDialogOpen(false)}>
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setDialogOpen(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
             {viewMode ? 'Close' : 'Cancel'}
-          </Button>
+              </button>
           {!viewMode && (
-            <Button
-              variant="contained"
+                <button
               onClick={handleSaveIncident}
               disabled={!formData.title || !formData.description || !formData.category}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {selectedIncident ? 'Update' : 'Create'}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete}>
-        <DialogTitle>Delete Incident</DialogTitle>
-        <DialogContent>
-          <Typography>
+      {deleteDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={handleCancelDelete}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <span>Delete Incident</span>
+              </h3>
+              <button
+                onClick={handleCancelDelete}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-gray-700">
             Are you sure you want to delete "{incidentToDelete?.title}"?
             This action cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelDelete}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleConfirmDelete}>
-            Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-      >
-        <Alert
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Container>
+              </p>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={handleCancelDelete}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

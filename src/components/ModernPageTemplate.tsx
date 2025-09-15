@@ -5,13 +5,26 @@ import {
   Typography,
   Fade,
   Grow,
-  useTheme,
   Grid,
   Card,
   CardContent,
 } from '@mui/material';
 
-const ModernPageTemplate = ({ 
+interface ModernPageTemplateProps {
+  title?: string;
+  subtitle?: string;
+  children?: React.ReactNode;
+  headerActions?: React.ReactNode;
+  statsCards?: React.ReactNode[];
+  loading?: boolean;
+  loadingText?: string;
+  error?: string | null;
+  errorText?: string;
+  onRetry?: (() => void) | null;
+  [key: string]: any;
+}
+
+const ModernPageTemplate: React.FC<ModernPageTemplateProps> = ({ 
   title, 
   subtitle, 
   children, 
@@ -23,7 +36,7 @@ const ModernPageTemplate = ({
   errorText = "Something went wrong",
   onRetry = null,
 }) => {
-  const theme = useTheme();
+  // const theme = useTheme();
 
   if (loading) {
     return (

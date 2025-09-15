@@ -8,8 +8,23 @@ import {
   MenuItem,
   Typography,
   Stack,
-  useTheme
+  SxProps,
+  Theme
 } from '@mui/material';
+
+interface CustomPaginationProps {
+  currentPage?: number;
+  totalPages?: number;
+  totalItems?: number;
+  itemsPerPage?: number;
+  onPageChange?: (page: number) => void;
+  onItemsPerPageChange?: (itemsPerPage: number) => void;
+  showItemsPerPage?: boolean;
+  showTotal?: boolean;
+  size?: 'small' | 'medium' | 'large';
+  sx?: SxProps<Theme>;
+  [key: string]: any;
+}
 import {
   FirstPage as FirstPageIcon,
   LastPage as LastPageIcon,
@@ -17,7 +32,7 @@ import {
   NavigateNext as NavigateNextIcon
 } from '@mui/icons-material';
 
-const CustomPagination = ({
+const CustomPagination: React.FC<CustomPaginationProps> = ({
   currentPage = 1,
   totalPages = 1,
   totalItems = 0,
@@ -28,15 +43,15 @@ const CustomPagination = ({
   showTotal = true,
   size = 'medium'
 }) => {
-  const theme = useTheme();
+  // const theme = useTheme();
 
-  const handlePageChange = (event, page) => {
+  const handlePageChange = (_event: any, page: number) => {
     if (onPageChange) {
       onPageChange(page);
     }
   };
 
-  const handleItemsPerPageChange = (event) => {
+  const handleItemsPerPageChange = (event: any) => {
     if (onItemsPerPageChange) {
       onItemsPerPageChange(event.target.value);
     }
@@ -130,6 +145,7 @@ const CustomPagination = ({
           showLastButton
           renderItem={(item) => (
             <PaginationItem
+              {...({ component: "div" } as any)}
               slots={{
                 first: FirstPageIcon,
                 last: LastPageIcon,

@@ -1,55 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Paper,
-  Typography,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  Alert,
-  Card,
-  CardContent,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  CircularProgress,
-  Snackbar,
-  Tooltip,
-  Stack,
-  Container,
-  Fade,
-  Pagination,
-  Avatar,
-  Switch,
-  FormControlLabel,
-  InputAdornment,
-  IconButton
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Search as SearchIcon,
-  Download as DownloadIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  FileUpload as FileUploadIcon,
-  Description as DescriptionIcon,
-  Security as SecurityIcon,
-  Schedule as ScheduleIcon,
-  CloudUpload as CloudUploadIcon
-} from '@mui/icons-material';
+  Plus,
+  Search,
+  Download,
+  Edit,
+  Trash2,
+  Upload,
+  FileText,
+  Shield,
+  Clock,
+  Filter,
+  RefreshCw,
+  X,
+  AlertCircle,
+  CheckCircle
+} from 'lucide-react';
+import { cn } from '../utils/cn';
 import documentService from '../services/documentService';
-import { Document, DocumentFormData } from '../types';
+import { Document } from '../types';
+import { showNotification } from '../utils/notification';
+import DashboardCard from '../components/DashboardCard';
 
 const DocumentManagement: React.FC = () => {
   // State management
@@ -60,20 +30,19 @@ const DocumentManagement: React.FC = () => {
   const [filterType, setFilterType] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterAccessLevel, setFilterAccessLevel] = useState('');
-  const [sortBy, setSortBy] = useState('uploadedAt');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [sortBy] = useState('uploadedAt');
+  const [sortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [rowsPerPage] = useState(10);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editingDocument, setEditingDocument] = useState<Document | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileCache, setFileCache] = useState<Map<string, File>>(new Map());
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'warning' | 'info' });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
   
   // Form state
-  const [formData, setFormData] = useState<DocumentFormData>({
+  const [formData, setFormData] = useState({
     title: '',
     type: '',
     category: '',
@@ -119,7 +88,7 @@ const DocumentManagement: React.FC = () => {
       console.log('Documents loaded:', result);
       
       if (result.success && result.data) {
-        const documentsArray = Array.isArray(result.data) ? result.data : [];
+        const documentsArray = Array.isArray(result.data) ? result.data as Document[] : [];
         console.log('Setting documents to:', documentsArray.length, 'documents');
         setDocuments(documentsArray);
         setError('');
@@ -200,7 +169,7 @@ const DocumentManagement: React.FC = () => {
         'txt': 'Text Document'
       };
       if (extension && typeMap[extension]) {
-        setFormData(prev => ({ ...prev, type: typeMap[extension] }));
+        setFormData((prev: any) => ({ ...prev, type: typeMap[extension] }));
       }
     }
   };
@@ -209,12 +178,12 @@ const DocumentManagement: React.FC = () => {
   const handleFormSubmit = async () => {
     // Only require file for new documents, not for updates
     if (!editingDocument && !selectedFile) {
-      setSnackbar({ open: true, message: 'Please select a file to upload', severity: 'error' });
+      showNotification('Please select a file to upload', 'error');
       return;
     }
 
     if (!formData.title.trim()) {
-      setSnackbar({ open: true, message: 'Please enter a title', severity: 'error' });
+      showNotification('Please enter a title', 'error');
       return;
     }
 
@@ -241,7 +210,7 @@ const DocumentManagement: React.FC = () => {
         const result = await documentService.updateDocument(editingDocument.id, updateData);
         
         if (result.success) {
-          setSnackbar({ open: true, message: 'Document updated successfully!', severity: 'success' });
+          showNotification('Document updated successfully!', 'success');
           loadDocuments();
           loadStats();
           handleCloseUploadDialog();
@@ -263,10 +232,12 @@ const DocumentManagement: React.FC = () => {
         console.log('Submitting document data:', documentData);
         const result = await documentService.createDocument(documentData);
         
-        if (result.success && result.data?.id) {
+        if (result.success && result.data?.['id']) {
           // Cache the file for download
-          setFileCache(prev => new Map(prev).set(result.data.id, selectedFile));
-          setSnackbar({ open: true, message: 'Document uploaded successfully!', severity: 'success' });
+          if (selectedFile) {
+            setFileCache(prev => new Map(prev).set(result.data!['id'], selectedFile));
+          }
+          showNotification('Document uploaded successfully!', 'success');
           loadDocuments();
           loadStats();
           handleCloseUploadDialog();
@@ -276,11 +247,7 @@ const DocumentManagement: React.FC = () => {
       }
     } catch (err) {
       console.error('Error submitting form:', err);
-      setSnackbar({ 
-        open: true, 
-        message: err instanceof Error ? err.message : 'Failed to process document', 
-        severity: 'error' 
-      });
+      showNotification(err instanceof Error ? err.message : 'Failed to process document', 'error');
     } finally {
       setLoading(false);
     }
@@ -316,7 +283,7 @@ const DocumentManagement: React.FC = () => {
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-        setSnackbar({ open: true, message: `Downloaded ${doc.title}`, severity: 'success' });
+        showNotification(`Downloaded ${doc.title}`, 'success');
       } else if ((doc as any).fileData && (doc as any).fileData.trim() !== '') {
         // Download from base64 data stored in Firestore
         const base64Data = (doc as any).fileData;
@@ -340,7 +307,7 @@ const DocumentManagement: React.FC = () => {
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-        setSnackbar({ open: true, message: `Downloaded ${doc.title}`, severity: 'success' });
+        showNotification(`Downloaded ${doc.title}`, 'success');
       } else if (doc.url && doc.url.trim() !== '' && !doc.url.includes('dashboard')) {
         // Open URL in new tab
         window.open(doc.url, '_blank');
@@ -367,11 +334,11 @@ Note: Original file not available for download.`;
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-        setSnackbar({ open: true, message: `Downloaded ${doc.title} information`, severity: 'info' });
+        showNotification(`Downloaded ${doc.title} information`, 'info');
       }
     } catch (err) {
       console.error('Error downloading document:', err);
-      setSnackbar({ open: true, message: 'Failed to download document', severity: 'error' });
+      showNotification('Failed to download document', 'error');
     }
   };
 
@@ -411,7 +378,7 @@ Note: Original file not available for download.`;
           newCache.delete(documentToDelete.id);
           return newCache;
         });
-        setSnackbar({ open: true, message: `Document "${documentToDelete.title}" permanently deleted`, severity: 'success' });
+        showNotification(`Document "${documentToDelete.title}" permanently deleted`, 'success');
 
         // Reload both documents and stats
         console.log('Reloading documents and stats...');
@@ -421,11 +388,7 @@ Note: Original file not available for download.`;
       }
     } catch (err) {
       console.error('Error deleting document:', err);
-      setSnackbar({
-        open: true,
-        message: err instanceof Error ? err.message : 'Failed to delete document',
-        severity: 'error'
-      });
+      showNotification(err instanceof Error ? err.message : 'Failed to delete document', 'error');
     } finally {
       setDeleteDialogOpen(false);
       setDocumentToDelete(null);
@@ -439,14 +402,6 @@ Note: Original file not available for download.`;
   };
 
 
-  // Format file size
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
 
   // Format date
   const formatDate = (date: string | number) => {
@@ -459,426 +414,525 @@ Note: Original file not available for download.`;
     });
   };
 
+  // Loading state
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress size={60} />
-      </Box>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading documents...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
+    <div className="space-y-6 p-4 sm:p-6">
                 {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1" fontWeight="bold">
-          Document Management
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Document Management</h1>
+          <p className="text-gray-600">Upload, organize, and manage your documents</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button 
           onClick={() => setUploadDialogOpen(true)}
-          sx={{ borderRadius: 2 }}
-        >
-          Upload Document
-        </Button>
-      </Box>
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Upload Document</span>
+          </button>
+          <button 
+            onClick={loadData}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center space-x-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
 
       {/* Error Alert */}
           {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-              {error}
-            </Alert>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-600 mr-3" />
+            <p className="text-red-800">{error}</p>
+          </div>
+          <button
+            onClick={() => setError('')}
+            className="text-red-600 hover:text-red-800"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
           )}
 
           {/* Stats Cards */}
-      <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3} mb={4}>
-            <Card>
-              <CardContent>
-            <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Box>
-                <Typography color="textSecondary" gutterBottom>
-                      Total Documents
-                    </Typography>
-                <Typography variant="h4" fontWeight="bold">
-                  {stats.total}
-                </Typography>
-                  </Box>
-              <Avatar sx={{ bgcolor: 'primary.main' }}>
-                <DescriptionIcon />
-              </Avatar>
-                </Box>
-              </CardContent>
-            </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <DashboardCard
+          name="Total Documents"
+          value={stats.total}
+          icon={FileText}
+          color="blue"
+        />
+        <DashboardCard
+          name="Active Documents"
+          value={stats.active}
+          icon={CheckCircle}
+          color="green"
+        />
+        <DashboardCard
+          name="Restricted Access"
+          value={stats.restricted}
+          icon={Shield}
+          color="yellow"
+        />
+        <DashboardCard
+          name="Expired Documents"
+          value={stats.expired}
+          icon={Clock}
+          color="red"
+        />
+      </div>
 
-            <Card>
-              <CardContent>
-            <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Box>
-                <Typography color="textSecondary" gutterBottom>
-                  Active Documents
-                    </Typography>
-                <Typography variant="h4" fontWeight="bold" color="success.main">
-                  {stats.active}
-                    </Typography>
-                  </Box>
-              <Avatar sx={{ bgcolor: 'success.main' }}>
-                <CloudUploadIcon />
-              </Avatar>
-                </Box>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent>
-            <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Box>
-                <Typography color="textSecondary" gutterBottom>
-                  Restricted Access
-                    </Typography>
-                <Typography variant="h4" fontWeight="bold" color="warning.main">
-                  {stats.restricted}
-                    </Typography>
-                  </Box>
-              <Avatar sx={{ bgcolor: 'warning.main' }}>
-                <SecurityIcon />
-              </Avatar>
-                </Box>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent>
-            <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Box>
-                <Typography color="textSecondary" gutterBottom>
-                  Expired Documents
-                    </Typography>
-                <Typography variant="h4" fontWeight="bold" color="error.main">
-                  {stats.expired}
-                    </Typography>
-                  </Box>
-              <Avatar sx={{ bgcolor: 'error.main' }}>
-                <ScheduleIcon />
-              </Avatar>
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
-
-          {/* Filters */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-              <TextField
+      {/* Search and Filters */}
+      {documents.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
                 placeholder="Search documents..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-            }}
-            sx={{ minWidth: 250 }}
-          />
-          
-          <FormControl sx={{ minWidth: 150 }}>
-                <InputLabel>Type</InputLabel>
-                <Select
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+              >
+                <Filter className="w-4 h-4" />
+                <span>Filters</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Options */}
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-                  label="Type"
-            >
-              <MenuItem value="">All Types</MenuItem>
-              <MenuItem value="PDF">PDF</MenuItem>
-              <MenuItem value="Word Document">Word Document</MenuItem>
-              <MenuItem value="Excel Spreadsheet">Excel Spreadsheet</MenuItem>
-              <MenuItem value="PowerPoint Presentation">PowerPoint Presentation</MenuItem>
-              <MenuItem value="Image">Image</MenuItem>
-              <MenuItem value="Text Document">Text Document</MenuItem>
-            </Select>
-          </FormControl>
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Types</option>
+                  <option value="PDF">PDF</option>
+                  <option value="Word Document">Word Document</option>
+                  <option value="Excel Spreadsheet">Excel Spreadsheet</option>
+                  <option value="PowerPoint Presentation">PowerPoint Presentation</option>
+                  <option value="Image">Image</option>
+                  <option value="Text Document">Text Document</option>
+                </select>
+              </div>
 
-          <FormControl sx={{ minWidth: 150 }}>
-            <InputLabel>Category</InputLabel>
-            <Select
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              label="Category"
-            >
-              <MenuItem value="">All Categories</MenuItem>
-              <MenuItem value="HR Policies">HR Policies</MenuItem>
-              <MenuItem value="Training Materials">Training Materials</MenuItem>
-              <MenuItem value="Forms">Forms</MenuItem>
-              <MenuItem value="Reports">Reports</MenuItem>
-              <MenuItem value="Legal">Legal</MenuItem>
-              <MenuItem value="Other">Other</MenuItem>
-                </Select>
-              </FormControl>
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Categories</option>
+                  <option value="HR Policies">HR Policies</option>
+                  <option value="Training Materials">Training Materials</option>
+                  <option value="Forms">Forms</option>
+                  <option value="Reports">Reports</option>
+                  <option value="Legal">Legal</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
 
-          <FormControl sx={{ minWidth: 150 }}>
-                <InputLabel>Access Level</InputLabel>
-                <Select
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Access Level</label>
+                <select
               value={filterAccessLevel}
               onChange={(e) => setFilterAccessLevel(e.target.value)}
-                  label="Access Level"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-              <MenuItem value="">All Levels</MenuItem>
-                  <MenuItem value="public">Public</MenuItem>
-                  <MenuItem value="restricted">Restricted</MenuItem>
-              <MenuItem value="confidential">Confidential</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
-          </Paper>
+                  <option value="">All Levels</option>
+                  <option value="public">Public</option>
+                  <option value="restricted">Restricted</option>
+                  <option value="confidential">Confidential</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Documents Table */}
-          <Paper>
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Document</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Category</TableCell>
-                    <TableCell>Access Level</TableCell>
-                <TableCell>Uploaded</TableCell>
-                <TableCell>Expiry</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
+      {documents.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Document</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Access Level</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expiry</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
               {paginatedDocuments.map((doc) => (
-                <TableRow key={doc.id} hover>
-                                          <TableCell>
-                    <Box>
-                      <Typography variant="subtitle2" fontWeight="bold">
+                  <tr key={doc.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
+                            <FileText className="w-5 h-5 text-gray-600" />
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
                         {doc.title}
-                      </Typography>
+                          </div>
                       {doc.description && (
-                        <Typography variant="body2" color="textSecondary" noWrap>
-                          {doc.description}
-                        </Typography>
-                      )}
-                    </Box>
-                  </TableCell>
-                        <TableCell>
-                    <Chip label={doc.type} size="small" color="primary" />
-                  </TableCell>
-                  <TableCell>
-                    <Chip label={doc.category} size="small" color="secondary" />
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                      label={doc.accessLevel} 
-                            size="small"
-                      color={doc.accessLevel === 'public' ? 'success' : 'warning'} 
-                          />
-                        </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {formatDate(doc.uploadedAt)}
-                    </Typography>
-                  </TableCell>
-                        <TableCell>
-                    <Typography variant="body2">
+                            <div className="text-sm text-gray-500">{doc.description}</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                        {doc.type}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                        {doc.category}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={cn(
+                        "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                        doc.accessLevel === 'public' ? 'bg-green-100 text-green-800' : 
+                        doc.accessLevel === 'restricted' ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-red-100 text-red-800'
+                      )}>
+                        {doc.accessLevel}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{formatDate(doc.uploadedAt)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
                       {doc.expiryDate ? formatDate(doc.expiryDate) : 'No expiry'}
-                    </Typography>
-                        </TableCell>
-                                          <TableCell align="center">
-                    <Stack direction="row" spacing={1} justifyContent="center">
-                      <Tooltip title="Download">
-                        <IconButton onClick={() => handleDownload(doc)} size="small">
-                          <DownloadIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit">
-                        <IconButton onClick={() => handleEdit(doc)} size="small">
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton onClick={() => handleDeleteClick(doc)} size="small" color="error">
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
-                  </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleDownload(doc)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Download"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(doc)}
+                          className="text-green-600 hover:text-green-900"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(doc)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* No Results */}
+      {filteredDocuments.length === 0 && documents.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No documents found</h3>
+          <p className="text-gray-500">Try adjusting your search or filter parameters</p>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {documents.length === 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-medium text-gray-900 mb-2">No Documents Yet</h3>
+          <p className="text-gray-500 mb-6">Start by uploading your first document to get started with document management</p>
+          <button
+            onClick={() => setUploadDialogOpen(true)}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 mx-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Upload First Document</span>
+          </button>
+        </div>
+      )}
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <Box display="flex" justifyContent="center" p={2}>
-            <Pagination
-              count={totalPages}
-              page={page}
-              onChange={(_, newPage) => setPage(newPage)}
-              color="primary"
-            />
-          </Box>
-        )}
-          </Paper>
+      {filteredDocuments.length > rowsPerPage && (
+        <div className="flex justify-center">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+              <button
+                key={pageNum}
+                onClick={() => setPage(pageNum)}
+                className={cn(
+                  "px-3 py-2 text-sm font-medium rounded-lg",
+                  pageNum === page
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 bg-white border border-gray-300 hover:bg-gray-50"
+                )}
+              >
+                {pageNum}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setPage(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Upload/Edit Dialog */}
-      <Dialog open={uploadDialogOpen} onClose={handleCloseUploadDialog} maxWidth="md" fullWidth>
-        <DialogTitle>
-          {editingDocument ? 'Edit Document' : 'Upload New Document'}
-        </DialogTitle>
-            <DialogContent>
-          <Box display="flex" flexDirection="column" gap={3} pt={1}>
-                <TextField
-              label="Document Title"
+      {uploadDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={handleCloseUploadDialog}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                <Upload className="w-5 h-5" />
+                <span>{editingDocument ? 'Edit Document' : 'Upload New Document'}</span>
+              </h3>
+              <button
+                onClick={handleCloseUploadDialog}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Document Title</label>
+                  <input
+                    type="text"
                   value={formData.title}
-                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                  fullWidth
+                    onChange={(e) => setFormData((prev: any) => ({ ...prev, title: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
+                </div>
 
-            <Box display="flex" gap={2}>
-                <FormControl fullWidth>
-                  <InputLabel>Type</InputLabel>
-                  <Select
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select
                     value={formData.type}
-                  onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value }))}
-                    label="Type"
-                >
-                  <MenuItem value="PDF">PDF</MenuItem>
-                  <MenuItem value="Word Document">Word Document</MenuItem>
-                  <MenuItem value="Excel Spreadsheet">Excel Spreadsheet</MenuItem>
-                  <MenuItem value="PowerPoint Presentation">PowerPoint Presentation</MenuItem>
-                  <MenuItem value="Image">Image</MenuItem>
-                  <MenuItem value="Text Document">Text Document</MenuItem>
-                  </Select>
-                </FormControl>
+                      onChange={(e) => setFormData((prev: any) => ({ ...prev, type: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="PDF">PDF</option>
+                      <option value="Word Document">Word Document</option>
+                      <option value="Excel Spreadsheet">Excel Spreadsheet</option>
+                      <option value="PowerPoint Presentation">PowerPoint Presentation</option>
+                      <option value="Image">Image</option>
+                      <option value="Text Document">Text Document</option>
+                    </select>
+                  </div>
 
-              <FormControl fullWidth>
-                <InputLabel>Category</InputLabel>
-                <Select
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select
                   value={formData.category}
-                  onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                  label="Category"
-                >
-                  <MenuItem value="HR Policies">HR Policies</MenuItem>
-                  <MenuItem value="Training Materials">Training Materials</MenuItem>
-                  <MenuItem value="Forms">Forms</MenuItem>
-                  <MenuItem value="Reports">Reports</MenuItem>
-                  <MenuItem value="Legal">Legal</MenuItem>
-                  <MenuItem value="Other">Other</MenuItem>
-                </Select>
-              </FormControl>
-            </Box>
+                      onChange={(e) => setFormData((prev: any) => ({ ...prev, category: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="HR Policies">HR Policies</option>
+                      <option value="Training Materials">Training Materials</option>
+                      <option value="Forms">Forms</option>
+                      <option value="Reports">Reports</option>
+                      <option value="Legal">Legal</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
 
-                <TextField
-                  label="Description"
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
                   value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              fullWidth
-                  multiline
+                    onChange={(e) => setFormData((prev: any) => ({ ...prev, description: e.target.value }))}
                   rows={3}
-                />
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-            <Box display="flex" gap={2}>
-                <FormControl fullWidth>
-                  <InputLabel>Access Level</InputLabel>
-                  <Select
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Access Level</label>
+                    <select
                     value={formData.accessLevel}
-                  onChange={(e) => setFormData(prev => ({ ...prev, accessLevel: e.target.value }))}
-                    label="Access Level"
-                  >
-                    <MenuItem value="public">Public</MenuItem>
-                    <MenuItem value="restricted">Restricted</MenuItem>
-                  <MenuItem value="confidential">Confidential</MenuItem>
-                  </Select>
-                </FormControl>
+                      onChange={(e) => setFormData((prev: any) => ({ ...prev, accessLevel: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="public">Public</option>
+                      <option value="restricted">Restricted</option>
+                      <option value="confidential">Confidential</option>
+                    </select>
+                  </div>
 
-                <TextField
-                  label="Expiry Date"
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+                    <input
                   type="date"
                   value={formData.expiryDate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, expiryDate: e.target.value }))}
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
-                />
-            </Box>
+                      onChange={(e) => setFormData((prev: any) => ({ ...prev, expiryDate: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
 
-            <Box>
-              <Button
-                variant="outlined"
-                component="label"
-                startIcon={<FileUploadIcon />}
-                  fullWidth
-                sx={{ py: 2 }}
-              >
-                {selectedFile 
-                  ? selectedFile.name 
-                  : editingDocument 
-                    ? 'Select New File (optional)' 
-                    : 'Select File'
-                }
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">File</label>
+                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors">
+                    <div className="space-y-1 text-center">
+                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                      <div className="flex text-sm text-gray-600">
+                        <label
+                          htmlFor="file-upload"
+                          className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
+                        >
+                          <span>{selectedFile ? selectedFile.name : editingDocument ? 'Select New File (optional)' : 'Select File'}</span>
                 <input
+                            id="file-upload"
+                            name="file-upload"
                   type="file"
-                  hidden
+                            className="sr-only"
                   onChange={handleFileUpload}
                   accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.txt"
                 />
-              </Button>
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-500">PDF, DOC, XLS, PPT, JPG, PNG, TXT up to 10MB</p>
+                    </div>
+                  </div>
               {editingDocument && !selectedFile && (
-                <Typography variant="body2" color="textSecondary" sx={{ mt: 1, textAlign: 'center' }}>
+                    <p className="mt-1 text-sm text-gray-500 text-center">
                   Current file will be kept if no new file is selected
-              </Typography>
-              )}
-            </Box>
-          </Box>
-            </DialogContent>
-            <DialogActions>
-          <Button onClick={handleCloseUploadDialog}>Cancel</Button>
-          <Button 
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={handleCloseUploadDialog}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
             onClick={handleFormSubmit} 
-            variant="contained"
             disabled={(!editingDocument && !selectedFile) || !formData.title.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {editingDocument ? 'Update Document' : 'Upload Document'}
-              </Button>
-            </DialogActions>
-          </Dialog>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
                 {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete}>
-        <DialogTitle>Permanently Delete Document</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to permanently delete "{documentToDelete?.title}"?
+      {deleteDialogOpen && documentToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={handleCancelDelete}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                <Trash2 className="w-5 h-5" />
+                <span>Permanently Delete Document</span>
+              </h3>
+              <button
+                onClick={handleCancelDelete}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Are you sure you want to permanently delete <strong>"{documentToDelete.title}"</strong>? 
             This action will remove the document from the database completely and cannot be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCancelDelete}>Cancel</Button>
-          <Button variant="contained" color="error" onClick={handleConfirmDelete}>
-            Permanently Delete
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-          {/* Snackbar */}
-          <Snackbar
-            open={snackbar.open}
-            autoHideDuration={6000}
-            onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          >
-            <Alert 
-              onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
-              severity={snackbar.severity}
-            >
-              {snackbar.message}
-            </Alert>
-          </Snackbar>
-        </Container>
+              </p>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={handleCancelDelete}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Permanently Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
       );
     };
 

@@ -1,28 +1,44 @@
 import firebaseService from './firebaseService';
 
+interface EmployeeFilters {
+  department?: string;
+  designation?: string;
+  resigned?: boolean;
+  [key: string]: any;
+}
+
+interface QueryOptions {
+  where?: Array<{ field: string; operator: string; value: any }>;
+  orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
+  limit?: number;
+  [key: string]: any;
+}
+
 class EmployeeService {
+  private collection: string;
+
   constructor() {
     this.collection = 'employees';
   }
 
   // Get all employees
-  async getEmployees(filters = {}) {
+  async getEmployees(filters: EmployeeFilters = {}) {
     try {
-      const options = {};
+      const options: QueryOptions = {};
       
       // Build where conditions
-      const whereConditions = [];
+      const whereConditions: Array<{ field: string; operator: string; value: any }> = [];
       
-      if (filters.department) {
-        whereConditions.push({ field: 'department', operator: '==', value: filters.department });
+      if (filters['department']) {
+        whereConditions.push({ field: 'department', operator: '==', value: filters['department'] });
       }
       
-      if (filters.designation) {
-        whereConditions.push({ field: 'designation', operator: '==', value: filters.designation });
+      if (filters['designation']) {
+        whereConditions.push({ field: 'designation', operator: '==', value: filters['designation'] });
       }
       
-      if (filters.resigned !== undefined) {
-        whereConditions.push({ field: 'resigned', operator: '==', value: filters.resigned });
+      if (filters['resigned'] !== undefined) {
+        whereConditions.push({ field: 'resigned', operator: '==', value: filters['resigned'] });
       }
 
       if (whereConditions.length > 0) {
@@ -30,18 +46,18 @@ class EmployeeService {
       }
 
       // Apply ordering
-      if (filters.sortBy) {
-        options.orderBy = { 
-          field: filters.sortBy, 
-          direction: filters.sortOrder || 'asc' 
-        };
+      if (filters['sortBy']) {
+        options.orderBy = [{ 
+          field: filters['sortBy'], 
+          direction: (filters['sortOrder'] || 'asc') as 'asc' | 'desc'
+        }];
       } else {
-        options.orderBy = { field: 'employeeName', direction: 'asc' };
+        options.orderBy = [{ field: 'employeeName', direction: 'asc' }];
       }
 
       // Apply limit
-      if (filters.limit) {
-        options.limit = filters.limit;
+      if (filters['limit']) {
+        options.limit = filters['limit'];
       }
 
       const result = await firebaseService.getCollection(this.collection, options);
@@ -53,7 +69,7 @@ class EmployeeService {
   }
 
   // Get employee by ID
-  async getEmployee(id) {
+  async getEmployee(id: string) {
     try {
       const result = await firebaseService.getDocument(this.collection, id);
       return result;
@@ -64,7 +80,7 @@ class EmployeeService {
   }
 
   // Get employee by employee ID (not document ID)
-  async getEmployeeByEmployeeId(employeeId) {
+  async getEmployeeByEmployeeId(employeeId: string) {
     try {
       const result = await firebaseService.queryDocuments(
         this.collection,
@@ -80,7 +96,7 @@ class EmployeeService {
   }
 
   // Create employee
-  async createEmployee(employeeData) {
+  async createEmployee(employeeData: any) {
     try {
       const result = await firebaseService.addDocument(this.collection, employeeData);
       return result;
@@ -91,7 +107,7 @@ class EmployeeService {
   }
 
   // Update employee
-  async updateEmployee(id, updateData) {
+  async updateEmployee(id: string, updateData: any) {
     try {
       const result = await firebaseService.updateDocument(this.collection, id, updateData);
       return result;
@@ -102,7 +118,7 @@ class EmployeeService {
   }
 
   // Delete employee (soft delete)
-  async deleteEmployee(id) {
+  async deleteEmployee(id: string) {
     try {
       const result = await firebaseService.updateDocument(this.collection, id, { 
         resigned: true,
@@ -116,7 +132,7 @@ class EmployeeService {
   }
 
   // Permanently delete employee
-  async permanentDeleteEmployee(id) {
+  async permanentDeleteEmployee(id: string) {
     try {
       const result = await firebaseService.deleteDocument(this.collection, id);
       return result;
@@ -127,11 +143,10 @@ class EmployeeService {
   }
 
   // Search employees
-  async searchEmployees(searchTerm) {
+  async searchEmployees(searchTerm: string) {
     try {
       // Since Firestore doesn't support full-text search,
       // we'll implement a simple prefix search
-      const searchUpper = searchTerm.toUpperCase();
       
       // Search by name (prefix)
       const nameResults = await firebaseService.queryDocuments(
@@ -155,7 +170,7 @@ class EmployeeService {
         ...(idResults.success ? idResults.data || [] : [])
       ];
       const uniqueResults = allResults.filter((employee, index, self) => 
-        index === self.findIndex(e => e.id === employee.id)
+        index === self.findIndex(e => e['id'] === employee['id'])
       );
 
       return uniqueResults;
@@ -166,7 +181,7 @@ class EmployeeService {
   }
 
   // Get employees by department
-  async getEmployeesByDepartment(department) {
+  async getEmployeesByDepartment(department: string) {
     try {
       const result = await firebaseService.queryDocuments(
         this.collection,
@@ -190,7 +205,7 @@ class EmployeeService {
       }
       
       const allEmployees = allEmployeesResult.data || [];
-      const activeEmployees = allEmployees.filter(emp => !emp.resigned);
+      const activeEmployees = allEmployees.filter(emp => !emp['resigned']);
       
       const stats = {
         total: allEmployees.length,
@@ -202,8 +217,8 @@ class EmployeeService {
 
       // Count by department and designation
       activeEmployees.forEach(emp => {
-        stats.departments[emp.department] = (stats.departments[emp.department] || 0) + 1;
-        stats.designations[emp.designation] = (stats.designations[emp.designation] || 0) + 1;
+        (stats as any).departments[emp['department']] = ((stats as any).departments[emp['department']] || 0) + 1;
+        (stats as any).designations[emp['designation']] = ((stats as any).designations[emp['designation']] || 0) + 1;
       });
 
       return stats;
@@ -214,23 +229,23 @@ class EmployeeService {
   }
 
   // Get paginated employees
-  async getPaginatedEmployees(pageSize = 10, lastDoc = null, filters = {}) {
+  async getPaginatedEmployees(pageSize = 10, _lastDoc: any = null, filters: EmployeeFilters = {}) {
     try {
-      const options = {};
+      const options: QueryOptions = {};
       
       // Build where conditions
-      const whereConditions = [];
+      const whereConditions: Array<{ field: string; operator: string; value: any }> = [];
       
-      if (filters.department) {
-        whereConditions.push({ field: 'department', operator: '==', value: filters.department });
+      if (filters['department']) {
+        whereConditions.push({ field: 'department', operator: '==', value: filters['department'] });
       }
       
-      if (filters.designation) {
-        whereConditions.push({ field: 'designation', operator: '==', value: filters.designation });
+      if (filters['designation']) {
+        whereConditions.push({ field: 'designation', operator: '==', value: filters['designation'] });
       }
       
-      if (filters.resigned !== undefined) {
-        whereConditions.push({ field: 'resigned', operator: '==', value: filters.resigned });
+      if (filters['resigned'] !== undefined) {
+        whereConditions.push({ field: 'resigned', operator: '==', value: filters['resigned'] });
       }
 
       if (whereConditions.length > 0) {
@@ -238,7 +253,7 @@ class EmployeeService {
       }
 
       // Apply ordering
-      options.orderBy = { field: 'employeeName', direction: 'asc' };
+      options.orderBy = [{ field: 'employeeName', direction: 'asc' }];
 
       // Apply limit
       options.limit = pageSize;
@@ -252,26 +267,26 @@ class EmployeeService {
   }
 
   // Real-time employee updates
-  onEmployeesSnapshot(callback, filters = {}) {
+  onEmployeesSnapshot(_callback: (employees: any[]) => void, filters: EmployeeFilters = {}) {
     try {
-      const options = {};
+      const options: QueryOptions = {};
       
       // Build where conditions
-      const whereConditions = [];
+      const whereConditions: Array<{ field: string; operator: string; value: any }> = [];
       
-      if (filters.department) {
-        whereConditions.push({ field: 'department', operator: '==', value: filters.department });
+      if (filters['department']) {
+        whereConditions.push({ field: 'department', operator: '==', value: filters['department'] });
       }
       
-      if (filters.resigned !== undefined) {
-        whereConditions.push({ field: 'resigned', operator: '==', value: filters.resigned });
+      if (filters['resigned'] !== undefined) {
+        whereConditions.push({ field: 'resigned', operator: '==', value: filters['resigned'] });
       }
 
       if (whereConditions.length > 0) {
         options.where = whereConditions;
       }
 
-      options.orderBy = { field: 'employeeName', direction: 'asc' };
+      options.orderBy = [{ field: 'employeeName', direction: 'asc' }];
 
       // Note: onSnapshot is not implemented in firebaseService yet
       // This would need to be implemented in firebaseService
@@ -284,16 +299,16 @@ class EmployeeService {
   }
 
   // Update employee contact information
-  async updateEmployeeContact(id, contactData) {
+  async updateEmployeeContact(id: string, contactData: any) {
     try {
       const updateData = {};
       
-      if (contactData.contactInfo) {
-        updateData.contactInfo = contactData.contactInfo;
+      if (contactData['contactInfo']) {
+        (updateData as any)['contactInfo'] = contactData['contactInfo'];
       }
       
-      if (contactData.emergencyContacts) {
-        updateData.emergencyContacts = contactData.emergencyContacts;
+      if (contactData['emergencyContacts']) {
+        (updateData as any)['emergencyContacts'] = contactData['emergencyContacts'];
       }
 
       return await this.updateEmployee(id, updateData);
@@ -312,7 +327,7 @@ class EmployeeService {
       }
       
       const employees = employeesResult.data || [];
-      const departments = [...new Set(employees.map(emp => emp.department))];
+      const departments = [...new Set(employees.map(emp => emp['department']))];
       return departments.filter(dept => dept).sort();
     } catch (error) {
       console.error('Error fetching departments:', error);
@@ -329,7 +344,7 @@ class EmployeeService {
       }
       
       const employees = employeesResult.data || [];
-      const designations = [...new Set(employees.map(emp => emp.designation))];
+      const designations = [...new Set(employees.map(emp => emp['designation']))];
       return designations.filter(designation => designation).sort();
     } catch (error) {
       console.error('Error fetching designations:', error);

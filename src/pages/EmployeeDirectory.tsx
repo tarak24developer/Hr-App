@@ -1,68 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react';
-//
 import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Card,
-  CardContent,
-  Alert,
-  Snackbar,
-  Pagination,
-  Tooltip,
-  Avatar,
-  InputAdornment,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
-  CircularProgress
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Visibility as ViewIcon,
-  Search as SearchIcon,
-  FilterList as FilterIcon,
-  Person as PersonIcon,
-  Email as EmailIcon,
-  Phone as PhoneIcon,
-  Business as BusinessIcon,
-  Work as WorkIcon,
-  CalendarToday as CalendarIcon,
-  Badge as BadgeIcon,
-  Download as DownloadIcon,
-  Emergency as EmergencyIcon,
-  Refresh as RefreshIcon,
-  AccountBalance as BankIcon,
-  CreditCard as CardIcon,
-  School as EducationIcon,
-  Home as HomeIcon,
-  Description as FileText,
-  ExitToApp as ExitIcon
-} from '@mui/icons-material';
+  Search,
+  Filter,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  Download,
+  Users,
+  Mail,
+  Phone,
+  Building,
+  Briefcase,
+  Badge,
+  X,
+  User,
+  CheckCircle,
+  Clock,
+  MapPin
+} from 'lucide-react';
+import { cn } from '../utils/cn';
 import firebaseService from '../services/firebaseService';
-import { useAuthStore } from '../stores/authStore';
-import { populateSampleUsers, checkUsersCollection } from '../utils/sampleData';
+import DashboardCard from '../components/DashboardCard';
+// import { useAuthStore } from '../stores/authStore';
 import { formatIndianCurrency } from '../utils/currency';
 
 interface Employee {
@@ -132,14 +92,10 @@ const initialFilters: EmployeeFilters = {
   position: '',
 };
 
-const statusColors = {
-  active: '#4caf50',
-  inactive: '#ff9800',
-  terminated: '#f44336'
-};
+// Removed: statusColors (unused)
 
 const EmployeeDirectory: React.FC = () => {
-  const { user } = useAuthStore ? useAuthStore() : { user: null } as any;
+  // Removed: user (unused)
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -553,13 +509,9 @@ const EmployeeDirectory: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    return statusColors[status as keyof typeof statusColors] || '#9e9e9e';
-  };
+  // Removed: getStatusColor (unused)
 
-  const formatSalary = (salary: number) => {
-    return formatIndianCurrency(salary);
-  };
+  // Removed: formatSalary (unused)
 
   const maskSalary = (salary: number) => {
     const formatted = formatIndianCurrency(salary);
@@ -577,7 +529,8 @@ const EmployeeDirectory: React.FC = () => {
     return maskedReversed.reverse().join('');
   };
 
-  const canViewSalary = !!(user && (user.role === 'admin' || user.role === 'hr'));
+  // Note: canViewSalary is currently unused in the compact view
+  // const canViewSalary = !!(user && (user.role === 'admin' || user.role === 'hr'));
 
   const getDepartmentCount = (departmentName: string) => {
     return employees.filter(emp => emp.department === departmentName).length;
@@ -599,285 +552,239 @@ const EmployeeDirectory: React.FC = () => {
   // Show loading state
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress size={60} />
-        <Typography variant="h6" sx={{ ml: 2 }}>
-          Loading Employee Directory...
-        </Typography>
-      </Box>
+      <div className="flex justify-center items-center h-96">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+        <p className="ml-3 text-base font-medium text-gray-700">Loading Employee Directory...</p>
+      </div>
     );
   }
 
   // Show error state
   if (error) {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-        <Button variant="contained" onClick={() => window.location.reload()}>
+      <div className="p-6 text-center">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+          <p className="text-red-800">{error}</p>
+        </div>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+        >
           Retry
-        </Button>
-      </Box>
+        </button>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Employee Directory
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
+    <div className="space-y-6 p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Employee Directory</h1>
+          <p className="text-gray-600">Manage your team members and their information</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button
             onClick={handleExportEmployees}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2"
           >
-            Download Employees Info
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
+            <Download className="w-4 h-4" />
+            <span>Export</span>
+          </button>
+          <button
             onClick={handleCreateEmployee}
-            sx={{ bgcolor: 'primary.main' }}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
           >
-            Add Employee
-          </Button>
-        </Box>
-      </Box>
+            <Plus className="w-4 h-4" />
+            <span>Add Employee</span>
+          </button>
+        </div>
+      </div>
 
       {/* Statistics Cards */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-        gap: 3, 
-        mb: 3 
-      }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Employees
-            </Typography>
-            <Typography variant="h4" component="div">
-              {employees.length}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Active Employees
-            </Typography>
-            <Typography variant="h4" component="div" color="success.main">
-              {employees.filter(emp => emp.status === 'active').length}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Departments
-            </Typography>
-            <Typography variant="h4" component="div" color="primary.main">
-              {departments.length}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              New This Month
-            </Typography>
-            <Typography variant="h4" component="div" color="info.main">
-              {employees.filter(emp => {
-                const joinDate = new Date(emp.joiningDate);
-                const now = new Date();
-                return joinDate.getMonth() === now.getMonth() && 
-                       joinDate.getFullYear() === now.getFullYear();
-              }).length}
-            </Typography>
-          </CardContent>
-        </Card>
-      </Box>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <DashboardCard
+          name="Total Employees"
+          value={employees.length}
+          icon={Users}
+          color="blue"
+        />
+        <DashboardCard
+          name="Active Employees"
+          value={employees.filter(emp => emp.status === 'active').length}
+          icon={CheckCircle}
+          color="green"
+        />
+        <DashboardCard
+          name="Departments"
+          value={departments.length}
+          icon={Building}
+          color="purple"
+        />
+        <DashboardCard
+          name="New This Month"
+          value={employees.filter(emp => {
+            const joinDate = new Date(emp.joiningDate);
+            const now = new Date();
+            return joinDate.getMonth() === now.getMonth() && 
+                   joinDate.getFullYear() === now.getFullYear();
+          }).length}
+          icon={Clock}
+          color="yellow"
+        />
+      </div>
 
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterIcon sx={{ mr: 1 }} />
-          <Typography variant="h6">Filters</Typography>
-        </Box>
-        <Box sx={{ 
-          display: 'grid', 
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-          gap: 2 
-        }}>
-          <TextField
-            fullWidth
-            label="Search Employees"
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex items-center mb-3">
+          <div className="p-1.5 bg-gray-100 rounded-lg">
+            <Filter className="w-4 h-4 text-gray-600" />
+          </div>
+          <h3 className="text-sm font-medium text-gray-900 ml-2">Filters</h3>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              Search Employees
+            </label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <input
+                type="text"
             value={filters.search}
             onChange={(e) => handleFilterChange('search', e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              )
-            }}
-          />
-          <FormControl fullWidth>
-            <InputLabel>Department</InputLabel>
-            <Select
+                className="w-full pl-8 pr-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-xs"
+                placeholder="Search by name, email, or ID..."
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              Department
+            </label>
+            <select
               value={filters.department}
-              label="Department"
               onChange={(e) => handleFilterChange('department', e.target.value)}
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-xs"
             >
-              <MenuItem value="">All Departments</MenuItem>
+              <option value="">All Departments</option>
               {departments.map(dept => (
-                <MenuItem key={dept.id} value={dept.name}>
+                <option key={dept.id} value={dept.name}>
                   {dept.name} ({getDepartmentCount(dept.name)})
-                </MenuItem>
+                </option>
               ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Status</InputLabel>
-            <Select
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              Status
+            </label>
+            <select
               value={filters.status}
-              label="Status"
               onChange={(e) => handleFilterChange('status', e.target.value)}
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-xs"
             >
-              <MenuItem value="">All Statuses</MenuItem>
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-              <MenuItem value="terminated">Terminated</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Position</InputLabel>
-            <Select
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+              <option value="terminated">Terminated</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              Position
+            </label>
+            <select
               value={filters.position}
-              label="Position"
               onChange={(e) => handleFilterChange('position', e.target.value)}
+              className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-xs"
             >
-              <MenuItem value="">All Positions</MenuItem>
+              <option value="">All Positions</option>
               {getUniquePositions().map(position => (
-                <MenuItem key={position} value={position}>
+                <option key={position} value={position}>
                   {position}
-                </MenuItem>
+                </option>
               ))}
-            </Select>
-          </FormControl>
-        </Box>
-      </Paper>
+            </select>
+          </div>
+        </div>
+      </div>
 
-      {/* Employee Table */}
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-        <TableContainer>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell>Employee</TableCell>
-                <TableCell>Contact</TableCell>
-                <TableCell>Department</TableCell>
-                <TableCell>Position</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Emergency Contact</TableCell>
-                <TableCell>Salary</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+      {/* Employee Table (unified with Holidays table UI) */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Designation</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salary</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
               {paginatedEmployees.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
-                    <Typography variant="body1" color="textSecondary">
-                      {employees.length === 0 ? 'No employees found. Add your first employee to get started.' : 'No employees match the current filters.'}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
+                <tr>
+                  <td colSpan={9} className="px-6 py-12 text-center">
+            <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {employees.length === 0 ? 'No employees found' : 'No employees match the current filters'}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {employees.length === 0 ? 'Add your first employee to get started.' : 'Try adjusting your search criteria.'}
+            </p>
+            {employees.length === 0 && (
+              <button
+                onClick={handleCreateEmployee}
+                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2 mx-auto"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Employee</span>
+              </button>
+            )}
+                  </td>
+                </tr>
               ) : (
-                paginatedEmployees.map((employee) => (
-                  <TableRow key={employee.id} hover>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>
+                paginatedEmployees.map((employee, index) => (
+                  <tr key={employee.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{(currentPage - 1) * itemsPerPage + index + 1}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-8 w-8">
+                          <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                            <span className="text-primary-600 font-semibold text-xs">
                           {employee.name.split(' ').map(n => n[0]).join('')}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="subtitle2" fontWeight="bold">
-                            {employee.name}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            {employee.employeeId}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                          <EmailIcon fontSize="small" color="action" />
-                          <Typography variant="body2">
-                            {employee.email}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <PhoneIcon fontSize="small" color="action" />
-                          <Typography variant="body2">
-                            {employee.phone}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <BusinessIcon fontSize="small" color="action" />
-                        <Typography variant="body2">
-                          {employee.department}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <WorkIcon fontSize="small" color="action" />
-                        <Typography variant="body2">
-                          {employee.position}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={employee.status}
-                        size="small"
-                        sx={{
-                          bgcolor: getStatusColor(employee.status),
-                          color: 'white',
-                          fontWeight: 'bold',
-                          textTransform: 'capitalize'
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="medium">
-                          {employee.emergencyContact.name}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          {employee.emergencyContact.relation} • {employee.emergencyContact.phone}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="medium">
-                        {maskSalary(employee.salary)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Tooltip title="Edit">
-                          <IconButton
-                            size="small"
+                        </span>
+                      </div>
+                    </div>
+                        <div className="ml-3">
+                          <div className="text-sm font-medium text-gray-900">{employee.name}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{employee.employeeId}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{employee.department}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 truncate max-w-[12rem]">{employee.position}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{maskSalary(employee.salary)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{employee.phone}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={cn(
+                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                          employee.status === 'active' ? "bg-green-100 text-green-800" :
+                        employee.status === 'inactive' ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"
+                        )}>
+                          {employee.status.charAt(0).toUpperCase() + employee.status.slice(1)}
+                        </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                    <button
                             onClick={() => {
                               setSelectedEmployee(employee);
                               setEditFormData({
@@ -894,581 +801,524 @@ const EmployeeDirectory: React.FC = () => {
                               });
                               setIsEditDialogOpen(true);
                             }}
-                            color="secondary"
-                          >
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="View Details">
-                          <IconButton
-                            size="small"
+                          className="text-green-600 hover:text-green-900"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
                             onClick={() => handleViewEmployee(employee)}
-                            color="primary"
-                          >
-                            <ViewIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
+                          className="text-blue-600 hover:text-blue-900"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => { setSelectedEmployee(employee); handleDeleteEmployee(); }}
+                          className="text-red-600 hover:text-red-900"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                    </td>
+                  </tr>
                 ))
               )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(_, page) => setCurrentPage(page)}
-            color="primary"
-            showFirstButton
-            showLastButton
-          />
-        </Box>
+        <div className="flex justify-center mt-6">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              First
+            </button>
+            <button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {/* Page Numbers */}
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  "px-3 py-2 text-sm font-medium border-t border-b border-gray-300",
+                  currentPage === page
+                    ? "bg-primary-600 text-white border-primary-600"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                )}
+              >
+                {page}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Last
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* Add / Edit Employee Dialog */}
-      <Dialog
-        open={isEditDialogOpen}
-        onClose={() => setIsEditDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {selectedEmployee ? <EditIcon /> : <AddIcon />}
-            <Typography variant="h6">{selectedEmployee ? 'Edit Employee' : 'Add Employee'}</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 1, display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-            <TextField label="Employee Name (As per Aadhaar)" value={editFormData.name || ''} onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })} fullWidth />
-            <TextField label="Employee ID (auto)" value={selectedEmployee?.employeeId || `EMP${String(employees.length + 1).padStart(3, '0')}`} fullWidth disabled />
-
-            <TextField label="Designation" value={editFormData.position || ''} onChange={(e) => setEditFormData({ ...editFormData, position: e.target.value })} fullWidth />
-            <FormControl fullWidth>
-              <InputLabel>Department</InputLabel>
-              <Select label="Department" value={editFormData.department || ''} onChange={(e) => setEditFormData({ ...editFormData, department: String(e.target.value) })}>
-                {departments.length === 0 && <MenuItem value="">Unassigned</MenuItem>}
-                {departments.map((d) => (<MenuItem key={d.id} value={d.name}>{d.name}</MenuItem>))}
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select label="Status" value={editFormData.status || 'active'} onChange={(e) => setEditFormData({ ...editFormData, status: String(e.target.value) as Employee['status'] })}>
-                <MenuItem value="active">On Roll</MenuItem>
-                <MenuItem value="inactive">Off Roll</MenuItem>
-                <MenuItem value="terminated">Resigned</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl fullWidth>
-              <InputLabel>Employment Type</InputLabel>
-              <Select label="Employment Type" value={editFormData.employmentType || 'Permanent'} onChange={(e) => setEditFormData({ ...editFormData, employmentType: String(e.target.value) })}>
-                <MenuItem value="Permanent">Permanent</MenuItem>
-                <MenuItem value="Contract">Contract</MenuItem>
-                <MenuItem value="Intern">Intern</MenuItem>
-              </Select>
-            </FormControl>
-
-            <TextField label="DOJ" type="date" value={(editFormData.joiningDate ? new Date(editFormData.joiningDate) : new Date()).toISOString().split('T')[0]} onChange={(e) => setEditFormData({ ...editFormData, joiningDate: e.target.value ? new Date(e.target.value) : new Date() })} InputLabelProps={{ shrink: true }} fullWidth />
-            <TextField label="DOB" type="date" value={(editFormData.dateOfBirth ? new Date(editFormData.dateOfBirth) : new Date(0)).toISOString().split('T')[0]} onChange={(e) => setEditFormData({ ...editFormData, dateOfBirth: e.target.value ? new Date(e.target.value) : new Date(0) })} InputLabelProps={{ shrink: true }} fullWidth />
-
-            <TextField label="Retirement Age" type="number" value={editFormData.retirementAge ?? 60} onChange={(e) => setEditFormData({ ...editFormData, retirementAge: Number(e.target.value) || 60 })} fullWidth />
-            <FormControl fullWidth>
-              <InputLabel>Gender</InputLabel>
-              <Select label="Gender" value={editFormData.gender || ''} onChange={(e) => setEditFormData({ ...editFormData, gender: String(e.target.value) })}>
-                <MenuItem value="Male">Male</MenuItem>
-                <MenuItem value="Female">Female</MenuItem>
-                <MenuItem value="Other">Other</MenuItem>
-              </Select>
-            </FormControl>
-
-            <TextField label="Gross Salary" type="number" value={editFormData.salary ?? 0} onChange={(e) => setEditFormData({ ...editFormData, salary: Number(e.target.value) || 0 })} fullWidth />
-            <FormControl fullWidth>
-              <InputLabel>PF/ESI</InputLabel>
-              <Select label="PF/ESI" value={(editFormData as any).pfEsicOption ?? 4} onChange={(e) => setEditFormData({ ...editFormData, pfEsicOption: Number(e.target.value) as any })}>
-                <MenuItem value={1}>PF</MenuItem>
-                <MenuItem value={2}>ESI</MenuItem>
-                <MenuItem value={3}>Both</MenuItem>
-                <MenuItem value={4}>None</MenuItem>
-              </Select>
-            </FormControl>
-
-            <TextField label="PF Number" value={editFormData.pfNumber || ''} onChange={(e) => setEditFormData({ ...editFormData, pfNumber: e.target.value })} fullWidth />
-            <TextField label="PF / UAN Number" value={editFormData.uanNumber || ''} onChange={(e) => setEditFormData({ ...editFormData, uanNumber: e.target.value })} fullWidth />
-            <TextField label="ESI Number" value={editFormData.esiNumber || ''} onChange={(e) => setEditFormData({ ...editFormData, esiNumber: e.target.value })} fullWidth />
-
-            <TextField label="Bank Name" value={editFormData.bankName || ''} onChange={(e) => setEditFormData({ ...editFormData, bankName: e.target.value })} fullWidth />
-            <TextField label="Branch" value={editFormData.branch || ''} onChange={(e) => setEditFormData({ ...editFormData, branch: e.target.value })} fullWidth />
-            <TextField label="IFSC" value={editFormData.ifsc || ''} onChange={(e) => setEditFormData({ ...editFormData, ifsc: e.target.value })} fullWidth />
-            <TextField label="Account Number" value={editFormData.bankAccount || ''} onChange={(e) => setEditFormData({ ...editFormData, bankAccount: e.target.value })} fullWidth />
-
-            <TextField label="Aadhaar Number" value={editFormData.aadhaarNumber || ''} onChange={(e) => setEditFormData({ ...editFormData, aadhaarNumber: e.target.value })} fullWidth />
-            <TextField label="PAN Number" value={editFormData.panNumber || ''} onChange={(e) => setEditFormData({ ...editFormData, panNumber: e.target.value })} fullWidth />
-            <TextField label="Blood Group" value={editFormData.bloodGroup || ''} onChange={(e) => setEditFormData({ ...editFormData, bloodGroup: e.target.value })} fullWidth />
-            <TextField label="Educational Qualification" value={editFormData.educationalQualification || ''} onChange={(e) => setEditFormData({ ...editFormData, educationalQualification: e.target.value })} fullWidth />
-
-            <TextField label="Residence Address" value={editFormData.residence || ''} onChange={(e) => setEditFormData({ ...editFormData, residence: e.target.value })} fullWidth />
-            <TextField label="Contact Number" value={editFormData.phone || ''} onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })} fullWidth />
-            <TextField label="S/W/D/O" value={editFormData.spouseName || ''} onChange={(e) => setEditFormData({ ...editFormData, spouseName: e.target.value })} fullWidth />
-            <TextField label="Emergency Contact Number" value={editFormData.emergencyContact?.phone || ''} onChange={(e) => setEditFormData({ ...editFormData, emergencyContact: { name: editFormData.emergencyContact?.name || '', relation: editFormData.emergencyContact?.relation || '', phone: e.target.value } })} fullWidth />
-
-            <TextField label="Remarks" value={editFormData.remarks || ''} onChange={(e) => setEditFormData({ ...editFormData, remarks: e.target.value })} fullWidth multiline minRows={2} />
-            <FormControl fullWidth>
-              <InputLabel>Resigned</InputLabel>
-              <Select label="Resigned" value={(editFormData.resigned ? 'Yes' : 'No')} onChange={(e) => setEditFormData({ ...editFormData, resigned: String(e.target.value) === 'Yes' })}>
-                <MenuItem value="No">No</MenuItem>
-                <MenuItem value="Yes">Yes</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          {selectedEmployee && (
-            <Button color="error" startIcon={<DeleteIcon />} onClick={handleDeleteEmployee} disabled={isSaving}>
-              Mark Terminated
-            </Button>
-          )}
-          <Button onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleSaveEmployee} disabled={isSaving}>
-            {selectedEmployee ? 'Save Changes' : 'Add Employee'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Employee Details View Dialog */}
-      <Dialog
-        open={isDialogOpen}
-        onClose={handleCloseDialog}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PersonIcon />
-            <Typography variant="h6">
-              Employee Details
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {selectedEmployee && (
-            <Box sx={{ mt: 2 }}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
+      {/* Add / Edit Employee Modal */}
+      {isEditDialogOpen && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[200] p-3">
+          <div className="bg-white rounded-lg shadow-xl max-w-xl w-full max-h-[85vh] overflow-y-auto z-[210]">
+            <div className="p-4">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-1.5 bg-primary-100 rounded-lg">
+                    {selectedEmployee ? <Edit className="w-5 h-5 text-primary-600" /> : <Plus className="w-5 h-5 text-primary-600" />}
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900">
+                    {selectedEmployee ? 'Edit Employee' : 'Add Employee'}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setIsEditDialogOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {/* Form */}
+              <div className="space-y-4 pb-16">
                 {/* Basic Information */}
-                <Box>
-                  <Typography variant="h6" gutterBottom>Basic Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'primary.main' }}>
-                          <BadgeIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="S.No"
-                        secondary="1"
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-3">Basic Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Employee Name *
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.name || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                        placeholder="Enter employee name"
                       />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'primary.main' }}>
-                          <BadgeIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Employee ID"
-                        secondary={selectedEmployee.employeeId}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Employee ID
+                      </label>
+                      <input
+                        type="text"
+                        value={selectedEmployee?.employeeId || `EMP${String(employees.length + 1).padStart(3, '0')}`}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 text-sm"
+                        disabled
                       />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'primary.main' }}>
-                          <PersonIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Employee Name (As per Aadhaar)"
-                        secondary={selectedEmployee.name}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Designation *
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.position || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, position: e.target.value })}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                        placeholder="Enter designation"
                       />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                          <WorkIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Designation"
-                        secondary={selectedEmployee.position}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                          <BusinessIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Department"
-                        secondary={selectedEmployee.department}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Status"
-                        secondary={
-                          <Chip
-                            label={selectedEmployee.status}
-                            size="small"
-                            sx={{
-                              bgcolor: getStatusColor(selectedEmployee.status),
-                              color: 'white',
-                              textTransform: 'capitalize'
-                            }}
-                          />
-                        }
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Department *
+                      </label>
+                      <select
+                        value={editFormData.department || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, department: String(e.target.value) })}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                      >
+                        <option value="">Select Department</option>
+                        {departments.map((d) => (
+                          <option key={d.id} value={d.name}>{d.name}</option>
+                        ))}
+                      </select>
+                    </div>
 
-                {/* Employment Details */}
-                <Box>
-                  <Typography variant="h6" gutterBottom>Employment Details</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <WorkIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Employment Type"
-                        secondary={selectedEmployee.employmentType || 'Full-time'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <CalendarIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Date of Joining (DOJ)"
-                        secondary={selectedEmployee.joiningDate.toLocaleDateString()}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <CalendarIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Date of Birth (DOB)"
-                        secondary={selectedEmployee.dateOfBirth?.toLocaleDateString() || 'Not specified'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <CalendarIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Retirement Age"
-                        secondary={selectedEmployee.retirementAge || '60'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <PersonIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Gender"
-                        secondary={selectedEmployee.gender || 'Not specified'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <CardIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Gross Salary"
-                        secondary={canViewSalary ? formatSalary(selectedEmployee.salary) : maskSalary(selectedEmployee.salary)}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Status *
+                      </label>
+                      <select
+                        value={editFormData.status || 'active'}
+                        onChange={(e) => setEditFormData({ ...editFormData, status: String(e.target.value) as Employee['status'] })}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                      >
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="terminated">Terminated</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Employment Type
+                      </label>
+                      <select
+                        value={editFormData.employmentType || 'Permanent'}
+                        onChange={(e) => setEditFormData({ ...editFormData, employmentType: String(e.target.value) })}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                      >
+                        <option value="Permanent">Permanent</option>
+                        <option value="Contract">Contract</option>
+                        <option value="Intern">Intern</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
 
-                {/* Government & Financial Information */}
-                <Box>
-                  <Typography variant="h6" gutterBottom>Government & Financial Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'warning.main' }}>
-                          <BadgeIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="PF Status"
-                        secondary={selectedEmployee.pfStatus || 'Active'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'warning.main' }}>
-                          <BadgeIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="PF Number"
-                        secondary={selectedEmployee.pfNumber || 'Not specified'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'warning.main' }}>
-                          <BadgeIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="PF / UAN No"
-                        secondary={selectedEmployee.uanNumber || 'Not specified'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'warning.main' }}>
-                          <BadgeIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="ESI Number"
-                        secondary={selectedEmployee.esiNumber || 'Not specified'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'success.main' }}>
-                          <BankIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Bank Name"
-                        secondary={selectedEmployee.bankName || 'Not specified'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'success.main' }}>
-                          <BankIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Branch"
-                        secondary={selectedEmployee.branch || 'Not specified'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'success.main' }}>
-                          <BankIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="IFSC"
-                        secondary={selectedEmployee.ifsc || 'Not specified'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'success.main' }}>
-                          <BankIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Bank Account"
-                        secondary={selectedEmployee.bankAccount || 'Not specified'}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
+                {/* Personal Information */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-3">Personal Information</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
-                {/* Personal & Contact Information */}
-                <Box>
-                  <Typography variant="h6" gutterBottom>Personal & Contact Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'error.main' }}>
-                          <BadgeIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Aadhaar No"
-                        secondary={selectedEmployee.aadhaarNumber || 'Not specified'}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Date of Joining
+                      </label>
+                      <input
+                        type="date"
+                        value={(editFormData.joiningDate ? new Date(editFormData.joiningDate) : new Date()).toISOString().split('T')[0]}
+                        onChange={(e) => setEditFormData({ ...editFormData, joiningDate: e.target.value ? new Date(e.target.value) : new Date() })}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
                       />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'error.main' }}>
-                          <CardIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="PAN No"
-                        secondary={selectedEmployee.panNumber || 'Not specified'}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Date of Birth
+                      </label>
+                      <input
+                        type="date"
+                        value={(editFormData.dateOfBirth ? new Date(editFormData.dateOfBirth) : new Date(0)).toISOString().split('T')[0]}
+                        onChange={(e) => setEditFormData({ ...editFormData, dateOfBirth: e.target.value ? new Date(e.target.value) : new Date(0) })}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
                       />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'error.main' }}>
-                          <PersonIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Blood Group"
-                        secondary={selectedEmployee.bloodGroup || 'Not specified'}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Contact Number
+                      </label>
+                      <input
+                        type="tel"
+                        value={editFormData.phone || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                        placeholder="Enter contact number"
                       />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <EducationIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Educational Qualification"
-                        secondary={selectedEmployee.educationalQualification || 'Not specified'}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Email Address
+                      </label>
+                      <input
+                        type="email"
+                        value={editFormData.email || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                        placeholder="Enter email address"
                       />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <HomeIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Residence"
-                        secondary={selectedEmployee.residence || selectedEmployee.address || 'Not specified'}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Gross Salary
+                      </label>
+                      <input
+                        type="number"
+                        value={editFormData.salary ?? 0}
+                        onChange={(e) => setEditFormData({ ...editFormData, salary: Number(e.target.value) || 0 })}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                        placeholder="Enter salary"
                       />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <PhoneIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Contact Number"
-                        secondary={selectedEmployee.phone}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Office Location
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.officeLocation || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, officeLocation: e.target.value })}
+                        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                        placeholder="Enter office location"
                       />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <PersonIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="S/W/D/O"
-                        secondary={selectedEmployee.spouseName || 'Not specified'}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                {/* Emergency Contact & Additional Info */}
-                <Box>
-                  <Typography variant="h6" gutterBottom>Emergency Contact & Additional Info</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'warning.main' }}>
-                          <EmergencyIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Emergency Contact"
-                        secondary={
-                          <Box>
-                            <Typography variant="body2">
-                              {selectedEmployee.emergencyContact.name}
-                            </Typography>
-                            <Typography variant="caption" color="textSecondary">
-                              {selectedEmployee.emergencyContact.relation} • {selectedEmployee.emergencyContact.phone}
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <FileText />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Remarks"
-                        secondary={selectedEmployee.remarks || 'No remarks'}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'error.main' }}>
-                          <ExitIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Resigned"
-                        secondary={
-                          <Chip
-                            label={selectedEmployee.resigned ? 'Yes' : 'No'}
-                            size="small"
-                            color={selectedEmployee.resigned ? 'error' : 'success'}
-                          />
-                        }
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-            <Button onClick={handleCloseDialog}>Close</Button>
-        </DialogActions>
-      </Dialog>
+              {/* Modal Footer */}
+              <div className="sticky bottom-0 bg-white mt-4 flex justify-end space-x-2 border-t border-gray-200 pt-3 z-[1] shadow-[0_-4px_8px_-4px_rgba(0,0,0,0.08)]">
+                {selectedEmployee && (
+                  <button
+                    onClick={handleDeleteEmployee}
+                    disabled={isSaving}
+                    className="px-3 py-1.5 text-sm font-medium text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="w-4 h-4 inline mr-2" />
+                    Mark Terminated
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsEditDialogOpen(false)}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEmployee}
+                  disabled={isSaving}
+                  className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 border border-blue-600"
+                >
+                  {isSaving ? 'Saving...' : (selectedEmployee ? 'Save Changes' : 'Add Employee')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {/* Employee Details View Modal */}
+      {isDialogOpen && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[200] p-3">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto z-[210]">
+            <div className="p-4">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-1.5 bg-primary-100 rounded-lg">
+                    <User className="w-5 h-5 text-primary-600" />
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900">Employee Details</h3>
+                </div>
+                <button
+                  onClick={handleCloseDialog}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {/* Employee Details Content */}
+              {selectedEmployee && (
+                <div className="space-y-6">
+                  {/* Employee Header */}
+                  <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+                      <span className="text-primary-600 font-semibold text-xl">
+                        {selectedEmployee.name.split(' ').map(n => n[0]).join('')}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-xl font-semibold text-gray-900">{selectedEmployee.name}</h4>
+                      <p className="text-gray-600">{selectedEmployee.employeeId}</p>
+                      <div className="flex items-center space-x-4 mt-2">
+                        <span className={cn(
+                          "px-2 py-1 text-xs font-medium rounded-full",
+                          selectedEmployee.status === 'active' ? "bg-green-100 text-green-800" :
+                          selectedEmployee.status === 'inactive' ? "bg-yellow-100 text-yellow-800" :
+                          "bg-red-100 text-red-800"
+                        )}>
+                          {selectedEmployee.status.charAt(0).toUpperCase() + selectedEmployee.status.slice(1)}
+                        </span>
+                        <span className="text-sm text-gray-500">{selectedEmployee.department}</span>
+                        <span className="text-sm text-gray-500">{selectedEmployee.position}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Basic Information */}
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Basic Information</h5>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Badge className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Employee ID</p>
+                            <p className="text-sm text-gray-600">{selectedEmployee.employeeId}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <User className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Name</p>
+                            <p className="text-sm text-gray-600">{selectedEmployee.name}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                            <Briefcase className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Position</p>
+                            <p className="text-sm text-gray-600">{selectedEmployee.position}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                            <Building className="w-4 h-4 text-orange-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Department</p>
+                            <p className="text-sm text-gray-600">{selectedEmployee.department}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Contact Information */}
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Contact Information</h5>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Mail className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Email</p>
+                            <p className="text-sm text-gray-600">{selectedEmployee.email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <Phone className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Phone</p>
+                            <p className="text-sm text-gray-600">{selectedEmployee.phone}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                            <MapPin className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Office Location</p>
+                            <p className="text-sm text-gray-600">{selectedEmployee.officeLocation}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Employment Details</h5>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Joining Date</span>
+                          <span className="text-sm text-gray-900">{new Date(selectedEmployee.joiningDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Salary</span>
+                          <span className="text-sm text-gray-900">{formatIndianCurrency(selectedEmployee.salary)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Status</span>
+                          <span className={cn(
+                            "px-2 py-1 text-xs font-medium rounded-full",
+                            selectedEmployee.status === 'active' ? "bg-green-100 text-green-800" :
+                            selectedEmployee.status === 'inactive' ? "bg-yellow-100 text-yellow-800" :
+                            "bg-red-100 text-red-800"
+                          )}>
+                            {selectedEmployee.status.charAt(0).toUpperCase() + selectedEmployee.status.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Emergency Contact</h5>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Name</span>
+                          <span className="text-sm text-gray-900">{selectedEmployee.emergencyContact.name}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Relation</span>
+                          <span className="text-sm text-gray-900">{selectedEmployee.emergencyContact.relation}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Phone</span>
+                          <span className="text-sm text-gray-900">{selectedEmployee.emergencyContact.phone}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Footer */}
+              <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+                <button
+                  onClick={handleCloseDialog}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-      >
-        <Alert
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
+      {snackbar.open && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className={cn(
+            "px-4 py-3 rounded-lg shadow-lg max-w-sm",
+            snackbar.severity === 'success' ? "bg-green-50 border border-green-200" :
+            snackbar.severity === 'error' ? "bg-red-50 border border-red-200" :
+            "bg-blue-50 border border-blue-200"
+          )}>
+            <div className="flex items-center justify-between">
+              <p className={cn(
+                "text-sm font-medium",
+                snackbar.severity === 'success' ? "text-green-800" :
+                snackbar.severity === 'error' ? "text-red-800" :
+                "text-blue-800"
+              )}>
           {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+              </p>
+              <button
+                onClick={() => setSnackbar(prev => ({ ...prev, open: false }))}
+                className="ml-2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -5,8 +5,18 @@ import {
   CardContent,
   Typography,
   useTheme,
-  useMediaQuery
+  useMediaQuery,
+  SxProps,
+  Theme
 } from '@mui/material';
+
+interface ChartProps {
+  data: any[];
+  title?: string;
+  height?: number;
+  sx?: SxProps<Theme>;
+  [key: string]: any;
+}
 import {
   LineChart,
   Line,
@@ -27,7 +37,7 @@ import {
 
 const COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#8b5cf6'];
 
-export const ProfessionalLineChart = ({ data, title, height = 400 }) => {
+export const ProfessionalLineChart: React.FC<ChartProps> = ({ data, title, height = 400 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mounted, setMounted] = useState(false);
@@ -124,7 +134,7 @@ export const ProfessionalLineChart = ({ data, title, height = 400 }) => {
   );
 };
 
-export const ProfessionalAreaChart = ({ data, title, height = 400 }) => {
+export const ProfessionalAreaChart: React.FC<ChartProps> = ({ data, title, height = 400 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mounted, setMounted] = useState(false);
@@ -220,7 +230,7 @@ export const ProfessionalAreaChart = ({ data, title, height = 400 }) => {
   );
 };
 
-export const ProfessionalBarChart = ({ data, title, height = 400 }) => {
+export const ProfessionalBarChart: React.FC<ChartProps> = ({ data, title, height = 400 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mounted, setMounted] = useState(false);
@@ -313,7 +323,7 @@ export const ProfessionalBarChart = ({ data, title, height = 400 }) => {
   );
 };
 
-export const ProfessionalPieChart = ({ data, title, height = 400 }) => {
+export const ProfessionalPieChart: React.FC<ChartProps> = ({ data, title, height = 400 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [mounted, setMounted] = useState(false);
@@ -377,12 +387,12 @@ export const ProfessionalPieChart = ({ data, title, height = 400 }) => {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                 outerRadius={isMobile ? 80 : 120}
                 fill="#8884d8"
                 dataKey="value"
               >
-                {data.map((entry, index) => (
+                {data.map((_entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>

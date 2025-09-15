@@ -8,7 +8,7 @@ export class SettingsService {
   async getUserSettings(userId: string): Promise<UserSettings | null> {
     try {
       const settings = await firebaseService.getDocument(this.collection, userId);
-      return settings as UserSettings;
+      return settings as any;
     } catch (error) {
       console.error('Error getting user settings:', error);
       return null;
@@ -28,7 +28,7 @@ export class SettingsService {
 
       // If no existing settings, add createdAt
       if (!existingSettings) {
-        settingsData.createdAt = new Date().toISOString();
+        (settingsData as any).createdAt = new Date().toISOString();
       }
 
       // Use setDoc with merge to create or update

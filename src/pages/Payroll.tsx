@@ -1,61 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Card,
-  CardContent,
-  Alert,
-  Snackbar,
-  Pagination,
-  Tooltip,
-  Avatar,
-  List,
-  ListItem,
-  ListItemText,
-  CircularProgress,
-  Tabs,
-  Tab
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Visibility as ViewIcon,
-  Search as SearchIcon,
-  FilterList as FilterIcon,
-  Download as DownloadIcon,
-  Print as PrintIcon,
-  Person as PersonIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Pending as PendingIcon,
-  Description as FileTextIcon,
-  AccountBalance as BankIcon,
-  Receipt as ReceiptIcon,
-  AttachMoney as MoneyIcon,
-  PlayArrow as ProcessIcon
-} from '@mui/icons-material';
-import firebaseService from '@/services/firebaseService';
-import { showNotification } from '@/utils/notification';
+  Search, 
+  Users, 
+  AlertCircle, 
+  CheckCircle,
+  X,
+  Download,
+  Eye,
+  Edit,
+  Trash2,
+  Clock,
+  FileText,
+  DollarSign,
+  Settings,
+  Calculator,
+  Receipt,
+  CreditCard,
+  Plus,
+  FileSpreadsheet,
+  ChevronDown
+} from 'lucide-react';
+import { cn } from '../utils/cn';
+import firebaseService from '../services/firebaseService';
+import DashboardCard from '../components/DashboardCard';
 
 interface Employee {
   id: string;
@@ -65,134 +32,139 @@ interface Employee {
   email: string;
   department: string;
   position: string;
-  baseSalary: number;
+  salary: number;
   joinDate: string;
   isActive: boolean;
+  uanNumber?: string;
+  esiNumber?: string;
+  pfStatus?: 'active' | 'inactive';
+  pfNumber?: string;
+  bankName?: string;
+  branch?: string;
+  ifsc?: string;
+  bankAccount?: string;
+  panNumber?: string;
+  aadhaarNumber?: string;
 }
 
 interface PayrollRecord {
   id: string;
   employeeId: string;
-  employee: Employee;
-  month: string;
-  year: number;
+  employeeName: string;
+  grossSalary: number;
+  payableDays: number;
+  otHours: number;
+  netPayable: number;
+  totalPayableAmount: number;
+  remarks?: string;
+  // Detailed breakdown for edit modal
   basicSalary: number;
-  overtimeHours: number;
-  overtimeRate: number;
-  overtimePay: number;
-  bonuses: number;
-  allowances: number;
-  deductions: number;
-  taxDeductions: number;
-  grossPay: number;
-  netPay: number;
-  status: 'draft' | 'pending' | 'approved' | 'paid' | 'rejected';
-  paymentMethod: 'bank' | 'check' | 'cash';
-  paymentDate?: string;
-  processedBy: string;
-  processedAt: string;
-  paidAt?: string;
-  notes?: string;
-  payableDays?: number;
-  otHours?: number;
-  basicDA?: number;
-  hra?: number;
-  specialAllowance?: number;
-  pfEmployee?: number;
-  esiEmployee?: number;
-  pt?: number;
-  salaryAdvance?: number;
-  otherDeductions?: number;
-  balanceAdvance?: number;
-  tds?: number;
-  arrears?: number;
-  otPayment?: number;
-  totalPayableAmount?: number;
-  pfEsiStatus?: string;
-  differenceAmount?: number;
+  hra: number;
+  specialAllowance: number;
+  pfEmployee: number;
+  esiEmployee: number;
+  pt: number;
+  salaryAdvance: number;
+  otherDeductions: number;
+  otPayment: number;
+  pfApplicable: boolean;
+  esiApplicable: boolean;
   uanNumber?: string;
   esiNumber?: string;
-  pfApplicable?: boolean;
-  esiApplicable?: boolean;
-  remarks?: string;
+  // Additional detailed fields for comprehensive salary sheet
+  pfStatus?: 'active' | 'inactive';
+  esiStatus?: 'active' | 'inactive';
+  basicDA?: number; // Basic + DA
+  balanceAdvance?: number;
+  tds?: number;
+  totalDeductions?: number;
+  arrears?: number;
+  differenceAmount?: number;
 }
 
-
-
-interface PayrollFilters {
-  search: string;
-  status: string;
-  department: string;
-  month: string;
-  year: string;
-  paymentMethod: string;
+interface PFContribution {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  uanNumber: string;
+  pfBasic: number;
+  employeePF: number; // 12%
+  eps: number; // 8.33%
+  epf: number; // 3.67%
+  edli: number; // 0.5%
+  adminCharges: number; // 0.5%
+  edliAdmin: number; // 0%
+  employerPFTotal: number;
 }
 
-const initialFilters: PayrollFilters = {
-  search: '',
-  status: '',
-  department: '',
-  month: '',
-  year: new Date().getFullYear().toString(),
-  paymentMethod: ''
-};
+interface ESIContribution {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  esiNumber: string;
+  grossSalary: number;
+  employeeContribution: number; // 0.75%
+  employerContribution: number; // 3.25%
+  total: number;
+}
 
-const statusColors = {
-  draft: '#9e9e9e',
-  pending: '#ff9800',
-  approved: '#2196f3',
-  paid: '#4caf50',
-  rejected: '#f44336'
-};
-
-const paymentMethodColors = {
-  bank: '#2196f3',
-  check: '#ff9800',
-  cash: '#4caf50'
-};
+interface PayrollSettings {
+  // PF Settings
+  pfEmployeeRate: number; // 12%
+  pfEmployerRate: number; // 12%
+  epsContributionRate: number; // 8.33%
+  epfContributionRate: number; // 3.67%
+  edliContributionRate: number; // 0.5%
+  adminChargesRate: number; // 0.5%
+  edliAdminChargesRate: number; // 0.0%
+  pfApplicable: boolean;
+  
+  // ESI Settings
+  esiEmployeeRate: number; // 0.75%
+  esiEmployerRate: number; // 3.25%
+  esiApplicable: boolean;
+  
+  // Overtime Settings
+  otHourlyRate: number; // 50
+  
+  // Holiday Pay Settings
+  holidayPayRules: 'paid' | 'unpaid';
+  holidayPayType: 'paid' | 'unpaid';
+}
 
 const Payroll: React.FC = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'salary' | 'pf' | 'esi' | 'settings'>('salary');
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
+  const [pfContributions, setPfContributions] = useState<PFContribution[]>([]);
+  const [esiContributions, setEsiContributions] = useState<ESIContribution[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [employeesLoading, setEmployeesLoading] = useState<boolean>(false);
-  const [employeesError, setEmployeesError] = useState<string | null>(null);
-  const [filteredRecords, setFilteredRecords] = useState<PayrollRecord[]>([]);
-  const [filters, setFilters] = useState<PayrollFilters>(initialFilters);
-  const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isViewMode, setIsViewMode] = useState(false);
-  const [isCreateMode, setIsCreateMode] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'info';
-  }>({
-    open: false,
-    message: '',
-    severity: 'info'
-  });
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState<string>('');
+  const [savingSettings, setSavingSettings] = useState<boolean>(false);
 
-  // Form state for creating/editing payroll records
-  const [payrollForm, setPayrollForm] = useState({
+  // Modal states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<PayrollRecord | null>(null);
+  
+  // Export dropdown state
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Form data
+  const [formData, setFormData] = useState<Partial<PayrollRecord>>({
     employeeId: '',
-    month: new Date().getMonth().toString().padStart(2, '0'),
-    year: new Date().getFullYear(),
-    basicSalary: 0,
-    overtimeHours: 0,
-    overtimeRate: 0,
-    bonuses: 0,
-    allowances: 0,
-    deductions: 0,
-    taxDeductions: 0,
-    paymentMethod: 'bank' as 'bank' | 'check' | 'cash',
-    notes: '',
+    employeeName: '',
+    grossSalary: 0,
     payableDays: 0,
     otHours: 0,
-    basicDA: 0,
+    netPayable: 0,
+    totalPayableAmount: 0,
+    basicSalary: 0,
     hra: 0,
     specialAllowance: 0,
     pfEmployee: 0,
@@ -200,1991 +172,2146 @@ const Payroll: React.FC = () => {
     pt: 0,
     salaryAdvance: 0,
     otherDeductions: 0,
-    balanceAdvance: 0,
-    tds: 0,
-    arrears: 0,
     otPayment: 0,
-    totalPayableAmount: 0,
-    pfEsiStatus: '',
-    differenceAmount: 0,
-    uanNumber: '',
-    esiNumber: '',
     pfApplicable: true,
     esiApplicable: true,
     remarks: ''
   });
 
-  // Fetch attendance data for payroll calculations
-  const fetchAttendanceForMonth = async (employeeId: string, month: string, year: number) => {
-    try {
-      const startDate = `${year}-${month}-01`;
-      const endDateObj = new Date(year, parseInt(month), 0);
-      const endDate = (endDateObj.toISOString().split('T')[0]) || '';
-      
-      const result = await firebaseService.getCollection('attendance');
-      if (!result.success || !result.data) return null;
+  const [settings, setSettings] = useState<PayrollSettings>({
+    // PF Settings
+    pfEmployeeRate: 0,
+    pfEmployerRate: 0,
+    epsContributionRate: 0,
+    epfContributionRate: 0,
+    edliContributionRate: 0,
+    adminChargesRate: 0,
+    edliAdminChargesRate: 0,
+    pfApplicable: false,
+    
+    // ESI Settings
+    esiEmployeeRate: 0,
+    esiEmployerRate: 0,
+    esiApplicable: false,
+    
+    // Overtime Settings
+    otHourlyRate: 0,
+    
+    // Holiday Pay Settings
+    holidayPayRules: 'paid',
+    holidayPayType: 'paid'
+  });
 
-      // Filter attendance records for the specific employee and month
-      const monthRecords = result.data.filter((record: any) => {
-        const recordDate = record.date;
-        return record.employeeId === employeeId && 
-               recordDate >= startDate && 
-               endDate !== '' && recordDate <= endDate;
-      });
+  // Load data
+  useEffect(() => {
+    const initializeData = async () => {
+      await loadEmployees();
+      await loadSettings();
+      await loadPayrollData();
+    };
+    initializeData();
+  }, []);
 
-      return monthRecords;
-    } catch (err) {
-      console.error('Error fetching attendance data:', err);
-      return null;
-    }
-  };
-
-  // Calculate payable days and overtime from attendance
-  const calculateAttendanceMetrics = async (employeeId: string, month: string, year: number) => {
-    try {
-      const attendanceRecords = await fetchAttendanceForMonth(employeeId, month, year);
-      if (!attendanceRecords) return { payableDays: 0, otHours: 0 };
-
-      // Get holidays for the month
-      const holidaysResult = await firebaseService.getCollection('holidays');
-      const holidays = holidaysResult.success && holidaysResult.data ? holidaysResult.data : [];
-      
-      // Get leave requests for the month
-      const leavesResult = await firebaseService.getCollection('leaveRequests');
-      const leaves = leavesResult.success && leavesResult.data ? leavesResult.data : [];
-
-      let payableDays = 0;
-      let totalOtHours = 0;
-
-      // Get all dates in the month
-      const startDate = new Date(year, parseInt(month) - 1, 1);
-      const endDate = new Date(year, parseInt(month), 0);
-      
-      if (!endDate) return { payableDays: 0, otHours: 0 };
-      
-      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0];
-        if (!dateStr) continue;
-        
-        const dayOfWeek = d.getDay();
-        
-        // Skip weekends (0 = Sunday, 6 = Saturday)
-        if (dayOfWeek === 0 || dayOfWeek === 6) continue;
-        
-        // Skip holidays
-        const isHoliday = holidays.some((h: any) => h.date === dateStr && (h.isActive ?? true));
-        if (isHoliday) continue;
-        
-        // Check if employee has approved leave on this date
-        const hasLeave = leaves.some((l: any) => 
-          l.employeeId === employeeId && 
-          l['status'] === 'approved' &&
-          l.startDate <= dateStr && 
-          (l.endDate || l.startDate) >= dateStr
-        );
-        if (hasLeave) continue;
-        
-        // Check if employee was present on this date
-        const attendanceRecord = attendanceRecords.find((r: any) => r.date === dateStr);
-        if (attendanceRecord && attendanceRecord['status'] === 'present') {
-          payableDays++;
-          
-          // Calculate overtime hours (assuming 8 hours is standard work day)
-          if (attendanceRecord['totalHours'] && attendanceRecord['totalHours'] > 8) {
-            totalOtHours += attendanceRecord['totalHours'] - 8;
-          }
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showExportDropdown) {
+        const target = event.target as Element;
+        if (!target.closest('.export-dropdown')) {
+          setShowExportDropdown(false);
         }
       }
+    };
 
-      return { payableDays, otHours: totalOtHours };
-    } catch (err) {
-      console.error('Error calculating attendance metrics:', err);
-      return { payableDays: 0, otHours: 0 };
-    }
-  };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showExportDropdown]);
 
-  // Fetch employees from Firebase
-  const fetchEmployees = async () => {
+
+  const loadPayrollData = async () => {
+    setLoading(true);
     try {
-      setEmployeesLoading(true);
-      setEmployeesError(null);
-
-      const mapToEmployee = (emp: any): Employee => ({
-        id: emp.id,
-        employeeId: emp.employeeId || emp.employee_id || emp.userId || emp.uid || '',
-        firstName: emp.firstName || emp.first_name || emp.givenName || '',
-        lastName: emp.lastName || emp.last_name || emp.familyName || '',
-        email: emp.email || '',
-        department: emp.department || emp.dept || '',
-        position: emp.position || emp.designation || '',
-        baseSalary: emp.baseSalary || emp.base_salary || emp.salary || 0,
-        joinDate: emp.joinDate || emp.join_date || emp.joinedAt || '',
-        isActive: emp.isActive !== false
-      });
-
-      // Try 'employees' collection first
-      let employeesData: Employee[] = [];
-      const employeesResult = await firebaseService.getCollection('employees');
-      if (employeesResult.success && employeesResult.data) {
-        employeesData = employeesResult.data.map(mapToEmployee);
-      }
-
-      // Fallback to 'users' collection if empty
-      if (employeesData.length === 0) {
-        const usersResult = await firebaseService.getCollection('users');
-        if (usersResult.success && usersResult.data) {
-          employeesData = usersResult.data
-            .filter((u: any) => (u.role ? ['employee','staff','hr','finance','admin'].includes(String(u.role).toLowerCase()) : true))
-            .map(mapToEmployee);
-        }
-      }
-
-      setEmployees(employeesData);
-      if (employeesData.length === 0) {
-        setEmployeesError('No employees found');
-      }
-    } catch (err) {
-      console.error('Error fetching employees:', err);
-      setEmployeesError('Failed to load employees');
-    } finally {
-      setEmployeesLoading(false);
-    }
-  };
-
-  // Fetch payroll records from Firebase
-  const fetchPayrollRecords = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const result = await firebaseService.getCollection('payroll');
-      
-      if (result.success && result.data) {
-        const payrollData = result.data.map((record: any) => {
-          // Handle both embedded employee object and employeeId field
-          let employee;
-          if (record.employee && record.employee.id) {
-            // If employee object is embedded, use it directly
-            employee = record.employee;
-          } else if (record.employeeId) {
-            // If only employeeId is stored, find the employee
-            employee = employees.find(emp => emp.id === record.employeeId);
-          }
-          
-          return {
-            id: record.id,
-            employeeId: record.employeeId || (record.employee ? record.employee.id : ''),
-            employee: employee || {
-              id: '',
-              employeeId: '',
-              firstName: 'Unknown',
-              lastName: 'Employee',
-              email: '',
-              department: '',
-              position: '',
-              baseSalary: 0,
-              joinDate: '',
-              isActive: false
-            },
-            month: record.month || '',
-            year: record.year || new Date().getFullYear(),
-            basicSalary: record.basicSalary || 0,
-            overtimeHours: record.overtimeHours || 0,
-            overtimeRate: record.overtimeRate || 0,
-            overtimePay: record.overtimePay || 0,
-            bonuses: record.bonuses || 0,
-            allowances: record.allowances || 0,
-            deductions: record.deductions || 0,
-            taxDeductions: record.taxDeductions || 0,
-            grossPay: record.grossPay || 0,
-            netPay: record.netPay || 0,
-            status: record.status || 'draft',
-            paymentMethod: record.paymentMethod || 'bank',
-            paymentDate: record.paymentDate || '',
-            processedBy: record.processedBy || '',
-            processedAt: record.processedAt || '',
-            paidAt: record.paidAt || '',
-            notes: record.notes || '',
-            // Add the new fields
-            payableDays: record.payableDays || 0,
-            otHours: record.otHours || 0,
-            basicDA: record.basicDA || 0,
-            hra: record.hra || 0,
-            specialAllowance: record.specialAllowance || 0,
-            pfEmployee: record.pfEmployee || 0,
-            esiEmployee: record.esiEmployee || 0,
-            pt: record.pt || 0,
-            salaryAdvance: record.salaryAdvance || 0,
-            otherDeductions: record.otherDeductions || 0,
-            arrears: record.arrears || 0,
-            pfApplicable: record.pfApplicable !== false,
-            esiApplicable: record.esiApplicable !== false,
-            uanNumber: record.uanNumber || '',
-            esiNumber: record.esiNumber || '',
-            remarks: record.remarks || ''
-          };
-        });
-        setPayrollRecords(payrollData);
+      const response = await firebaseService.getCollection('payrollRecords');
+      if (response.success && response.data && response.data.length > 0) {
+        setPayrollRecords(response.data as PayrollRecord[]);
       } else {
-        setError('Failed to load payroll records');
-        showNotification('Error loading payroll records', 'error');
+        // Generate payroll records from employee data if no payroll records exist
+        await generatePayrollFromEmployees();
       }
-    } catch (err) {
-      console.error('Error fetching payroll records:', err);
-      setError('Failed to load payroll records');
-      showNotification('Error loading payroll records', 'error');
+    } catch (error) {
+      console.error('Error loading payroll data:', error);
+      setError('Failed to load payroll data');
+      // Don't load sample data, let the user generate payroll manually
     } finally {
       setLoading(false);
     }
   };
 
-  // Calculate payroll totals
-  const calculatePayrollTotals = useCallback(() => {
-    const totalBasicSalary = payrollRecords.reduce((sum, record) => sum + record.basicSalary, 0);
-    const totalAllowances = payrollRecords.reduce((sum, record) => sum + record.allowances, 0);
-    const totalDeductions = payrollRecords.reduce((sum, record) => sum + record.deductions, 0);
-    const totalNetSalary = payrollRecords.reduce((sum, record) => sum + record.netPay, 0);
-    const totalOvertimePay = payrollRecords.reduce((sum, record) => sum + record.overtimePay, 0);
-    const totalBonuses = payrollRecords.reduce((sum, record) => sum + record.bonuses, 0);
-    const totalTaxDeductions = payrollRecords.reduce((sum, record) => sum + record.taxDeductions, 0);
+  const generatePayrollFromEmployees = async () => {
+    try {
+      if (employees.length === 0) {
+        await loadEmployees();
+      }
+      
+      if (employees.length === 0) {
+        setError('No employees found. Please add employees first.');
+        return;
+      }
+      
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth() + 1;
+      const currentYear = currentDate.getFullYear();
+      
+      const payrollRecords: PayrollRecord[] = employees.map((employee) => {
+        const grossSalary = employee.salary;
+        const basicSalary = grossSalary * 0.6; // 60% basic
+        const hra = grossSalary * 0.3; // 30% HRA
+        const specialAllowance = grossSalary * 0.1; // 10% special allowance
+        
+        // Calculate PF and ESI based on settings
+        const pfEmployee = settings.pfApplicable ? basicSalary * (settings.pfEmployeeRate / 100) : 0;
+        const esiEmployee = settings.esiApplicable ? grossSalary * (settings.esiEmployeeRate / 100) : 0;
+        
+        // Default values for now - will be calculated from attendance
+        const payableDays = 22;
+        const otHours = 0;
+        const otPayment = otHours * settings.otHourlyRate;
+        const otherDeductions = 0;
+        
+        const netPayable = grossSalary - pfEmployee - esiEmployee - otherDeductions + otPayment;
+        const totalPayableAmount = netPayable;
+        
+        // Calculate additional detailed fields
+        const basicDA = basicSalary; // Basic + DA (assuming DA is 0 for now)
+        const balanceAdvance = 0;
+        const tds = grossSalary > 250000 ? Math.min((grossSalary - 250000) * 0.1, 10000) : 0; // Simple TDS calculation
+        const totalDeductions = pfEmployee + esiEmployee + 200 + otherDeductions + tds; // PT + other deductions + TDS
+        const arrears = 0;
+        const differenceAmount = 0;
+
+        return {
+          id: `payroll_${employee.id}_${currentYear}_${currentMonth}`,
+          employeeId: employee.employeeId,
+          employeeName: `${employee.firstName} ${employee.lastName}`,
+          grossSalary,
+          payableDays,
+          otHours,
+          netPayable,
+          totalPayableAmount,
+          remarks: 'Auto-generated from employee data',
+          basicSalary,
+          hra,
+          specialAllowance,
+          pfEmployee,
+          esiEmployee,
+          pt: 200, // Professional Tax
+          salaryAdvance: 0,
+          otherDeductions,
+          otPayment,
+          pfApplicable: settings.pfApplicable,
+          esiApplicable: settings.esiApplicable,
+          uanNumber: employee.uanNumber || '',
+          esiNumber: employee.esiNumber || '',
+          // Additional detailed fields
+          pfStatus: employee.pfStatus || 'inactive',
+          esiStatus: 'active', // Default to active for ESI
+          basicDA,
+          balanceAdvance,
+          tds,
+          totalDeductions,
+          arrears,
+          differenceAmount
+        };
+      });
+      
+      setPayrollRecords(payrollRecords);
+      
+      // Save to Firebase
+      await savePayrollRecords(payrollRecords);
+      
+      // Generate PF and ESI contributions
+      generatePFContributions(payrollRecords);
+      generateESIContributions(payrollRecords);
+      
+    } catch (error) {
+      console.error('Error generating payroll from employees:', error);
+      setError('Failed to generate payroll from employee data');
+    }
+  };
+
+  const generatePFContributions = (payrollRecords: PayrollRecord[]) => {
+    const pfContributions: PFContribution[] = payrollRecords.map((record) => {
+      const pfBasic = record.basicSalary;
+      const employeePF = record.pfEmployee;
+      const eps = pfBasic * (settings.epsContributionRate / 100);
+      const epf = pfBasic * (settings.epfContributionRate / 100);
+      const edli = pfBasic * (settings.edliContributionRate / 100);
+      const adminCharges = pfBasic * (settings.adminChargesRate / 100);
+      const edliAdmin = pfBasic * (settings.edliAdminChargesRate / 100);
+      const employerPFTotal = eps + epf + edli + adminCharges + edliAdmin;
+      
+      return {
+        id: `pf_${record.id}`,
+        employeeId: record.employeeId,
+        employeeName: record.employeeName,
+        uanNumber: record.uanNumber || '',
+        pfBasic,
+        employeePF,
+        eps,
+        epf,
+        edli,
+        adminCharges,
+        edliAdmin,
+        employerPFTotal
+      };
+    });
     
-    return {
-      totalEmployees: payrollRecords.length,
-      totalBasicSalary,
-      totalAllowances,
-      totalDeductions,
-      totalNetSalary,
-      averageSalary: payrollRecords.length > 0 ? totalNetSalary / payrollRecords.length : 0,
-      totalOvertimePay,
-      totalBonuses,
-      totalTaxDeductions
-    };
+    setPfContributions(pfContributions);
+  };
+
+  const generateESIContributions = (payrollRecords: PayrollRecord[]) => {
+    const esiContributions: ESIContribution[] = payrollRecords.map((record) => {
+      const employeeContribution = record.esiEmployee;
+      const employerContribution = record.grossSalary * (settings.esiEmployerRate / 100);
+      const total = employeeContribution + employerContribution;
+      
+      return {
+        id: `esi_${record.id}`,
+        employeeId: record.employeeId,
+        employeeName: record.employeeName,
+        esiNumber: record.esiNumber || '',
+        grossSalary: record.grossSalary,
+        employeeContribution,
+        employerContribution,
+        total
+      };
+    });
+    
+    setEsiContributions(esiContributions);
+  };
+
+
+  const loadEmployees = async () => {
+    try {
+      const response = await firebaseService.getCollection('users');
+      if (response.success && response.data) {
+        // Transform the user data to match our Employee interface
+        const transformedEmployees: Employee[] = response.data.map((user: any) => ({
+          id: user.id,
+          employeeId: user.employeeId || `EMP${user.id.slice(-3)}`,
+          firstName: user.firstName || user.name?.split(' ')[0] || 'Unknown',
+          lastName: user.lastName || user.name?.split(' ').slice(1).join(' ') || 'Employee',
+          email: user.email || '',
+          department: user.department || 'General',
+          position: user.position || 'Employee',
+          salary: user.salary || 0,
+          joinDate: user.joiningDate || user.hireDate || user.createdAt || new Date().toISOString(),
+          isActive: user.status === 'active' || user.isActive !== false,
+          uanNumber: user.uanNumber || '',
+          esiNumber: user.esiNumber || '',
+          pfStatus: user.pfStatus || 'inactive',
+          pfNumber: user.pfNumber || '',
+          bankName: user.bankingInfo?.bankName || user.bankName || '',
+          branch: user.bankingInfo?.branch || user.branch || '',
+          ifsc: user.bankingInfo?.ifscCode || user.ifsc || '',
+          bankAccount: user.bankingInfo?.accountNumber || user.bankAccount || '',
+          panNumber: user.governmentInfo?.panNumber || user.panNumber || '',
+          aadhaarNumber: user.governmentInfo?.aadharNumber || user.aadhaarNumber || ''
+        }));
+        setEmployees(transformedEmployees);
+      }
+    } catch (error) {
+      console.error('Error loading employees:', error);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      const response = await firebaseService.getDocument('payrollSettings', 'settings');
+      if (response.success && response.data) {
+        setSettings(response.data as PayrollSettings);
+      } else {
+        // Create default settings in Firebase if they don't exist
+        const defaultSettings: PayrollSettings = {
+          // PF Settings
+          pfEmployeeRate: 12,
+          pfEmployerRate: 12,
+          epsContributionRate: 8.33,
+          epfContributionRate: 3.67,
+          edliContributionRate: 0.5,
+          adminChargesRate: 0.5,
+          edliAdminChargesRate: 0.0,
+          pfApplicable: true,
+          
+          // ESI Settings
+          esiEmployeeRate: 0.75,
+          esiEmployerRate: 3.25,
+          esiApplicable: true,
+          
+          // Overtime Settings
+          otHourlyRate: 50,
+          
+          // Holiday Pay Settings
+          holidayPayRules: 'paid',
+          holidayPayType: 'paid'
+        };
+        
+        await firebaseService.setDocument('payrollSettings', 'settings', defaultSettings);
+        setSettings(defaultSettings);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      // Use default settings if Firebase fails
+      const defaultSettings: PayrollSettings = {
+        // PF Settings
+        pfEmployeeRate: 12,
+        pfEmployerRate: 12,
+        epsContributionRate: 8.33,
+        epfContributionRate: 3.67,
+        edliContributionRate: 0.5,
+        adminChargesRate: 0.5,
+        edliAdminChargesRate: 0.0,
+        pfApplicable: true,
+        
+        // ESI Settings
+        esiEmployeeRate: 0.75,
+        esiEmployerRate: 3.25,
+        esiApplicable: true,
+        
+        // Overtime Settings
+        otHourlyRate: 50,
+        
+        // Holiday Pay Settings
+        holidayPayRules: 'paid',
+        holidayPayType: 'paid'
+      };
+      setSettings(defaultSettings);
+    }
+  };
+
+  // Calculate salary based on attendance and holidays
+  const calculateSalaryFromAttendance = async (employeeId: string, month: string, year: number) => {
+    try {
+      // Fetch attendance data
+      const attendanceResponse = await firebaseService.getCollection('attendance');
+      const holidaysResponse = await firebaseService.getCollection('holidays');
+      
+      if (!attendanceResponse.success || !holidaysResponse.success) {
+        console.warn('Could not fetch attendance or holiday data, using default values');
+        return { payableDays: 22, otHours: 0 }; // Default values when data unavailable
+      }
+
+      const attendanceRecords = attendanceResponse.data || [];
+      const holidays = holidaysResponse.data || [];
+
+      // Get all dates in the month
+      const startDate = new Date(year, parseInt(month) - 1, 1);
+      const endDate = new Date(year, parseInt(month), 0);
+      
+      let payableDays = 0;
+      let totalOtHours = 0;
+
+      // Calculate payable days and OT hours
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0];
+        const dayOfWeek = d.getDay();
+        
+        // Skip weekends
+        if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+        
+        // Check if it's a holiday
+        const isHoliday = holidays.some((holiday: any) => 
+          holiday.date === dateStr && holiday['status'] === 'active'
+        );
+        
+        if (isHoliday && settings.holidayPayRules === 'unpaid') continue;
+        
+        // Check attendance for this date
+        const attendanceRecord = attendanceRecords.find((record: any) => 
+          record.employeeId === employeeId && record.date === dateStr
+        );
+        
+        if (attendanceRecord && attendanceRecord['status'] === 'present') {
+          payableDays++;
+          
+          // Calculate OT hours (assuming 8 hours standard work day)
+          const clockIn = new Date(`${dateStr}T${attendanceRecord['clockIn']}`);
+          const clockOut = attendanceRecord['clockOut'] ? new Date(`${dateStr}T${attendanceRecord['clockOut']}`) : null;
+          
+          if (clockOut) {
+            const totalHours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+            const otHours = Math.max(0, totalHours - 8); // 8 hours standard
+            totalOtHours += otHours;
+          }
+        }
+      }
+
+      return { payableDays, otHours: totalOtHours };
+    } catch (error) {
+      console.error('Error calculating salary from attendance:', error);
+      return { payableDays: 22, otHours: 0 }; // Default values
+    }
+  };
+
+  // Save payroll records to Firebase
+  const savePayrollRecords = async (records: PayrollRecord[]) => {
+    try {
+      for (const record of records) {
+        await firebaseService.setDocument('payrollRecords', record.id, record);
+      }
+    } catch (error) {
+      console.error('Error saving payroll records:', error);
+    }
+  };
+
+  // Update payroll record in Firebase
+  const updatePayrollRecord = async (record: PayrollRecord) => {
+    try {
+      await firebaseService.updateDocument('payrollRecords', record.id, record);
+    } catch (error) {
+      console.error('Error updating payroll record:', error);
+    }
+  };
+
+  // Create new payroll record
+  const createPayrollRecord = async (record: PayrollRecord) => {
+    try {
+      await firebaseService.setDocument('payrollRecords', record.id, record);
+      setPayrollRecords(prev => [...prev, record]);
+    } catch (error) {
+      console.error('Error creating payroll record:', error);
+    }
+  };
+
+  // Save settings to Firebase
+  const saveSettings = async (newSettings: PayrollSettings) => {
+    try {
+      setSavingSettings(true);
+      await firebaseService.setDocument('payrollSettings', 'settings', newSettings);
+      setSettings(newSettings);
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      setError('Failed to save settings');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  // Auto-calculate salary when editing
+  const handleAutoCalculate = async (employeeId: string, grossSalary: number) => {
+    const currentDate = new Date();
+    const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
+    const year = currentDate.getFullYear();
+    
+    const { payableDays, otHours } = await calculateSalaryFromAttendance(employeeId, month, year);
+    
+    // Calculate salary breakdown
+    const basicSalary = grossSalary * 0.6; // 60% basic
+    const hra = grossSalary * 0.3; // 30% HRA
+    const specialAllowance = grossSalary * 0.1; // 10% special allowance
+    
+    // Calculate PF and ESI
+    const pfEmployee = settings.pfApplicable ? basicSalary * (settings.pfEmployeeRate / 100) : 0;
+    const esiEmployee = settings.esiApplicable ? grossSalary * (settings.esiEmployeeRate / 100) : 0;
+    
+    // Calculate OT payment
+    const otPayment = otHours * settings.otHourlyRate;
+    
+    // Calculate net payable
+    const totalWorkingDays = 22; // Default working days per month
+    const netPayable = (grossSalary / totalWorkingDays) * payableDays + otPayment - pfEmployee - esiEmployee;
+    const totalPayableAmount = netPayable;
+    
+    setFormData(prev => ({
+      ...prev,
+      payableDays,
+      otHours,
+      basicSalary,
+      hra,
+      specialAllowance,
+      pfEmployee,
+      esiEmployee,
+      otPayment,
+      netPayable,
+      totalPayableAmount
+    }));
+  };
+
+  // Filtered records
+  const filteredRecords = useMemo(() => {
+    let filtered = [...payrollRecords];
+
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      filtered = filtered.filter(record =>
+        record.employeeName.toLowerCase().includes(searchLower) ||
+        record.employeeId.toLowerCase().includes(searchLower)
+      );
+    }
+
+    if (departmentFilter !== 'all') {
+      filtered = filtered.filter(record => {
+        const employee = employees.find(emp => emp.employeeId === record.employeeId);
+        return employee && employee.department === departmentFilter;
+      });
+    }
+
+    return filtered;
+  }, [payrollRecords, searchQuery, departmentFilter, employees]);
+
+  // Statistics
+  const stats = useMemo(() => {
+    const total = payrollRecords.length;
+    const totalGrossSalary = payrollRecords.reduce((sum, record) => sum + record.grossSalary, 0);
+    const totalNetPayable = payrollRecords.reduce((sum, record) => sum + record.netPayable, 0);
+    const totalOTHours = payrollRecords.reduce((sum, record) => sum + record.otHours, 0);
+
+    return { total, totalGrossSalary, totalNetPayable, totalOTHours };
   }, [payrollRecords]);
 
-  const payrollSummary = calculatePayrollTotals();
-  const [activeTab, setActiveTab] = useState(0);
-
-  // Settings state (persisted in Firebase under 'payrollSettings/percentages')
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState({
-    pfPercent: 12,
-    epsPercent: 8.33,
-    epfPercent: 3.67,
-    edliPercent: 0.5,
-    adminChargesPercent: 0.5,
-    esiEmployeePercent: 0.75,
-    esiEmployerPercent: 3.25,
-    ptAmount: 0,
-    hraPercent: 40,
-    daPercent: 0,
-    specialAllowancePercent: 0
-  });
-
-  const fetchSettings = useCallback(async () => {
-    try {
-      const result = await firebaseService.getDocument('payrollSettings', 'percentages');
-      if (result.success && result.data) {
-        setSettings((prev) => ({ ...prev, ...result.data }));
-      }
-    } catch (e) {
-      // ignore; use defaults
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
-
-  // Handler functions
-  const handlePayrollFormChange = (field: string, value: any) => {
-    setPayrollForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  // Auto-calculate attendance metrics when employee is selected
-  const handleEmployeeSelection = async (employeeId: string) => {
-    if (!employeeId) return;
-    
-    // Update the form
-    setPayrollForm(prev => ({
-      ...prev,
-      employeeId
-    }));
-
-    // Auto-calculate attendance metrics
-    const metrics = await calculateAttendanceMetrics(employeeId, payrollForm.month, payrollForm.year);
-    
-    // Update payable days and OT hours
-    setPayrollForm(prev => ({
-      ...prev,
-      payableDays: metrics.payableDays,
-      otHours: metrics.otHours
-    }));
-
-    // Auto-populate basic salary from employee data
-    const selectedEmployee = employees.find(emp => emp.id === employeeId);
-    if (selectedEmployee) {
-      const basicSalary = selectedEmployee.baseSalary || 0;
-      
-      // Calculate PF/ESI and other values based on settings
-      const da = (settings.daPercent / 100) * basicSalary;
-      const hra = (settings.hraPercent / 100) * basicSalary;
-      const specialAllowance = (settings.specialAllowancePercent / 100) * basicSalary;
-      const pfEmployee = (settings.pfPercent / 100) * basicSalary;
-      const esiEmployee = (settings.esiEmployeePercent / 100) * (basicSalary + hra + specialAllowance);
-      const pt = settings.ptAmount || 0;
-      
-      setPayrollForm(prev => ({
-        ...prev,
-        basicSalary,
-        basicDA: da,
-        hra: hra,
-        specialAllowance: specialAllowance,
-        pfEmployee: pfEmployee,
-        esiEmployee: esiEmployee,
-        pt: pt
-      }));
-    }
-  };
-
-  const handleSavePayroll = async () => {
-    try {
-      if (!payrollForm.employeeId || payrollForm.basicSalary <= 0) {
-        showNotification('Please fill in all required fields', 'error');
-        return;
-      }
-
-      const employee = employees.find(emp => emp.id === payrollForm.employeeId);
-      if (!employee) {
-        showNotification('Employee not found', 'error');
-        return;
-      }
-
-      const da = (settings.daPercent / 100) * payrollForm.basicSalary;
-      const hra = (settings.hraPercent / 100) * payrollForm.basicSalary;
-      const specialAllowance = (settings.specialAllowancePercent / 100) * payrollForm.basicSalary;
-      const overtimePay = payrollForm.overtimeHours * payrollForm.overtimeRate;
-      const grossPay = payrollForm.basicSalary + da + hra + specialAllowance + overtimePay + payrollForm.bonuses + payrollForm.allowances + (payrollForm.arrears || 0);
-
-      const pfEmployee = payrollForm.pfApplicable ? (settings.pfPercent / 100) * payrollForm.basicSalary : 0;
-      const esiEmployee = payrollForm.esiApplicable ? (settings.esiEmployeePercent / 100) * (payrollForm.basicSalary + hra + specialAllowance) : 0;
-      const pt = settings.ptAmount || 0;
-
-      const totalDeductions = (payrollForm.deductions || 0) + (payrollForm.taxDeductions || 0) + (payrollForm.salaryAdvance || 0) + (payrollForm.otherDeductions || 0) + pfEmployee + esiEmployee + pt;
-      const netPay = grossPay - totalDeductions;
-
-      const payrollData = {
-        ...payrollForm,
-        employee: {
-          id: employee.id,
-          employeeId: employee.employeeId,
-          firstName: employee.firstName,
-          lastName: employee.lastName,
-          email: employee.email,
-          department: employee.department,
-          position: employee.position,
-          baseSalary: employee.baseSalary,
-          joinDate: employee.joinDate,
-          isActive: employee.isActive
-        },
-        overtimePay,
-        grossPay,
-        netPay,
-        payableDays: payrollForm.payableDays,
-        otHours: payrollForm.otHours,
-        basicDA: da,
-        hra: hra,
-        specialAllowance: specialAllowance,
-        pfEmployee: pfEmployee,
-        esiEmployee: esiEmployee,
-        pt: pt,
-        arrears: payrollForm.arrears,
-        salaryAdvance: payrollForm.salaryAdvance,
-        otherDeductions: payrollForm.otherDeductions,
-        pfApplicable: payrollForm.pfApplicable,
-        esiApplicable: payrollForm.esiApplicable,
-        uanNumber: payrollForm.uanNumber,
-        esiNumber: payrollForm.esiNumber,
-        remarks: payrollForm.remarks,
-        status: 'draft' as const,
-        processedBy: 'current-user-id', // TODO: Get from auth context
-        processedAt: new Date().toISOString()
-      };
-
-      if (isCreateMode) {
-        const result = await firebaseService.addDocument('payroll', payrollData);
-        if (result.success) {
-          showNotification('Payroll record created successfully!', 'success');
-          setIsDialogOpen(false);
-          resetPayrollForm();
-          fetchPayrollRecords();
-        } else {
-          showNotification('Failed to create payroll record', 'error');
-        }
-      } else if (selectedRecord) {
-        const result = await firebaseService.updateDocument('payroll', selectedRecord.id, payrollData);
-        if (result.success) {
-          showNotification('Payroll record updated successfully!', 'success');
-          setIsDialogOpen(false);
-          resetPayrollForm();
-          fetchPayrollRecords();
-        } else {
-          showNotification('Failed to update payroll record', 'error');
-        }
-      }
-    } catch (err) {
-      console.error('Error saving payroll record:', err);
-      showNotification('Error saving payroll record', 'error');
-    }
-  };
-
-  const resetPayrollForm = () => {
-    setPayrollForm({
-      employeeId: '',
-      month: new Date().getMonth().toString().padStart(2, '0'),
-      year: new Date().getFullYear(),
-      basicSalary: 0,
-      overtimeHours: 0,
-      overtimeRate: 0,
-      bonuses: 0,
-      allowances: 0,
-      deductions: 0,
-      taxDeductions: 0,
-      paymentMethod: 'bank',
-      notes: '',
-      payableDays: 0,
-      otHours: 0,
-      basicDA: 0,
-      hra: 0,
-      specialAllowance: 0,
-      pfEmployee: 0,
-      esiEmployee: 0,
-      pt: 0,
-      salaryAdvance: 0,
-      otherDeductions: 0,
-      balanceAdvance: 0,
-      tds: 0,
-      arrears: 0,
-      otPayment: 0,
-      totalPayableAmount: 0,
-      pfEsiStatus: '',
-      differenceAmount: 0,
-      uanNumber: '',
-      esiNumber: '',
-      pfApplicable: true,
-      esiApplicable: true,
-      remarks: ''
-    });
-  };
-
-  const handleCreatePayroll = async () => {
-    resetPayrollForm();
-    setSelectedRecord(null);
-    setIsViewMode(false);
-    setIsCreateMode(true);
-    if (employees.length === 0 && !employeesLoading) {
-      await fetchEmployees();
-      if (employeesError) {
-        showNotification(employeesError, 'error');
-      }
-    }
-    setIsDialogOpen(true);
-  };
-
-  const handleEditPayroll = async (record: PayrollRecord) => {
-    setPayrollForm({
-      employeeId: record.employeeId,
-      month: record.month,
-      year: record.year,
-      basicSalary: record.basicSalary,
-      overtimeHours: record.overtimeHours,
-      overtimeRate: record.overtimeRate,
-      bonuses: record.bonuses,
-      allowances: record.allowances,
-      deductions: record.deductions,
-      taxDeductions: record.taxDeductions,
-      paymentMethod: record.paymentMethod,
-      notes: record.notes || '',
-      payableDays: record.payableDays || 0,
-      otHours: record.otHours || 0,
-      basicDA: record.basicDA || 0,
-      hra: record.hra || 0,
-      specialAllowance: record.specialAllowance || 0,
-      pfEmployee: record.pfEmployee || 0,
-      esiEmployee: record.esiEmployee || 0,
-      pt: record.pt || 0,
-      salaryAdvance: record.salaryAdvance || 0,
-      otherDeductions: record.otherDeductions || 0,
-      balanceAdvance: record.balanceAdvance || 0,
-      tds: record.tds || 0,
-      arrears: record.arrears || 0,
-      otPayment: record.otPayment || 0,
-      totalPayableAmount: record.totalPayableAmount || 0,
-      pfEsiStatus: record.pfEsiStatus || '',
-      differenceAmount: record.differenceAmount || 0,
-      uanNumber: record.uanNumber || '',
-      esiNumber: record.esiNumber || '',
-      pfApplicable: record.pfApplicable ?? true,
-      esiApplicable: record.esiApplicable ?? true,
-      remarks: record.remarks || ''
-    });
+  // Action handlers
+  const handleViewRecord = (record: PayrollRecord) => {
     setSelectedRecord(record);
-    setIsViewMode(false);
-    setIsCreateMode(false);
-    if (employees.length === 0 && !employeesLoading) {
-      await fetchEmployees();
-      if (employeesError) {
-        showNotification(employeesError, 'error');
-      }
-    }
-    setIsDialogOpen(true);
+    setFormData(record);
+    setShowViewModal(true);
   };
 
-  const handleViewPayroll = (record: PayrollRecord) => {
+  const handleEditRecord = (record: PayrollRecord) => {
     setSelectedRecord(record);
-    setIsViewMode(true);
-    setIsCreateMode(false);
-    setIsDialogOpen(true);
+    setFormData(record);
+    setShowEditModal(true);
   };
 
-  const handleDeletePayroll = async (recordId: string) => {
+  const handleDeleteRecord = (record: PayrollRecord) => {
+    setSelectedRecord(record);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteRecord = async () => {
+    if (!selectedRecord) return;
+    
     try {
-      const result = await firebaseService.deleteDocument('payroll', recordId);
+      await firebaseService.deleteDocument('payrollRecords', selectedRecord.id);
+      setPayrollRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
+      setShowDeleteModal(false);
+      setSuccessMessage('Payroll record deleted successfully');
+    } catch (error) {
+      setError('Failed to delete payroll record');
+    }
+  };
+
+  const handleSaveRecord = async () => {
+    if (!selectedRecord) return;
+
+    try {
+      const updatedRecord = { ...selectedRecord, ...formData } as PayrollRecord;
       
-      if (result.success) {
-        setPayrollRecords(prev => prev.filter(record => record.id !== recordId));
-        setSnackbar({
-          open: true,
-          message: 'Payroll record deleted successfully',
-          severity: 'success'
-        });
-        showNotification('Payroll record deleted successfully!', 'success');
+      // Check if this is a new record (no employeeId means it's new)
+      if (!selectedRecord.employeeId || selectedRecord.employeeId === '') {
+        // Create new record
+        await createPayrollRecord(updatedRecord);
+        setSuccessMessage('New payroll record created successfully');
       } else {
-        setSnackbar({
-          open: true,
-          message: 'Failed to delete payroll record',
-          severity: 'error'
-        });
-        showNotification('Failed to delete payroll record', 'error');
+        // Update existing record
+        await updatePayrollRecord(updatedRecord);
+        setPayrollRecords(prev => prev.map(r => r.id === selectedRecord.id ? updatedRecord : r));
+        setSuccessMessage('Payroll record updated successfully');
       }
-    } catch (err) {
-      console.error('Error deleting payroll record:', err);
-      setSnackbar({
-        open: true,
-        message: 'Error deleting payroll record',
-        severity: 'error'
-      });
-      showNotification('Error deleting payroll record', 'error');
+      
+      setShowEditModal(false);
+    } catch (error) {
+      setError('Failed to save payroll record');
     }
   };
 
-  const handleProcessPayroll = async (recordId: string) => {
-    try {
-      const record = payrollRecords.find(r => r.id === recordId);
-      if (!record) return;
-
-      const updatedRecord = {
-        ...record,
-        status: 'approved',
-        processedAt: new Date().toISOString()
-      };
-
-      const result = await firebaseService.updateDocument('payroll', recordId, updatedRecord);
-      if (result.success) {
-        fetchPayrollRecords();
-        showNotification('Payroll record processed successfully!', 'success');
-      } else {
-        showNotification('Failed to process payroll record', 'error');
-      }
-    } catch (err) {
-      console.error('Error processing payroll record:', err);
-      showNotification('Error processing payroll record', 'error');
-    }
+  // Export functions
+  const exportToExcel = (data: any[], filename: string) => {
+    // Create a simple CSV export (can be enhanced with actual Excel library)
+    const headers = Object.keys(data[0] || {});
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => headers.map(header => `"${row[header] || ''}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${filename}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const handlePayPayroll = async (recordId: string) => {
+  const exportToPDF = (content: string | string[], filename: string) => {
     try {
-      const record = payrollRecords.find(r => r.id === recordId);
-      if (!record) {
-        showNotification('Payroll record not found', 'error');
-        return;
-      }
-
-      const updatedRecord = {
-        ...record,
-        status: 'paid',
-        paidAt: new Date().toISOString()
-      };
-
-      const result = await firebaseService.updateDocument('payroll', recordId, updatedRecord);
-      if (result.success) {
-        fetchPayrollRecords();
-        showNotification('Payroll record marked as paid!', 'success');
+      let pdfContent = '';
+      
+      if (Array.isArray(content)) {
+        pdfContent = content.join('\n\n' + '='.repeat(80) + '\n\n');
       } else {
-        showNotification('Failed to mark payroll record as paid', 'error');
+        pdfContent = content;
       }
-    } catch (err) {
-      console.error('Error marking payroll record as paid:', err);
-      showNotification('Error marking payroll record as paid', 'error');
-    }
-  };
-
-  const handleExportPayroll = () => {
-    try {
-      // Create CSV data
-      const csvData = [
-        ['Employee ID', 'Employee Name', 'Department', 'Position', 'Month', 'Year', 'Basic Salary', 'Allowances', 'Deductions', 'Net Pay', 'Status', 'Payment Method'],
-        ...filteredRecords.map(record => [
-          record.employee.employeeId,
-          `${record.employee.firstName} ${record.employee.lastName}`,
-          record.employee.department,
-          record.employee.position,
-          record.month,
-          record.year.toString(),
-          formatIndianCurrency(record.basicSalary),
-          formatIndianCurrency(record.allowances),
-          formatIndianCurrency(record.deductions),
-          formatIndianCurrency(record.netPay),
-          record.status,
-          record.paymentMethod
-        ])
-      ];
-
-      // Convert to CSV string
-      const csvString = csvData.map(row => row.join(',')).join('\n');
-
-      // Create and download file
-      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      
+      
+      // Create a simple PDF using a minimal working structure
+      const pdfData = createMinimalPDF(pdfContent);
+      const blob = new Blob([pdfData], { type: 'application/pdf' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `payroll_export_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `${filename}.pdf`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
-      showNotification('Payroll data exported successfully!', 'success');
-    } catch (err) {
-      console.error('Error exporting payroll data:', err);
-      showNotification('Error exporting payroll data', 'error');
+      
+    } catch (error) {
+      console.error('Error in exportToPDF:', error);
+      throw new Error(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
-// Generate payroll slip HTML content
-const generatePayrollSlipHTML = (record: PayrollRecord) => {
-  const employee = record.employee;
-  const monthYear = formatMonthYear(record.month, record.year);
-  
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Payroll Slip - ${employee.firstName} ${employee.lastName}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
-        .company-name { font-size: 24px; font-weight: bold; color: #333; }
-        .payroll-title { font-size: 20px; color: #666; margin-top: 10px; }
-        .employee-info { margin-bottom: 30px; }
-        .info-row { display: flex; margin-bottom: 10px; }
-        .info-label { font-weight: bold; width: 150px; }
-        .info-value { flex: 1; }
-        .section { margin-bottom: 30px; }
-        .section-title { font-size: 18px; font-weight: bold; color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 15px; }
-        .amount-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
-        .amount-label { font-weight: bold; }
-        .amount-value { text-align: right; }
-        .total-row { border-top: 2px solid #333; padding-top: 10px; margin-top: 15px; font-weight: bold; font-size: 16px; }
-        .footer { margin-top: 50px; text-align: center; color: #666; font-size: 12px; }
-        @media print { body { margin: 0; } .no-print { display: none; } }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="company-name">HRMS Company</div>
-        <div class="payroll-title">PAYROLL SLIP</div>
-        <div>${monthYear}</div>
-      </div>
-      
-      <div class="employee-info">
-        <div class="info-row">
-          <div class="info-label">Employee ID:</div>
-          <div class="info-value">${employee.employeeId}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">Name:</div>
-          <div class="info-value">${employee.firstName} ${employee.lastName}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">Department:</div>
-          <div class="info-value">${employee.department}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">Position:</div>
-          <div class="info-value">${employee.position}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">Payable Days:</div>
-          <div class="info-value">${record.payableDays || 0}</div>
-        </div>
-        <div class="info-row">
-          <div class="info-label">OT Hours:</div>
-          <div class="info-value">${record.otHours || 0}</div>
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">Earnings</div>
-        <div class="amount-row">
-          <div class="amount-label">Basic Salary:</div>
-          <div class="amount-value">₹${record.basicSalary?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">DA:</div>
-          <div class="amount-value">₹${record.basicDA?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">HRA:</div>
-          <div class="amount-value">₹${record.hra?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">Special Allowance:</div>
-          <div class="amount-value">₹${record.specialAllowance?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">Overtime Pay:</div>
-          <div class="amount-value">₹${record.overtimePay?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">Bonuses:</div>
-          <div class="amount-value">₹${record.bonuses?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">Other Allowances:</div>
-          <div class="amount-value">₹${record.allowances?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">Arrears:</div>
-          <div class="amount-value">₹${record.arrears?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row total-row">
-          <div class="amount-label">Gross Salary:</div>
-          <div class="amount-value">₹${record.grossPay?.toLocaleString('en-IN') || 0}</div>
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">Deductions</div>
-        <div class="amount-row">
-          <div class="amount-label">PF Employee:</div>
-          <div class="amount-value">₹${record.pfEmployee?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">ESI Employee:</div>
-          <div class="amount-value">₹${record.esiEmployee?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">PT:</div>
-          <div class="amount-value">₹${record.pt?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">Salary Advance:</div>
-          <div class="amount-value">₹${record.salaryAdvance?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">Other Deductions:</div>
-          <div class="amount-value">₹${record.otherDeductions?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row">
-          <div class="amount-label">TDS:</div>
-          <div class="amount-value">₹${record.taxDeductions?.toLocaleString('en-IN') || 0}</div>
-        </div>
-        <div class="amount-row total-row">
-          <div class="amount-label">Total Deductions:</div>
-          <div class="amount-value">₹${((record.pfEmployee || 0) + (record.esiEmployee || 0) + (record.pt || 0) + (record.salaryAdvance || 0) + (record.otherDeductions || 0) + (record.taxDeductions || 0)).toLocaleString('en-IN')}</div>
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">Net Pay</div>
-        <div class="amount-row total-row">
-          <div class="amount-label">Net Payable Amount:</div>
-          <div class="amount-value">₹${record.netPay?.toLocaleString('en-IN') || 0}</div>
-        </div>
-      </div>
-      
-      <div class="footer">
-        <p>This is a computer generated document. No signature required.</p>
-        <p>Generated on: ${new Date().toLocaleDateString('en-IN')}</p>
-      </div>
-      
-      <div class="no-print" style="margin-top: 30px; text-align: center;">
-        <button onclick="window.print()">Print Payroll Slip</button>
-      </div>
-    </body>
-    </html>
-  `;
-};
 
-// Download payroll slip as HTML
-const downloadPayrollSlip = async (record: PayrollRecord) => {
-  try {
-    const htmlContent = generatePayrollSlipHTML(record);
+  const createMinimalPDF = (content: string): string => {
+    // Create a very simple PDF that will definitely work
+    const lines = content.split('\n');
+    const maxLines = 60;
+    const pages = Math.ceil(lines.length / maxLines);
     
-    // Create a blob with the HTML content
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    
-    // Create download link
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Payroll_${record.employee.firstName}_${record.employee.lastName}_${record.month}_${record.year}.html`;
-    
-    // Trigger download
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Clean up
-    window.URL.revokeObjectURL(url);
-    
-    showNotification('Payroll slip downloaded successfully!', 'success');
-  } catch (error) {
-    console.error('Error downloading payroll slip:', error);
-    showNotification('Error downloading payroll slip', 'error');
-  }
-};
+    let pdf = `%PDF-1.4
+1 0 obj
+<<
+/Type /Catalog
+/Pages 2 0 R
+>>
+endobj
 
-// Print payroll slip
-const printPayrollSlip = (record: PayrollRecord) => {
-  try {
-    const htmlContent = generatePayrollSlipHTML(record);
+2 0 obj
+<<
+/Type /Pages
+/Kids [`;
+
+    // Add page references
+    for (let i = 0; i < pages; i++) {
+      pdf += `${3 + i * 2} 0 R `;
+    }
     
-    // Create a new window for printing
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.focus();
+    pdf += `]
+/Count ${pages}
+>>
+endobj
+
+`;
+
+    // Create each page
+    for (let pageNum = 0; pageNum < pages; pageNum++) {
+      const startLine = pageNum * maxLines;
+      const endLine = Math.min(startLine + maxLines, lines.length);
+      const pageLines = lines.slice(startLine, endLine);
       
-      // Wait for content to load then print
-      setTimeout(() => {
-        printWindow.print();
-        printWindow.close();
-      }, 500);
+      // Create content stream
+      let contentStream = '';
+      let yPos = 750;
       
-      showNotification('Print dialog opened successfully!', 'success');
+      for (const line of pageLines) {
+        // Escape special characters
+        const escapedLine = line.replace(/[()\\]/g, '\\$&');
+        contentStream += `BT\n/F1 10 Tf\n50 ${yPos} Td\n(${escapedLine}) Tj\nET\n`;
+        yPos -= 12;
+      }
+      
+      const contentLength = contentStream.length;
+      
+      // Page object
+      pdf += `${3 + pageNum * 2} 0 obj
+<<
+/Type /Page
+/Parent 2 0 R
+/MediaBox [0 0 612 792]
+/Contents ${4 + pageNum * 2} 0 R
+/Resources <<
+/Font <<
+/F1 5 0 R
+>>
+>>
+>>
+endobj
+
+${4 + pageNum * 2} 0 obj
+<<
+/Length ${contentLength}
+>>
+stream
+${contentStream}endstream
+endobj
+
+`;
+    }
+
+    // Font object
+    pdf += `5 0 obj
+<<
+/Type /Font
+/Subtype /Type1
+/BaseFont /Courier
+>>
+endobj
+
+xref
+0 ${5 + pages * 2}
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+`;
+
+    // Add xref entries
+    let offset = 100;
+    for (let i = 0; i < pages; i++) {
+      pdf += `${offset.toString().padStart(10, '0')} 00000 n 
+`;
+      offset += 200;
+      pdf += `${offset.toString().padStart(10, '0')} 00000 n 
+`;
+      offset += 200;
+    }
+
+    offset += 100;
+    pdf += `${offset.toString().padStart(10, '0')} 00000 n 
+`;
+
+    pdf += `trailer
+<<
+/Size ${5 + pages * 2}
+/Root 1 0 R
+>>
+startxref
+${offset + 50}
+%%EOF`;
+
+    return pdf;
+  };
+
+
+  const generatePayslipData = (record: PayrollRecord, employee: Employee | undefined, month: string, year: number) => {
+    // Calculate days in month
+    const daysInMonth = new Date(year, new Date().getMonth() + 1, 0).getDate();
+    const basicPayable = Math.round(record.basicSalary * (record.payableDays / daysInMonth));
+    const hraPayable = Math.round(record.hra * (record.payableDays / daysInMonth));
+    const specialPayable = Math.round(record.specialAllowance * (record.payableDays / daysInMonth));
+    const totalEarningsPayable = Math.round(record.grossSalary * (record.payableDays / daysInMonth));
+    
+    return {
+      'PAY SLIP FOR THE MONTH OF': `${month.toUpperCase()}-${year}`,
+      'SPACER1': '',
+      'EMPLOYEE DETAILS': '',
+      'EMPLOYEE ID': record.employeeId,
+      'NAME': record.employeeName.toUpperCase(),
+      'DAYS IN MONTH': daysInMonth,
+      'DAYS TO PAY': record.payableDays,
+      'BANK A/C NO': employee?.bankAccount || '0',
+      'PF / UAN NUMBER': employee?.pfNumber || '0',
+      'DESIGNATION': employee?.position || '',
+      'ESI NUMBER': employee?.esiNumber || '0',
+      'DEPARTMENT': employee?.department || '',
+      'OVER TIME Hrs.': record.otHours,
+      'ADVANCE': record.salaryAdvance,
+      'BAL ADVANCE': record.balanceAdvance,
+      'SPACER2': '',
+      'EARNINGS': '',
+      'EARNINGS_SALARY_HEAD': 'AMOUNT (Rs.)',
+      'Basic': record.basicSalary,
+      'Basic Payable': basicPayable,
+      'H R A': record.hra,
+      'H R A Payable': hraPayable,
+      'Special. All': record.specialAllowance,
+      'Special. All Payable': specialPayable,
+      'TOTAL EARNINGS': record.grossSalary,
+      'TOTAL EARNINGS Payable': totalEarningsPayable,
+      'SPACER3': '',
+      'DEDUCTIONS': '',
+      'DEDUCTIONS_SALARY_HEAD': 'AMOUNT (Rs.)',
+      'PF EMPLOYEE': record.pfEmployee || 0,
+      'ESI EMPLOYEE': record.esiEmployee || 0,
+      'PROFESSIONAL TAX': record.pt || 0,
+      'ADVANCE DEDUCTED': record.salaryAdvance || 0,
+      'TDS': record.tds || 0,
+      'TOTAL DEDUCTIONS': record.totalDeductions || 0,
+      'SPACER4': '',
+      'SUMMARY': '',
+      'PF & ESI ACCOUNT DEPOSIT': (record.pfEmployee + record.esiEmployee),
+      'OT Amount': record.otPayment,
+      'ALLOWANCE': record.arrears || 0,
+      'COST TO COMPANY': record.totalPayableAmount,
+      'TO BANK': record.netPayable,
+      'CASH TO PAY': record.otPayment,
+      'SALARY AFTER DEDUCTION': record.totalPayableAmount,
+      'SPACER5': '',
+      'Generated on': new Date().toLocaleDateString(),
+      'Generated at': new Date().toLocaleTimeString()
+    };
+  };
+
+  const generatePayslipPDF = (record: PayrollRecord, employee: Employee | undefined, month: string, year: number): string => {
+    const daysInMonth = new Date(year, new Date().getMonth() + 1, 0).getDate();
+    const basicPayable = Math.round(record.basicSalary * (record.payableDays / daysInMonth));
+    const hraPayable = Math.round(record.hra * (record.payableDays / daysInMonth));
+    const specialPayable = Math.round(record.specialAllowance * (record.payableDays / daysInMonth));
+    const totalEarningsPayable = Math.round(record.grossSalary * (record.payableDays / daysInMonth));
+    
+    return `
+                    PAY SLIP FOR THE MONTH OF ${month.toUpperCase()}-${year}
+${'='.repeat(80)}
+
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A                              EMPLOYEE DETAILS                                  A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A EMPLOYEE ID: ${record.employeeId.toString().padEnd(20)} A NAME: ${record.employeeName.toUpperCase().padEnd(30)} A
+A DAYS IN MONTH: ${daysInMonth.toString().padEnd(15)} A DAYS TO PAY: ${record.payableDays.toString().padEnd(25)} A
+A BANK A/C NO: ${(employee?.bankAccount || '0').toString().padEnd(18)} A PF / UAN NUMBER: ${(employee?.pfNumber || '0').toString().padEnd(20)} A
+A DESIGNATION: ${(employee?.position || '').padEnd(16)} A ESI NUMBER: ${(employee?.esiNumber || '0').toString().padEnd(25)} A
+A DEPARTMENT: ${(employee?.department || '').padEnd(17)} A OVER TIME Hrs.: ${record.otHours.toString().padEnd(20)} A
+A ADVANCE: ${record.salaryAdvance.toString().padEnd(22)} A BAL ADVANCE: ${(record.balanceAdvance || 0).toString().padEnd(25)} A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A                                  EARNINGS                                      A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A SALARY HEAD              A AMOUNT (Rs.)    A PAYABLE (Rs.)                     A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A Basic                    A ${record.basicSalary.toLocaleString().padStart(12)} A ${basicPayable.toLocaleString().padStart(12)}                     A
+A H R A                    A ${record.hra.toLocaleString().padStart(12)} A ${hraPayable.toLocaleString().padStart(12)}                     A
+A Special. All             A ${record.specialAllowance.toLocaleString().padStart(12)} A ${specialPayable.toLocaleString().padStart(12)}                     A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A TOTAL EARNINGS           A ${record.grossSalary.toLocaleString().padStart(12)} A ${totalEarningsPayable.toLocaleString().padStart(12)}                     A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A                                 DEDUCTIONS                                     A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A SALARY HEAD              A AMOUNT (Rs.)                                        A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A PF EMPLOYEE              A ${(record.pfEmployee || 0).toString().padStart(12)}                                        A
+A ESI EMPLOYEE             A ${(record.esiEmployee || 0).toString().padStart(12)}                                        A
+A PROFESSIONAL TAX         A ${(record.pt || 0).toString().padStart(12)}                                        A
+A ADVANCE DEDUCTED         A ${(record.salaryAdvance || 0).toString().padStart(12)}                                        A
+A TDS                      A ${(record.tds || 0).toString().padStart(12)}                                        A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A TOTAL DEDUCTIONS         A ${(record.totalDeductions || 0).toString().padStart(12)}                                        A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A                                  SUMMARY                                       A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+A PF & ESI ACCOUNT DEPOSIT: ${(record.pfEmployee + record.esiEmployee).toLocaleString().padEnd(35)} A
+A OT Amount: ${record.otPayment.toLocaleString().padEnd(50)} A
+A ALLOWANCE: ${(record.arrears || 0).toLocaleString().padEnd(52)} A
+A COST TO COMPANY: ${record.totalPayableAmount.toLocaleString().padEnd(45)} A
+A                                                                                 A
+A TO BANK: ${record.netPayable.toLocaleString().padEnd(55)} A
+A CASH TO PAY: ${record.otPayment.toLocaleString().padEnd(50)} A
+A SALARY AFTER DEDUCTION: ${record.totalPayableAmount.toLocaleString().padEnd(40)} A
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+${'='.repeat(80)}
+Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+    `.trim();
+  };
+
+  const handleExport = async (format: 'pdf' | 'excel') => {
+    setIsExporting(true);
+    setShowExportDropdown(false);
+    
+    try {
+      // Check if there are payroll records
+      if (payrollRecords.length === 0) {
+        setError('No payroll records found to export');
+        return;
+      }
+      
+      // Bulk export - all employees
+      await exportBulkPayslips(format);
+      setSuccessMessage(`Bulk payslips exported successfully! (${payrollRecords.length} employees)`);
+    } catch (error) {
+      console.error('Export error:', error);
+      setError(`Failed to export payslips: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+
+  const handleDownloadPDF = async (record: PayrollRecord) => {
+    setIsExporting(true);
+    try {
+      await exportSinglePayslip(record, 'pdf');
+      setSuccessMessage('Payslip downloaded successfully!');
+    } catch (error) {
+      setError('Failed to download payslip');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportSinglePayslip = async (record: PayrollRecord, format: 'pdf' | 'excel') => {
+    const employee = employees.find(emp => emp.id === record.employeeId);
+    const currentDate = new Date();
+    const month = currentDate.toLocaleString('default', { month: 'long' });
+    const year = currentDate.getFullYear();
+    
+    if (format === 'excel') {
+      const payslipData = generatePayslipData(record, employee, month, year);
+      exportToExcel([payslipData], `payslip_${record.employeeName.replace(/\s+/g, '_')}_${month}_${year}`);
     } else {
-      showNotification('Please allow popups to print payroll slip', 'info');
-    }
-  } catch (error) {
-    console.error('Error printing payroll slip:', error);
-    showNotification('Error printing payroll slip', 'error');
-  }
-};
-  // Filter and search functionality
-  useEffect(() => {
-    applyFilters();
-  }, [payrollRecords, filters]);
-
-  const applyFilters = useCallback(() => {
-    let filtered = [...payrollRecords];
-
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(record =>
-        record.employee.firstName.toLowerCase().includes(searchLower) ||
-        record.employee.lastName.toLowerCase().includes(searchLower) ||
-        record.employee.department.toLowerCase().includes(searchLower) ||
-        record.employee.position.toLowerCase().includes(searchLower)
-      );
-    }
-
-    if (filters.status) {
-      filtered = filtered.filter(record => record.status === filters.status);
-    }
-
-    if (filters.department) {
-      filtered = filtered.filter(record => record.employee.department === filters.department);
-    }
-
-    if (filters.month) {
-      filtered = filtered.filter(record => record.month === filters.month);
-    }
-
-    if (filters.year) {
-      filtered = filtered.filter(record => record.year.toString() === filters.year);
-    }
-
-    if (filters.paymentMethod) {
-      filtered = filtered.filter(record => record.paymentMethod === filters.paymentMethod);
-    }
-
-    setFilteredRecords(filtered);
-    setCurrentPage(1);
-  }, [payrollRecords, filters]);
-
-  const handleFilterChange = (field: keyof PayrollFilters, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  // Load data on component mount
-  useEffect(() => {
-    fetchEmployees();
-    fetchPayrollRecords();
-  }, []);
-
-  // Helper functions
-  const formatIndianCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  // Removed unused formatIndianDate helper (not referenced)
-
-  const formatMonthYear = (month: string, year: number) => {
-    const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    const monthIndex = parseInt(month) - 1;
-    if (monthIndex >= 0 && monthIndex < 12) {
-      return `${monthNames[monthIndex]} ${year}`;
-    }
-    return `${month}/${year}`;
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return <FileTextIcon color="action" />;
-      case 'pending':
-        return <PendingIcon color="warning" />;
-      case 'approved':
-        return <CheckCircleIcon color="info" />;
-      case 'paid':
-        return <CheckCircleIcon color="success" />;
-      case 'rejected':
-        return <CancelIcon color="error" />;
-      default:
-        return <FileTextIcon />;
+      const payslipContent = generatePayslipPDF(record, employee, month, year);
+      exportToPDF(payslipContent, `payslip_${record.employeeName.replace(/\s+/g, '_')}_${month}_${year}`);
     }
   };
 
-  const getPaymentMethodIcon = (method: string) => {
-    switch (method) {
-      case 'bank':
-        return <BankIcon />;
-      case 'check':
-        return <ReceiptIcon />;
-      case 'cash':
-        return <MoneyIcon />;
-      default:
-        return <MoneyIcon />;
+  const exportBulkPayslips = async (format: 'pdf' | 'excel') => {
+    const currentDate = new Date();
+    const month = currentDate.toLocaleString('default', { month: 'long' });
+    const year = currentDate.getFullYear();
+    
+    if (format === 'excel') {
+      const payslipsData = payrollRecords.map(record => {
+        const employee = employees.find(emp => emp.id === record.employeeId);
+        return generatePayslipData(record, employee, month, year);
+      });
+      exportToExcel(payslipsData, `payslips_${month}_${year}`);
+    } else {
+      // Create a comprehensive bulk PDF with all payslips - direct download
+      const bulkPayslipContent = generateBulkPayslipPDF(month, year);
+      exportToPDF(bulkPayslipContent, `payslips_${month}_${year}`);
     }
   };
 
-  // Loading state
+  const generateBulkPayslipPDF = (month: string, year: number): string => {
+    
+    let bulkContent = `
+                    BULK PAYSLIP REPORT - ${month.toUpperCase()} ${year}
+${'='.repeat(80)}
+
+Total Employees: ${payrollRecords.length}
+Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
+
+${'='.repeat(80)}
+
+`;
+
+    payrollRecords.forEach((record, index) => {
+      try {
+        const employee = employees.find(emp => emp.id === record.employeeId);
+        const payslipContent = generatePayslipPDF(record, employee, month, year);
+        
+        bulkContent += `
+PAYSLIP ${index + 1} of ${payrollRecords.length}
+${'='.repeat(80)}
+
+${payslipContent}
+
+${'='.repeat(80)}
+${'='.repeat(80)}
+
+`;
+      } catch (error) {
+        console.error(`Error generating payslip for employee ${record.employeeName}:`, error);
+        bulkContent += `
+PAYSLIP ${index + 1} of ${payrollRecords.length}
+${'='.repeat(80)}
+
+ERROR: Failed to generate payslip for ${record.employeeName}
+Employee ID: ${record.employeeId}
+
+${'='.repeat(80)}
+${'='.repeat(80)}
+
+`;
+      }
+    });
+
+    return bulkContent.trim();
+  };
+
+
+
+  const tabs = [
+    { id: 'salary', name: 'Salary Sheet', icon: FileText },
+    { id: 'pf', name: 'PF Contributions', icon: CreditCard },
+    { id: 'esi', name: 'ESI Statement', icon: Receipt },
+    { id: 'settings', name: 'Settings', icon: Settings }
+  ] as const;
+
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress />
-      </Box>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading payroll data...</p>
+        </div>
+      </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-        <Button onClick={fetchPayrollRecords} variant="contained">
-          Try Again
-        </Button>
-      </Box>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Payroll Management
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={handleExportPayroll}
-          >
-            Export
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreatePayroll}
-            sx={{ bgcolor: 'primary.main' }}
-          >
-            Process Payroll
-          </Button>
-        </Box>
-      </Box>
-
-      {/* Settings Modal Trigger */}
-      <Box sx={{ mb: 2 }}>
-        <Button variant="outlined" onClick={() => setSettingsOpen(true)}>Salary Calculation Settings</Button>
-      </Box>
-
-      {/* Settings Modal */}
-      <Dialog open={settingsOpen} onClose={() => setSettingsOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Salary Calculation Settings</DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2 }}>
-                         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
-               <Box sx={{ width: { xs: '100%', md: '50%' } }}>
-                 <TextField label="PF %" type="number" fullWidth value={settings.pfPercent}
-                   onChange={(e) => setSettings((s) => ({ ...s, pfPercent: parseFloat(e.target.value) || 0 }))} sx={{ mb: 2 }} />
-                 <TextField label="EPS %" type="number" fullWidth value={settings.epsPercent}
-                   onChange={(e) => setSettings((s) => ({ ...s, epsPercent: parseFloat(e.target.value) || 0 }))} sx={{ mb: 2 }} />
-                 <TextField label="EPF %" type="number" fullWidth value={settings.epfPercent}
-                   onChange={(e) => setSettings((s) => ({ ...s, epfPercent: parseFloat(e.target.value) || 0 }))} sx={{ mb: 2 }} />
-                 <TextField label="EDLI %" type="number" fullWidth value={settings.edliPercent}
-                   onChange={(e) => setSettings((s) => ({ ...s, edliPercent: parseFloat(e.target.value) || 0 }))} sx={{ mb: 2 }} />
-                 <TextField label="Admin Charges %" type="number" fullWidth value={settings.adminChargesPercent}
-                   onChange={(e) => setSettings((s) => ({ ...s, adminChargesPercent: parseFloat(e.target.value) || 0 }))} sx={{ mb: 2 }} />
-               </Box>
-               <Box sx={{ width: { xs: '100%', md: '50%' } }}>
-                 <TextField label="ESI Employee %" type="number" fullWidth value={settings.esiEmployeePercent}
-                   onChange={(e) => setSettings((s) => ({ ...s, esiEmployeePercent: parseFloat(e.target.value) || 0 }))} sx={{ mb: 2 }} />
-                 <TextField label="ESI Employer %" type="number" fullWidth value={settings.esiEmployerPercent}
-                   onChange={(e) => setSettings((s) => ({ ...s, esiEmployerPercent: parseFloat(e.target.value) || 0 }))} sx={{ mb: 2 }} />
-                 <TextField label="PT Amount" type="number" fullWidth value={settings.ptAmount}
-                   onChange={(e) => setSettings((s) => ({ ...s, ptAmount: parseFloat(e.target.value) || 0 }))} sx={{ mb: 2 }} />
-                 <TextField label="HRA %" type="number" fullWidth value={settings.hraPercent}
-                   onChange={(e) => setSettings((s) => ({ ...s, hraPercent: parseFloat(e.target.value) || 0 }))} sx={{ mb: 2 }} />
-                 <TextField label="DA %" type="number" fullWidth value={settings.daPercent}
-                   onChange={(e) => setSettings((s) => ({ ...s, daPercent: parseFloat(e.target.value) || 0 }))} sx={{ mb: 2 }} />
-                 <TextField label="Special Allowance %" type="number" fullWidth value={settings.specialAllowancePercent}
-                   onChange={(e) => setSettings((s) => ({ ...s, specialAllowancePercent: parseFloat(e.target.value) || 0 }))} sx={{ mb: 2 }} />
-               </Box>
-            </Box>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSettingsOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Payroll Management</h1>
+          <p className="text-gray-600">Manage employee salaries, PF contributions, and ESI statements</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button 
             onClick={async () => {
-              const res = await firebaseService.updateDocument('payrollSettings', 'percentages', settings);
-              if (res.success) {
-                showNotification('Settings saved', 'success');
-                setSettingsOpen(false);
-              } else {
-                showNotification('Failed to save settings', 'error');
+              setLoading(true);
+              try {
+                await generatePayrollFromEmployees();
+                setSuccessMessage('Payroll generated successfully from employee data');
+              } catch (error) {
+                setError('Failed to generate payroll from employee data');
+              } finally {
+                setLoading(false);
               }
             }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
           >
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
-      {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}>
-          <Tab label="Payroll" />
-          <Tab label="PF Statement" />
-          <Tab label="ESI Statement" />
-        </Tabs>
-      </Box>
-
-      {/* Statistics Cards */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-        gap: 3, 
-        mb: 3 
-      }}>
-        <Card>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box sx={{ p: 1, bgcolor: 'primary.100', borderRadius: 1, mr: 2 }}>
-                <PersonIcon color="primary" />
-              </Box>
-              <Box>
-                <Typography color="textSecondary" gutterBottom>
-                  Total Employees
-                </Typography>
-                <Typography variant="h4" component="div">
-                  {payrollSummary.totalEmployees}
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box sx={{ p: 1, bgcolor: 'success.100', borderRadius: 1, mr: 2 }}>
-                <MoneyIcon color="success" />
-              </Box>
-              <Box>
-                <Typography color="textSecondary" gutterBottom>
-                  Total Net Salary
-                </Typography>
-                <Typography variant="h4" component="div" color="success.main">
-                  {formatIndianCurrency(payrollSummary.totalNetSalary)}
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box sx={{ p: 1, bgcolor: 'warning.100', borderRadius: 1, mr: 2 }}>
-                <PendingIcon color="warning" />
-              </Box>
-              <Box>
-                <Typography color="textSecondary" gutterBottom>
-                  Pending
-                </Typography>
-                <Typography variant="h4" component="div" color="warning.main">
-                  {payrollRecords.filter(record => record.status === 'pending').length}
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <Box sx={{ p: 1, bgcolor: 'info.100', borderRadius: 1, mr: 2 }}>
-                <MoneyIcon color="info" />
-              </Box>
-              <Box>
-                <Typography color="textSecondary" gutterBottom>
-                  Average Salary
-                </Typography>
-                <Typography variant="h4" component="div" color="info.main">
-                  {formatIndianCurrency(payrollSummary.averageSalary)}
-                </Typography>
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      </Box>
-
-      {/* No Data State */}
-      {payrollRecords.length === 0 && (
-        <Box sx={{ textAlign: 'center', py: 8 }}>
-          <MoneyIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            No payroll records available
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Start by processing your first payroll record.
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreatePayroll}
+            <Calculator className="w-4 h-4" />
+            <span>Generate Payroll</span>
+          </button>
+          <button 
+            onClick={() => {
+              // Create a new payroll record
+              const newRecord: PayrollRecord = {
+                id: `payroll_${Date.now()}`,
+                employeeId: '',
+                employeeName: '',
+                grossSalary: 0,
+                payableDays: 0,
+                otHours: 0,
+                netPayable: 0,
+                totalPayableAmount: 0,
+                remarks: '',
+                pfStatus: 'active',
+                esiStatus: 'active',
+                basicSalary: 0,
+                hra: 0,
+                specialAllowance: 0,
+                pfEmployee: 0,
+                esiEmployee: 0,
+                pt: 0,
+                salaryAdvance: 0,
+                otherDeductions: 0,
+                otPayment: 0,
+                pfApplicable: true,
+                esiApplicable: true,
+                basicDA: 0,
+                balanceAdvance: 0,
+                tds: 0,
+                totalDeductions: 0,
+                arrears: 0,
+                differenceAmount: 0
+              };
+              setSelectedRecord(newRecord);
+              setShowEditModal(true);
+            }}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
           >
-            Process First Payroll
-          </Button>
-        </Box>
+            <Plus className="w-4 h-4" />
+            <span>Create</span>
+          </button>
+          
+          {/* Export Dropdown */}
+          <div className="relative export-dropdown">
+            <button 
+              onClick={() => setShowExportDropdown(!showExportDropdown)}
+              disabled={isExporting}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isExporting ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              <span>{isExporting ? 'Exporting...' : 'Export'}</span>
+              {!isExporting && <ChevronDown className="w-4 h-4" />}
+            </button>
+            
+            {showExportDropdown && (
+              <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                <div className="py-1">
+                  <button
+                    onClick={() => handleExport('pdf')}
+                    disabled={isExporting}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FileText className="w-4 h-4 text-red-600" />
+                    <span>PDF</span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('excel')}
+                    disabled={isExporting}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-green-600" />
+                    <span>Excel (.xlsx)</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Success/Error Messages */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center">
+              <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+            <p className="text-green-800">{successMessage}</p>
+          </div>
+        </div>
       )}
 
-      {/* Filters */}
-      {payrollRecords.length > 0 && (
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <FilterIcon sx={{ mr: 1 }} />
-            <Typography variant="h6">Filters</Typography>
-          </Box>
-          <Box sx={{ 
-            display: 'grid', 
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-            gap: 2 
-          }}>
-            <TextField
-              fullWidth
-              label="Search Payroll"
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              InputProps={{
-                startAdornment: <SearchIcon />
-              }}
-            />
-            <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={filters.status}
-                label="Status"
-                onChange={(e) => handleFilterChange('status', e.target.value)}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+            <p className="text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <DashboardCard
+          name="Total Employees"
+          value={stats.total}
+          icon={Users}
+          color="blue"
+        />
+        <DashboardCard
+          name="Total Gross Salary"
+          value={`₹${stats.totalGrossSalary.toLocaleString()}`}
+          icon={DollarSign}
+          color="green"
+        />
+        <DashboardCard
+          name="Net Payable"
+          value={`₹${stats.totalNetPayable.toLocaleString()}`}
+          icon={Calculator}
+          color="purple"
+        />
+        <DashboardCard
+          name="Total OT Hours"
+          value={stats.totalOTHours}
+          icon={Clock}
+          color="yellow"
+        />
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+          <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+            className={cn(
+              'flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                  activeTab === tab.id
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            )}
+          >
+                <Icon className="w-4 h-4" />
+                <span>{tab.name}</span>
+          </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'salary' && (
+        <div className="space-y-6">
+          {/* Filters */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <div className="relative flex-1 min-w-[220px]">
+              <input
+                type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by employee name or ID"
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+              />
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
               >
-                <MenuItem value="">All Statuses</MenuItem>
-                <MenuItem value="draft">Draft</MenuItem>
-                <MenuItem value="pending">Pending</MenuItem>
-                <MenuItem value="approved">Approved</MenuItem>
-                <MenuItem value="paid">Paid</MenuItem>
-                <MenuItem value="rejected">Rejected</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl fullWidth>
-              <InputLabel>Department</InputLabel>
-              <Select
-                value={filters.department}
-                label="Department"
-                onChange={(e) => handleFilterChange('department', e.target.value)}
-              >
-                <MenuItem value="">All Departments</MenuItem>
-                {Array.from(new Set(employees.map(emp => emp.department))).map(dept => (
-                  <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+                  <option value="all">All Departments</option>
+                  {[...new Set(employees.map(emp => emp.department))].map(dept => (
+                  <option key={dept} value={dept}>{dept}</option>
                 ))}
-              </Select>
-            </FormControl>
-          </Box>
-        </Paper>
+              </select>
+            </div>
+          </div>
+        </div>
+
+          {/* Salary Sheet Table */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Salary Sheet</h3>
+            </div>
+
+            {/* No Data Message */}
+            {payrollRecords.length === 0 && !loading && (
+              <div className="text-center py-12">
+                <Calculator className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Payroll Records Found</h3>
+                <p className="text-gray-600 mb-6">
+                  {employees.length > 0 
+                    ? "Generate payroll records from your employee data to get started."
+                    : "Add employees first, then generate payroll records."
+                  }
+                </p>
+                {employees.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      setLoading(true);
+                      try {
+                        await generatePayrollFromEmployees();
+                        setSuccessMessage('Payroll generated successfully from employee data');
+                      } catch (error) {
+                        setError('Failed to generate payroll from employee data');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 mx-auto"
+                  >
+                    <Calculator className="w-5 h-5" />
+                    <span>Generate Payroll from Employee Data</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gross Salary</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payable Days</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">OT Hours</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Net Payable</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Payable</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remarks</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredRecords.map((record, index) => (
+                    <tr key={record.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.employeeId}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-8 w-8">
+                            <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                              <span className="text-primary-600 font-semibold text-xs">
+                                {record.employeeName.split(' ').map(n => n[0]).join('')}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="ml-3">
+                            <div className="text-sm font-medium text-gray-900">{record.employeeName}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{record.grossSalary.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.payableDays}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.otHours}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{record.netPayable.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{record.totalPayableAmount.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.remarks || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-1">
+                          <button onClick={() => handleViewRecord(record)} className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors" title="View Details">
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleEditRecord(record)} className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 transition-colors" title="Edit Record">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDownloadPDF(record)}
+                            className="text-purple-600 hover:text-purple-900 p-1 rounded hover:bg-purple-50 transition-colors" 
+                            title="Download PDF Payslip"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDeleteRecord(record)} className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors" title="Delete Record">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Payroll Records Table (Tab 0) */}
-      {activeTab === 0 && payrollRecords.length > 0 && (
-        <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <TableContainer>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>S.No</TableCell>
-                  <TableCell>Employee ID</TableCell>
-                  <TableCell>Employee</TableCell>
-                  <TableCell>Month/Year</TableCell>
-                  <TableCell>Payable Days</TableCell>
-                  <TableCell>OT Hours</TableCell>
-                  <TableCell>Earnings (Basic+DA)</TableCell>
-                  <TableCell>HRA</TableCell>
-                  <TableCell>Special Allowance</TableCell>
-                  <TableCell>Gross Salary</TableCell>
-                  <TableCell>PF</TableCell>
-                  <TableCell>ESI</TableCell>
-                  <TableCell>PT</TableCell>
-                  <TableCell>Salary Advance</TableCell>
-                  <TableCell>Other Deductions</TableCell>
-                  <TableCell>Total Deductions</TableCell>
-                  <TableCell>Arrears</TableCell>
-                  <TableCell>Net Payable</TableCell>
-                  <TableCell>OT Payment</TableCell>
-                  <TableCell>Total Payable</TableCell>
-                  <TableCell>Remarks</TableCell>
-                  <TableCell>PF & ESI</TableCell>
-                  <TableCell>Difference</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Payment Method</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((record, idx) => {
-                  const da = (settings.daPercent / 100) * record.basicSalary;
-                  const hra = (settings.hraPercent / 100) * record.basicSalary;
-                  const specialAllowance = (settings.specialAllowancePercent / 100) * record.basicSalary;
-                  const pf = record.pfApplicable ? (settings.pfPercent / 100) * record.basicSalary : 0;
-                  const esi = record.esiApplicable ? (settings.esiEmployeePercent / 100) * (record.basicSalary + hra + specialAllowance) : 0;
-                  const pt = settings.ptAmount || 0;
-                  const totalDeductions = (record.deductions || 0) + (record.taxDeductions || 0) + (record.salaryAdvance || 0) + (record.otherDeductions || 0) + pf + esi + pt;
-                  const netPayable = record.grossPay - totalDeductions;
-                  const otPayment = record.overtimePay;
-                  const totalPayable = netPayable + otPayment;
-                  const pfEsiStatus = `${record.pfApplicable ? 'PF' : ''}${record.pfApplicable && record.esiApplicable ? ' & ' : ''}${record.esiApplicable ? 'ESI' : ''}` || 'N/A';
-                  const difference = totalPayable - record.netPay;
-                  return (
-                  <TableRow key={record.id} hover>
-                    <TableCell>{(currentPage - 1) * itemsPerPage + idx + 1}</TableCell>
-                    <TableCell>{record.employee.employeeId}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Avatar sx={{ width: 32, height: 32 }}>
-                          <PersonIcon />
-                        </Avatar>
-                        <Box>
-                          <Typography variant="subtitle2" fontWeight="bold">
-                            {record.employee.firstName} {record.employee.lastName}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            {record.employee.department} • {record.employee.position}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {formatMonthYear(record.month, record.year)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{record.payableDays ?? '-'}</TableCell>
-                    <TableCell>{record.overtimeHours}</TableCell>
-                    <TableCell>{formatIndianCurrency(record.basicSalary + da)}</TableCell>
-                    <TableCell>{formatIndianCurrency(hra)}</TableCell>
-                    <TableCell>{formatIndianCurrency(specialAllowance)}</TableCell>
-                    <TableCell>{formatIndianCurrency(record.grossPay)}</TableCell>
-                    <TableCell>{formatIndianCurrency(pf)}</TableCell>
-                    <TableCell>{formatIndianCurrency(esi)}</TableCell>
-                    <TableCell>{formatIndianCurrency(pt)}</TableCell>
-                    <TableCell>{formatIndianCurrency(record.salaryAdvance || 0)}</TableCell>
-                    <TableCell>{formatIndianCurrency(record.otherDeductions || 0)}</TableCell>
-                    <TableCell>{formatIndianCurrency(totalDeductions)}</TableCell>
-                    <TableCell>{formatIndianCurrency(record.arrears || 0)}</TableCell>
-                    <TableCell>{formatIndianCurrency(netPayable)}</TableCell>
-                    <TableCell>{formatIndianCurrency(otPayment)}</TableCell>
-                    <TableCell>{formatIndianCurrency(totalPayable)}</TableCell>
-                    <TableCell>{record.remarks || '-'}</TableCell>
-                    <TableCell>{pfEsiStatus}</TableCell>
-                    <TableCell>{formatIndianCurrency(difference)}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {getStatusIcon(record.status)}
-                        <Chip
-                          label={record.status}
-                          size="small"
-                          sx={{
-                            bgcolor: statusColors[record.status],
-                            color: 'white',
-                            fontWeight: 'bold',
-                            textTransform: 'capitalize'
-                          }}
-                        />
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {getPaymentMethodIcon(record.paymentMethod)}
-                        <Chip
-                          label={record.paymentMethod}
-                          size="small"
-                          sx={{
-                            bgcolor: paymentMethodColors[record.paymentMethod],
-                            color: 'white',
-                            fontWeight: 'bold',
-                            textTransform: 'capitalize'
-                          }}
-                        />
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Tooltip title="View Details">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleViewPayroll(record)}
-                            color="primary"
-                          >
-                            <ViewIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit Payroll">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleEditPayroll(record)}
-                            color="primary"
-                          >
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        {record.status === 'draft' && (
-                          <Tooltip title="Process Payroll">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleProcessPayroll(record.id)}
-                              color="success"
-                            >
-                              <ProcessIcon />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        {record.status === 'pending' && (
-                          <Tooltip title="Process Payroll">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleProcessPayroll(record.id)}
-                              color="success"
-                            >
-                              <ProcessIcon />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        {record.status === 'approved' && (
-                          <Tooltip title="Mark as Paid">
-                            <IconButton
-                              size="small"
-                              onClick={() => handlePayPayroll(record.id)}
-                              color="success"
-                            >
-                              <CheckCircleIcon />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        <Tooltip title="Delete Payroll">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDeletePayroll(record.id)}
-                            color="error"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Download Payroll Slip">
-                          <IconButton
-                            size="small"
-                            onClick={() => downloadPayrollSlip(record)}
-                            color="info"
-                          >
-                            <DownloadIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Print Payroll Slip">
-                          <IconButton
-                            size="small"
-                            onClick={() => printPayrollSlip(record)}
-                            color="secondary"
-                          >
-                            <PrintIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                )})}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
+      {/* PF Contributions Tab */}
+      {activeTab === 'pf' && (
+        <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">PF Contributions (Employer Side)</h3>
+            </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">UAN Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PF Basic</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee PF (12%)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EPS (8.33%)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EPF (3.67%)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EDLI (0.5%)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin Charges (0.5%)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EDLI Admin (0%)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employer PF Total</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                  {pfContributions.map((contribution, index) => (
+                    <tr key={contribution.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{contribution.employeeId}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{contribution.employeeName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{contribution.uanNumber}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{contribution.pfBasic.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{contribution.employeePF.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{contribution.eps.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{contribution.epf.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{contribution.edli.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{contribution.adminCharges.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{contribution.edliAdmin.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">₹{contribution.employerPFTotal.toLocaleString()}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* PF Statement (Tab 1) */}
-      {activeTab === 1 && (
-        <Paper sx={{ width: '100%', overflow: 'hidden', mt: 2 }}>
-          <TableContainer>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>S.No</TableCell>
-                  <TableCell>Employee ID</TableCell>
-                  <TableCell>Employee Name</TableCell>
-                  <TableCell>UAN Number</TableCell>
-                  <TableCell>PF Basic</TableCell>
-                  <TableCell>EPF 12% (A/C 1)</TableCell>
-                  <TableCell>EPS 8.33% (A/C 10)</TableCell>
-                  <TableCell>EPF 3.67% (A/C 1)</TableCell>
-                  <TableCell>EDLI 0.5% (A/C 2)</TableCell>
-                  <TableCell>Admin 0.5% (A/C 21)</TableCell>
-                  <TableCell>EDLI Admin 0.00% (A/C 22)</TableCell>
-                  <TableCell>Employer Total</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((record, idx) => {
-                  const pfBasic = record.basicSalary;
-                  const epf12 = (settings.pfPercent / 100) * pfBasic;
-                  const eps833 = (settings.epsPercent / 100) * pfBasic;
-                  const epf367 = (settings.epfPercent / 100) * pfBasic;
-                  const edli05 = (settings.edliPercent / 100) * pfBasic;
-                  const admin05 = (settings.adminChargesPercent / 100) * pfBasic;
-                  const edliAdmin0 = 0;
-                  const employerTotal = eps833 + epf367 + edli05 + admin05 + edliAdmin0;
-                  return (
-                    <TableRow key={record.id} hover>
-                      <TableCell>{(currentPage - 1) * itemsPerPage + idx + 1}</TableCell>
-                      <TableCell>{record.employee.employeeId}</TableCell>
-                      <TableCell>{record.employee.firstName} {record.employee.lastName}</TableCell>
-                      <TableCell>{record.employee.employeeId || '-'}</TableCell>
-                      <TableCell>{formatIndianCurrency(pfBasic)}</TableCell>
-                      <TableCell>{formatIndianCurrency(epf12)}</TableCell>
-                      <TableCell>{formatIndianCurrency(eps833)}</TableCell>
-                      <TableCell>{formatIndianCurrency(epf367)}</TableCell>
-                      <TableCell>{formatIndianCurrency(edli05)}</TableCell>
-                      <TableCell>{formatIndianCurrency(admin05)}</TableCell>
-                      <TableCell>{formatIndianCurrency(edliAdmin0)}</TableCell>
-                      <TableCell>{formatIndianCurrency(employerTotal)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
+      {/* ESI Statement Tab */}
+      {activeTab === 'esi' && (
+        <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">ESI Statement (Per Month)</h3>
+            </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ESI Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gross Salary</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee Contribution (0.75%)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employer Contribution (3.25%)</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                  {esiContributions.map((contribution, index) => (
+                    <tr key={contribution.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{contribution.employeeId}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{contribution.employeeName}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{contribution.esiNumber}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{contribution.grossSalary.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{contribution.employeeContribution.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{contribution.employerContribution.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">₹{contribution.total.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+                            </div>
+                          </div>
+                            </div>
       )}
 
-      {/* ESI Statement (Tab 2) */}
-      {activeTab === 2 && (
-        <Paper sx={{ width: '100%', overflow: 'hidden', mt: 2 }}>
-          <TableContainer>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>S.No</TableCell>
-                  <TableCell>Employee ID</TableCell>
-                  <TableCell>Employee Name</TableCell>
-                  <TableCell>ESI Number</TableCell>
-                  <TableCell>Gross (Basic+HRA+Allowances)</TableCell>
-                  <TableCell>Employee 0.75%</TableCell>
-                  <TableCell>Employer 3.25%</TableCell>
-                  <TableCell>Total</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredRecords.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((record, idx) => {
-                  const hra = (settings.hraPercent / 100) * record.basicSalary;
-                  const specialAllowance = (settings.specialAllowancePercent / 100) * record.basicSalary;
-                  const grossBase = record.basicSalary + hra + specialAllowance;
-                  const emp075 = (settings.esiEmployeePercent / 100) * grossBase;
-                  const empr325 = (settings.esiEmployerPercent / 100) * grossBase;
-                  const total = emp075 + empr325;
-                  return (
-                    <TableRow key={record.id} hover>
-                      <TableCell>{(currentPage - 1) * itemsPerPage + idx + 1}</TableCell>
-                      <TableCell>{record.employee.employeeId}</TableCell>
-                      <TableCell>{record.employee.firstName} {record.employee.lastName}</TableCell>
-                      <TableCell>{record.employee.employeeId || '-'}</TableCell>
-                      <TableCell>{formatIndianCurrency(grossBase)}</TableCell>
-                      <TableCell>{formatIndianCurrency(emp075)}</TableCell>
-                      <TableCell>{formatIndianCurrency(empr325)}</TableCell>
-                      <TableCell>{formatIndianCurrency(total)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
+      {/* Settings Tab */}
+      {activeTab === 'settings' && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Payroll Settings</h3>
+                  <p className="text-sm text-gray-600">Configure payroll calculation parameters and rules for PF, ESI, Overtime, and Holiday Pay</p>
+                </div>
+                {savingSettings && (
+                  <div className="flex items-center space-x-2 text-blue-600">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span className="text-sm font-medium">Saving...</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="space-y-8">
+                {/* PF Settings */}
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <CreditCard className="w-5 h-5 mr-2 text-blue-600" />
+                    PF (Provident Fund) Settings
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employee PF Rate (%)</label>
+                      <input
+                        type="number"
+                        value={settings.pfEmployeeRate}
+                        onChange={(e) => setSettings({ ...settings, pfEmployeeRate: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="0.01"
+                        placeholder="12.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employer PF Rate (%)</label>
+                      <input
+                        type="number"
+                        value={settings.pfEmployerRate}
+                        onChange={(e) => setSettings({ ...settings, pfEmployerRate: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="0.01"
+                        placeholder="12.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">EPS Contribution Rate (%)</label>
+                      <input
+                        type="number"
+                        value={settings.epsContributionRate}
+                        onChange={(e) => setSettings({ ...settings, epsContributionRate: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="0.01"
+                        placeholder="8.33"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">EPF Contribution Rate (%)</label>
+                      <input
+                        type="number"
+                        value={settings.epfContributionRate}
+                        onChange={(e) => setSettings({ ...settings, epfContributionRate: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="0.01"
+                        placeholder="3.67"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">EDLI Contribution Rate (%)</label>
+                      <input
+                        type="number"
+                        value={settings.edliContributionRate}
+                        onChange={(e) => setSettings({ ...settings, edliContributionRate: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="0.01"
+                        placeholder="0.50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Admin Charges Rate (%)</label>
+                      <input
+                        type="number"
+                        value={settings.adminChargesRate}
+                        onChange={(e) => setSettings({ ...settings, adminChargesRate: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="0.01"
+                        placeholder="0.50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">EDLI Admin Charges Rate (%)</label>
+                      <input
+                        type="number"
+                        value={settings.edliAdminChargesRate}
+                        onChange={(e) => setSettings({ ...settings, edliAdminChargesRate: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        step="0.01"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="pfApplicable"
+                        checked={settings.pfApplicable}
+                        onChange={(e) => setSettings({ ...settings, pfApplicable: e.target.checked })}
+                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="pfApplicable" className="ml-2 block text-sm text-gray-700">
+                        PF Applicable
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ESI Settings */}
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <Receipt className="w-5 h-5 mr-2 text-green-600" />
+                    ESI (Employee State Insurance) Settings
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employee ESI Rate (%)</label>
+                      <input
+                        type="number"
+                        value={settings.esiEmployeeRate}
+                        onChange={(e) => setSettings({ ...settings, esiEmployeeRate: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        step="0.01"
+                        placeholder="0.75"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employer ESI Rate (%)</label>
+                      <input
+                        type="number"
+                        value={settings.esiEmployerRate}
+                        onChange={(e) => setSettings({ ...settings, esiEmployerRate: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        step="0.01"
+                        placeholder="3.25"
+                      />
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="esiApplicable"
+                        checked={settings.esiApplicable}
+                        onChange={(e) => setSettings({ ...settings, esiApplicable: e.target.checked })}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="esiApplicable" className="ml-2 block text-sm text-gray-700">
+                        ESI Applicable
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overtime Settings */}
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <Clock className="w-5 h-5 mr-2 text-orange-600" />
+                    Overtime Settings
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">OT Hourly Rate (₹)</label>
+                      <input
+                        type="number"
+                        value={settings.otHourlyRate}
+                        onChange={(e) => setSettings({ ...settings, otHourlyRate: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        placeholder="50"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Holiday Pay Settings */}
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <Clock className="w-5 h-5 mr-2 text-purple-600" />
+                    Holiday Pay Rules
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Holiday Pay Type</label>
+                      <select
+                        value={settings.holidayPayType}
+                        onChange={(e) => setSettings({ ...settings, holidayPayType: e.target.value as 'paid' | 'unpaid' })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="paid">Paid Holidays</option>
+                        <option value="unpaid">Unpaid Holidays</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Holiday Pay Rules</label>
+                      <select
+                        value={settings.holidayPayRules}
+                        onChange={(e) => setSettings({ ...settings, holidayPayRules: e.target.value as 'paid' | 'unpaid' })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      >
+                        <option value="paid">Paid Holidays</option>
+                        <option value="unpaid">Unpaid Holidays</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-8 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
+                <button
+                  onClick={async () => {
+                    try {
+                      const defaultSettings: PayrollSettings = {
+                        // PF Settings
+                        pfEmployeeRate: 12,
+                        pfEmployerRate: 12,
+                        epsContributionRate: 8.33,
+                        epfContributionRate: 3.67,
+                        edliContributionRate: 0.5,
+                        adminChargesRate: 0.5,
+                        edliAdminChargesRate: 0.0,
+                        pfApplicable: true,
+                        
+                        // ESI Settings
+                        esiEmployeeRate: 0.75,
+                        esiEmployerRate: 3.25,
+                        esiApplicable: true,
+                        
+                        // Overtime Settings
+                        otHourlyRate: 50,
+                        
+                        // Holiday Pay Settings
+                        holidayPayRules: 'paid',
+                        holidayPayType: 'paid'
+                      };
+                      await saveSettings(defaultSettings);
+                      setSuccessMessage('Settings reset to default values');
+                    } catch (error) {
+                      setError('Failed to reset settings to default');
+                    }
+                  }}
+                  disabled={savingSettings}
+                  className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Reset to Default</span>
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await saveSettings(settings);
+                      setSuccessMessage('Settings saved successfully');
+                    } catch (error) {
+                      setError('Failed to save settings');
+                    }
+                  }}
+                  disabled={savingSettings}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingSettings ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Save Settings</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Pagination */}
-      {Math.ceil(filteredRecords.length / itemsPerPage) > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination
-            count={Math.ceil(filteredRecords.length / itemsPerPage)}
-            page={currentPage}
-            onChange={(_, page) => setCurrentPage(page)}
-            color="primary"
-            showFirstButton
-            showLastButton
-          />
-        </Box>
+      {/* View Modal - grouped sections, read-only */}
+      {showViewModal && selectedRecord && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[200] p-3">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto z-[210]">
+            <div className="p-4">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-1.5 bg-primary-100 rounded-lg">
+                    <Eye className="w-5 h-5 text-primary-600" />
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900">Salary Details</h3>
+                </div>
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {/* Salary Details Content */}
+              <div className="space-y-6">
+                {/* Employee Header */}
+                <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+                    <span className="text-primary-600 font-semibold text-xl">
+                      {selectedRecord.employeeName.split(' ').map(n => n[0]).join('')}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-xl font-semibold text-gray-900">{selectedRecord.employeeName}</h4>
+                    <p className="text-gray-600">{selectedRecord.employeeId}</p>
+                    <div className="flex items-center space-x-4 mt-2">
+                      <span className="text-sm text-gray-500">Payable Days: {selectedRecord.payableDays}</span>
+                      <span className="text-sm text-gray-500">OT Hours: {selectedRecord.otHours}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Basic Information */}
+                  <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Basic Information</h5>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <Users className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Employee Name</p>
+                          <p className="text-sm text-gray-600">{selectedRecord.employeeName}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Employee ID</p>
+                          <p className="text-sm text-gray-600">{selectedRecord.employeeId}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                          <Clock className="w-4 h-4 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Payable Days</p>
+                          <p className="text-sm text-gray-600">{selectedRecord.payableDays}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                          <Clock className="w-4 h-4 text-orange-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">OT Hours</p>
+                          <p className="text-sm text-gray-600">{selectedRecord.otHours}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Salary Information */}
+                  <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Salary Information</h5>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Gross Salary</span>
+                        <span className="text-sm text-gray-900">₹{selectedRecord.grossSalary.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Net Payable</span>
+                        <span className="text-sm text-gray-900">₹{selectedRecord.netPayable.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Total Payable</span>
+                        <span className="text-sm text-gray-900">₹{selectedRecord.totalPayableAmount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">OT Payment</span>
+                        <span className="text-sm text-gray-900">₹{selectedRecord.otPayment.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">PF Status</span>
+                        <span className={cn(
+                          "px-2 py-1 text-xs font-medium rounded-full",
+                          selectedRecord.pfStatus === 'active' ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                        )}>
+                          {selectedRecord.pfStatus || 'Inactive'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">ESI Status</span>
+                        <span className={cn(
+                          "px-2 py-1 text-xs font-medium rounded-full",
+                          selectedRecord.esiStatus === 'active' ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                        )}>
+                          {selectedRecord.esiStatus || 'Active'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Salary Breakdown */}
+                <div className="space-y-4">
+                  <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Salary Breakdown</h5>
+                  <div className="space-y-3">
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Basic + DA:</span>
+                      <span className="text-sm font-medium">₹{(selectedRecord.basicDA || selectedRecord.basicSalary).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">HRA:</span>
+                      <span className="text-sm font-medium">₹{selectedRecord.hra.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Special Allowances:</span>
+                      <span className="text-sm font-medium">₹{selectedRecord.specialAllowance.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-200 font-semibold">
+                      <span className="text-gray-900">Gross Salary:</span>
+                      <span className="text-gray-900">₹{selectedRecord.grossSalary.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Deductions */}
+                <div className="space-y-4">
+                  <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Deductions</h5>
+                  <div className="space-y-3">
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">P.F (Employee):</span>
+                      <span className="text-sm font-medium">₹{selectedRecord.pfEmployee.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">E.S.I (Employee):</span>
+                      <span className="text-sm font-medium">₹{selectedRecord.esiEmployee.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">PT (Professional Tax):</span>
+                      <span className="text-sm font-medium">₹{selectedRecord.pt.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Salary Advance:</span>
+                      <span className="text-sm font-medium">₹{selectedRecord.salaryAdvance.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100">
+                      <span className="text-sm text-gray-600">Other Deductions:</span>
+                      <span className="text-sm font-medium">₹{selectedRecord.otherDeductions.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-200 font-semibold">
+                      <span className="text-gray-900">Total Deductions:</span>
+                      <span className="text-gray-900">₹{(selectedRecord.totalDeductions || (selectedRecord.pfEmployee + selectedRecord.esiEmployee + selectedRecord.pt + selectedRecord.otherDeductions + (selectedRecord.tds || 0))).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Final Calculations */}
+                <div className="space-y-4">
+                  <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Final Calculations</h5>
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="space-y-3">
+                      <div className="flex justify-between py-2 border-b border-blue-200">
+                        <span className="text-blue-800 font-medium">Net Payable:</span>
+                        <span className="font-bold text-blue-900">₹{selectedRecord.netPayable.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-blue-200">
+                        <span className="text-blue-800 font-medium">Total Payable Amount:</span>
+                        <span className="font-bold text-blue-900">₹{selectedRecord.totalPayableAmount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between py-2">
+                        <span className="text-blue-800 font-medium">Difference Amount:</span>
+                        <span className="font-bold text-blue-900">₹{(selectedRecord.differenceAmount || 0).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Remarks */}
+                {selectedRecord.remarks && (
+                  <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Remarks</h5>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-900">{selectedRecord.remarks}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Payroll Details Dialog */}
-      <Dialog
-        open={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <MoneyIcon />
-            <Typography variant="h6">
-              {isViewMode ? 'Payroll Details' : isCreateMode ? 'Process New Payroll' : 'Edit Payroll'}
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {isViewMode && selectedRecord ? (
-            <Box sx={{ mt: 2 }}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
-                               <Box sx={{ width: { xs: '100%', md: '50%' } }}>
-                 <Typography variant="h6" gutterBottom>Employee Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemText
-                        primary="Employee Name"
-                        secondary={`${selectedRecord.employee.firstName} ${selectedRecord.employee.lastName}`}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Department"
-                        secondary={selectedRecord.employee.department}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Position"
-                        secondary={selectedRecord.employee.position}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Month/Year"
-                        secondary={formatMonthYear(selectedRecord.month, selectedRecord.year)}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-                <Box sx={{ width: { xs: '100%', md: '50%' } }}>
-                  <Typography variant="h6" gutterBottom>Payroll Details</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemText
-                        primary="Basic Salary"
-                        secondary={formatIndianCurrency(selectedRecord.basicSalary)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Allowances"
-                        secondary={formatIndianCurrency(selectedRecord.allowances)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Deductions"
-                        secondary={formatIndianCurrency(selectedRecord.deductions)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Net Pay"
-                        secondary={formatIndianCurrency(selectedRecord.netPay)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Status"
-                        secondary={
-                          <Chip
-                            label={selectedRecord.status}
-                            size="small"
-                            sx={{
-                              bgcolor: statusColors[selectedRecord.status],
-                              color: 'white',
-                              textTransform: 'capitalize'
-                            }}
-                          />
-                        }
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-              </Box>
-            </Box>
-          ) : (
-            <Box sx={{ mt: 2 }}>
-              {/* Payroll Form */}
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
-                <Box sx={{ width: { xs: '100%', md: '50%' } }}>
-                  <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel id="employee-label">Employee</InputLabel>
-                                         <Select
-                       labelId="employee-label"
-                       value={payrollForm.employeeId}
-                       label="Employee"
-                       onChange={(e) => handleEmployeeSelection(e.target.value)}
-                       displayEmpty
-                       disabled={employeesLoading}
-                     >
-                      <MenuItem value="" disabled>
-                        {employeesLoading ? 'Loading employees…' : 'Select an employee'}
-                      </MenuItem>
-                      {employees.map((emp) => (
-                        <MenuItem key={emp.id} value={emp.id}>
-                          {emp.firstName} {emp.lastName} - {emp.department}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel id="month-label">Month</InputLabel>
-                    <Select
-                      labelId="month-label"
-                      value={payrollForm.month}
-                      label="Month"
-                      onChange={(e) => handlePayrollFormChange('month', e.target.value)}
-                    >
-                      <MenuItem value="01">January</MenuItem>
-                      <MenuItem value="02">February</MenuItem>
-                      <MenuItem value="03">March</MenuItem>
-                      <MenuItem value="04">April</MenuItem>
-                      <MenuItem value="05">May</MenuItem>
-                      <MenuItem value="06">June</MenuItem>
-                      <MenuItem value="07">July</MenuItem>
-                      <MenuItem value="08">August</MenuItem>
-                      <MenuItem value="09">September</MenuItem>
-                      <MenuItem value="10">October</MenuItem>
-                      <MenuItem value="11">November</MenuItem>
-                      <MenuItem value="12">December</MenuItem>
-                    </Select>
-                  </FormControl>
-                  <TextField
-                    fullWidth
-                    label="Year"
-                    type="number"
-                    value={payrollForm.year}
-                    onChange={(e) => handlePayrollFormChange('year', parseInt(e.target.value))}
-                    sx={{ mb: 2 }}
-                  />
-                </Box>
-                <Box sx={{ width: { xs: '100%', md: '50%' } }}>
-                  <TextField
-                    fullWidth
-                    label="Basic Salary"
-                    type="number"
-                    value={payrollForm.basicSalary}
-                    onChange={(e) => handlePayrollFormChange('basicSalary', parseFloat(e.target.value))}
-                    InputProps={{
-                      startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-                    }}
-                    sx={{ mb: 2 }}
-                  />
-                  <TextField
-                    fullWidth
-                    label="Overtime Hours"
-                    type="number"
-                    value={payrollForm.overtimeHours}
-                    onChange={(e) => handlePayrollFormChange('overtimeHours', parseFloat(e.target.value))}
-                    sx={{ mb: 2 }}
-                  />
-                  <TextField
-                    fullWidth
-                    label="Overtime Rate"
-                    type="number"
-                    value={payrollForm.overtimeRate}
-                    onChange={(e) => handlePayrollFormChange('overtimeRate', parseFloat(e.target.value))}
-                    InputProps={{
-                      startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-                    }}
-                    sx={{ mb: 2 }}
-                  />
-                </Box>
-                <Box sx={{ width: { xs: '100%', md: '50%' } }}>
-                  <TextField
-                    fullWidth
-                    label="Bonuses"
-                    type="number"
-                    value={payrollForm.bonuses}
-                    onChange={(e) => handlePayrollFormChange('bonuses', parseFloat(e.target.value))}
-                    InputProps={{
-                      startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-                    }}
-                    sx={{ mb: 2 }}
-                  />
-                  <TextField
-                    fullWidth
-                    label="Allowances"
-                    type="number"
-                    value={payrollForm.allowances}
-                    onChange={(e) => handlePayrollFormChange('allowances', parseFloat(e.target.value))}
-                    InputProps={{
-                      startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-                    }}
-                    sx={{ mb: 2 }}
-                  />
-                </Box>
-                <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-  <Typography variant="subtitle2" gutterBottom color="primary">
-    💰 PF/ESI & Deductions
-  </Typography>
-  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
-    <TextField
-      fullWidth
-      label="PF Employee"
-      type="number"
-      value={payrollForm.pfEmployee}
-      onChange={(e) => handlePayrollFormChange('pfEmployee', parseFloat(e.target.value))}
-      InputProps={{
-        startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-      }}
-      sx={{ mb: 2 }}
-    />
-    <TextField
-      fullWidth
-      label="ESI Employee"
-      type="number"
-      value={payrollForm.esiEmployee}
-      onChange={(e) => handlePayrollFormChange('esiEmployee', parseFloat(e.target.value))}
-      InputProps={{
-        startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-      }}
-      sx={{ mb: 2 }}
-    />
-    <TextField
-      fullWidth
-      label="PT Amount"
-      type="number"
-      value={payrollForm.pt}
-      onChange={(e) => handlePayrollFormChange('pt', parseFloat(e.target.value))}
-      InputProps={{
-        startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-      }}
-      sx={{ mb: 2 }}
-    />
-    <TextField
-      fullWidth
-      label="Salary Advance"
-      type="number"
-      value={payrollForm.salaryAdvance}
-      onChange={(e) => handlePayrollFormChange('salaryAdvance', parseFloat(e.target.value))}
-      InputProps={{
-        startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-      }}
-      sx={{ mb: 2 }}
-    />
-    <TextField
-      fullWidth
-      label="Other Deductions"
-      type="number"
-      value={payrollForm.otherDeductions}
-      onChange={(e) => handlePayrollFormChange('otherDeductions', parseFloat(e.target.value))}
-      InputProps={{
-        startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-      }}
-      sx={{ mb: 2 }}
-    />
-    <TextField
-      fullWidth
-      label="Arrears"
-      type="number"
-      value={payrollForm.arrears}
-      onChange={(e) => handlePayrollFormChange('arrears', parseFloat(e.target.value))}
-      InputProps={{
-        startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-      }}
-      sx={{ mb: 2 }}
-    />
-  </Box>
-</Box>
-                <Box sx={{ width: { xs: '100%', md: '50%' } }}>
-                  <TextField
-                    fullWidth
-                    label="Deductions"
-                    type="number"
-                    value={payrollForm.deductions}
-                    onChange={(e) => handlePayrollFormChange('deductions', parseFloat(e.target.value))}
-                    InputProps={{
-                      startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-                    }}
-                    sx={{ mb: 2 }}
-                  />
-                  <TextField
-                    fullWidth
-                    label="Tax Deductions"
-                    type="number"
-                    value={payrollForm.taxDeductions}
-                    onChange={(e) => handlePayrollFormChange('taxDeductions', parseFloat(e.target.value))}
-                    InputProps={{
-                      startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-                    }}
-                    sx={{ mb: 2 }}
-                  />
-                </Box>
-                <Box sx={{ width: '100%' }}>
-                  <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel>Payment Method</InputLabel>
-                    <Select
-                      value={payrollForm.paymentMethod}
-                      label="Payment Method"
-                      onChange={(e) => handlePayrollFormChange('paymentMethod', e.target.value)}
-                    >
-                      <MenuItem value="bank">Bank Transfer</MenuItem>
-                      <MenuItem value="check">Check</MenuItem>
-                      <MenuItem value="cash">Cash</MenuItem>
-                    </Select>
-                  </FormControl>
-                                     <TextField
-                     fullWidth
-                     label="Notes (Optional)"
-                     multiline
-                     rows={3}
-                     value={payrollForm.notes}
-                     onChange={(e) => handlePayrollFormChange('notes', e.target.value)}
-                   />
-                   
-                   {/* Attendance Auto-Calculation Section */}
-                   <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                     <Typography variant="subtitle2" gutterBottom color="primary">
-                       📊 Attendance Auto-Calculation
-                     </Typography>
-                     <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mb: 1 }}>
-                       <TextField
-                         label="Payable Days"
-                         type="number"
-                         value={payrollForm.payableDays}
-                         onChange={(e) => handlePayrollFormChange('payableDays', parseInt(e.target.value) || 0)}
-                         size="small"
-                         sx={{ width: 120 }}
-                       />
-                       <TextField
-                         label="OT Hours"
-                         type="number"
-                         value={payrollForm.otHours}
-                         onChange={(e) => handlePayrollFormChange('otHours', parseFloat(e.target.value) || 0)}
-                         size="small"
-                         sx={{ width: 120 }}
-                       />
-                       <Button
-                         variant="outlined"
-                         size="small"
-                         onClick={() => {
-                           if (payrollForm.employeeId) {
-                             handleEmployeeSelection(payrollForm.employeeId);
-                           }
-                         }}
-                         disabled={!payrollForm.employeeId}
-                       >
-                         🔄 Refresh from Attendance
-                       </Button>
-                     </Box>
-                     <Typography variant="caption" color="textSecondary">
-                       Payable days and OT hours are automatically calculated from attendance records, excluding weekends, holidays, and approved leaves.
-                     </Typography>
-                   </Box>
-                </Box>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          {isViewMode ? (
-            <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
-          ) : (
-            <>
-              <Button onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button 
-                variant="contained" 
-                onClick={handleSavePayroll}
+      {/* Edit Modal */}
+      {showEditModal && selectedRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowEditModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {selectedRecord && (!selectedRecord.employeeId || selectedRecord.employeeId === '') ? 'Create New Payroll Record' : `Edit Salary Record - ${selectedRecord.employeeName}`}
+              </h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600"
               >
-                {isCreateMode ? 'Process Payroll' : 'Update Payroll'}
-              </Button>
-            </>
-          )}
-        </DialogActions>
-      </Dialog>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                  <h4 className="text-lg font-medium text-gray-900">Basic Information</h4>
+                  <div className="space-y-3">
+                      <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
+                      {selectedRecord && (!selectedRecord.employeeId || selectedRecord.employeeId === '') ? (
+                        <select
+                          value={formData.employeeId || ''}
+                          onChange={(e) => {
+                            const selectedEmployee = employees.find(emp => emp.id === e.target.value);
+                            setFormData({ 
+                              ...formData, 
+                              employeeId: e.target.value,
+                              employeeName: selectedEmployee ? `${selectedEmployee.firstName} ${selectedEmployee.lastName}` : '',
+                              grossSalary: selectedEmployee ? selectedEmployee.salary : 0
+                            });
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select Employee</option>
+                          {employees.map((employee) => (
+                            <option key={employee.id} value={employee.id}>
+                              {employee.firstName} {employee.lastName} - {employee.employeeId}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={formData.employeeId || ''}
+                          onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          readOnly
+                        />
+                      )}
+                        </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Employee Name</label>
+                      <input
+                        type="text"
+                        value={formData.employeeName || ''}
+                        onChange={(e) => setFormData({ ...formData, employeeName: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        readOnly
+                      />
+                      </div>
+                      <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Gross Salary</label>
+                      <div className="flex space-x-2">
+                          <input
+                    type="number"
+                          value={formData.grossSalary || 0}
+                          onChange={(e) => setFormData({ ...formData, grossSalary: Number(e.target.value) })}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                        <button
+                          onClick={() => handleAutoCalculate(formData.employeeId || '', formData.grossSalary || 0)}
+                          className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-1"
+                          title="Auto-calculate based on attendance"
+                        >
+                          <Calculator className="w-4 h-4" />
+                          <span>Auto Calc</span>
+                        </button>
+                        </div>
+                      </div>
+                      <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Payable Days</label>
+                          <input
+                            type="number"
+                        value={formData.payableDays || 0}
+                        onChange={(e) => setFormData({ ...formData, payableDays: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      </div>
+                      <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">OT Hours</label>
+                          <input
+                            type="number"
+                        value={formData.otHours || 0}
+                        onChange={(e) => setFormData({ ...formData, otHours: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      </div>
+                    </div>
+                  </div>
 
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-      >
-        <Alert
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+                <div className="space-y-4">
+                  <h4 className="text-lg font-medium text-gray-900">Salary Breakdown</h4>
+                  <div className="space-y-3">
+                      <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Basic Salary</label>
+                          <input
+      type="number"
+                        value={formData.basicSalary || 0}
+                        onChange={(e) => setFormData({ ...formData, basicSalary: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      </div>
+                      <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">HRA</label>
+                          <input
+      type="number"
+                        value={formData.hra || 0}
+                        onChange={(e) => setFormData({ ...formData, hra: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      </div>
+                      <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Special Allowance</label>
+                          <input
+      type="number"
+                        value={formData.specialAllowance || 0}
+                        onChange={(e) => setFormData({ ...formData, specialAllowance: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      </div>
+                      <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">OT Payment</label>
+                          <input
+      type="number"
+                        value={formData.otPayment || 0}
+                        onChange={(e) => setFormData({ ...formData, otPayment: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Other Deductions</label>
+                          <input
+      type="number"
+                        value={formData.otherDeductions || 0}
+                        onChange={(e) => setFormData({ ...formData, otherDeductions: Number(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+              <div className="mt-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+                      <textarea
+                  value={formData.remarks || ''}
+                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  rows={3}
+                  placeholder="Enter remarks"
+                   />
+                    </div>
+                  </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                      <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveRecord}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                {selectedRecord && (!selectedRecord.employeeId || selectedRecord.employeeId === '') ? 'Create Record' : 'Save Changes'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowDeleteModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Confirm Delete</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to delete the payroll record for <strong>{selectedRecord.employeeName}</strong>? 
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button
+                onClick={() => setShowDeleteModal(false)}
+                    className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+                  </button>
+                  <button
+                onClick={confirmDeleteRecord}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete Record
+                  </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
   );
 };
 

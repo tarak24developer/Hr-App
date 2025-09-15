@@ -77,8 +77,8 @@ const Sidebar: React.FC = () => {
       icon: Users
     },
     {
-      name: 'Employee Profile',
-      href: '/employee-profile',
+      name: 'Employee Management',
+      href: '/employee-management',
       icon: UserCircle
     },
     {

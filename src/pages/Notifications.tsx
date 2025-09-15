@@ -1,73 +1,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Card,
-  CardContent,
-  Alert,
-  Snackbar,
-  Pagination,
-  FormControlLabel,
-  Switch,
-  Divider,
-  Tooltip,
-  Avatar,
-  Badge,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  ListItemAvatar,
-  Grid,
-  InputAdornment
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Visibility as ViewIcon,
-  Search as SearchIcon,
-  FilterList as FilterIcon,
-  Notifications as NotificationsIcon,
-  NotificationsActive as NotificationsActiveIcon,
-  NotificationsOff as NotificationsOffIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Person as PersonIcon,
-  Work as WorkIcon,
-  Event as EventIcon,
-  Assignment as AssignmentIcon,
-  Payment as PaymentIcon,
-  Security as SecurityIcon,
-  Archive as ArchiveIcon,
-  Refresh as RefreshIcon,
-  FilterList as FilterListIcon,
-  Info as InfoIcon,
-  Error as ErrorIcon,
-  Warning as WarningIcon,
-  PushPin as PushPinIcon
-} from '@mui/icons-material';
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  Search,
+  Filter,
+  Bell,
+  BellRing,
+  CheckCircle,
+  Clock,
+  User as UserIcon,
+  Briefcase,
+  Calendar,
+  FileText,
+  CreditCard,
+  Shield,
+  Archive,
+  RefreshCw,
+  Info,
+  AlertCircle,
+  AlertTriangle,
+  Pin,
+  X
+} from 'lucide-react';
+import { cn } from '../utils/cn';
 import notificationService from '../services/notificationService';
 import { Notification, NotificationCategory, NotificationFormData, NotificationStats, User } from '../types';
+import { showNotification } from '../utils/notification';
+import DashboardCard from '../components/DashboardCard';
 
 const Notifications: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -108,17 +69,6 @@ const Notifications: React.FC = () => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  
-  // Snackbar
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'info' | 'warning';
-  }>({
-    open: false,
-    message: '',
-    severity: 'info'
-  });
 
   // Load data
   const loadData = useCallback(async () => {
@@ -205,25 +155,6 @@ const Notifications: React.FC = () => {
     setCurrentPage(1);
   }, [notifications, searchTerm, typeFilter, priorityFilter, categoryFilter, statusFilter]);
 
-  const handleFilterChange = (field: string, value: any) => {
-    switch (field) {
-      case 'search':
-        setSearchTerm(value);
-        break;
-      case 'type':
-        setTypeFilter(value);
-        break;
-      case 'priority':
-        setPriorityFilter(value);
-        break;
-      case 'category':
-        setCategoryFilter(value);
-        break;
-      case 'status':
-        setStatusFilter(value);
-        break;
-    }
-  };
 
   const handleCreateNotification = () => {
     setSelectedNotification(null);
@@ -277,26 +208,14 @@ const Notifications: React.FC = () => {
       const result = await notificationService.permanentDeleteNotification(notificationToDelete.id);
       
       if (result.success) {
-    setSnackbar({
-      open: true,
-      message: 'Notification deleted successfully',
-      severity: 'success'
-    });
+        showNotification('Notification deleted successfully', 'success');
         await loadData();
       } else {
-        setSnackbar({
-          open: true,
-          message: 'Failed to delete notification',
-          severity: 'error'
-        });
+        showNotification('Failed to delete notification', 'error');
       }
     } catch (error) {
       console.error('Error deleting notification:', error);
-      setSnackbar({
-        open: true,
-        message: 'Error deleting notification',
-        severity: 'error'
-      });
+      showNotification('Error deleting notification', 'error');
     } finally {
       setIsDeleteDialogOpen(false);
       setNotificationToDelete(null);
@@ -308,26 +227,14 @@ const Notifications: React.FC = () => {
       const result = await notificationService.markAsRead(notificationId);
       
       if (result.success) {
-    setSnackbar({
-      open: true,
-      message: 'Notification marked as read',
-      severity: 'success'
-    });
+        showNotification('Notification marked as read', 'success');
         await loadData();
       } else {
-        setSnackbar({
-          open: true,
-          message: 'Failed to mark notification as read',
-          severity: 'error'
-        });
+        showNotification('Failed to mark notification as read', 'error');
       }
     } catch (error) {
       console.error('Error marking notification as read:', error);
-      setSnackbar({
-        open: true,
-        message: 'Error marking notification as read',
-        severity: 'error'
-      });
+      showNotification('Error marking notification as read', 'error');
     }
   };
 
@@ -336,26 +243,14 @@ const Notifications: React.FC = () => {
       const result = await notificationService.togglePin(notificationId, !isPinned);
       
       if (result.success) {
-        setSnackbar({
-          open: true,
-          message: isPinned ? 'Notification unpinned' : 'Notification pinned',
-          severity: 'success'
-        });
+        showNotification(isPinned ? 'Notification unpinned' : 'Notification pinned', 'success');
         await loadData();
       } else {
-        setSnackbar({
-          open: true,
-          message: 'Failed to toggle pin status',
-          severity: 'error'
-        });
+        showNotification('Failed to toggle pin status', 'error');
       }
     } catch (error) {
       console.error('Error toggling pin status:', error);
-      setSnackbar({
-        open: true,
-        message: 'Error toggling pin status',
-        severity: 'error'
-      });
+      showNotification('Error toggling pin status', 'error');
     }
   };
 
@@ -379,27 +274,15 @@ const Notifications: React.FC = () => {
       }
 
       if (result.success) {
-      setSnackbar({
-        open: true,
-          message: selectedNotification ? 'Notification updated successfully' : 'Notification created successfully',
-        severity: 'success'
-      });
+        showNotification(selectedNotification ? 'Notification updated successfully' : 'Notification created successfully', 'success');
         setIsDialogOpen(false);
         await loadData();
     } else {
-        setSnackbar({
-          open: true,
-          message: selectedNotification ? 'Failed to update notification' : 'Failed to create notification',
-          severity: 'error'
-        });
+        showNotification(selectedNotification ? 'Failed to update notification' : 'Failed to create notification', 'error');
       }
     } catch (error) {
       console.error('Error saving notification:', error);
-      setSnackbar({
-        open: true,
-        message: 'Error saving notification',
-        severity: 'error'
-      });
+      showNotification('Error saving notification', 'error');
     }
   };
 
@@ -412,55 +295,43 @@ const Notifications: React.FC = () => {
       const result = await notificationService.archiveAll();
       
       if (result.success) {
-      setSnackbar({
-        open: true,
-          message: 'All notifications archived',
-        severity: 'success'
-      });
+        showNotification('All notifications archived', 'success');
         await loadData();
       } else {
-        setSnackbar({
-          open: true,
-          message: 'Failed to archive notifications',
-          severity: 'error'
-        });
+        showNotification('Failed to archive notifications', 'error');
       }
     } catch (error) {
       console.error('Error archiving notifications:', error);
-      setSnackbar({
-        open: true,
-        message: 'Error archiving notifications',
-        severity: 'error'
-      });
+      showNotification('Error archiving notifications', 'error');
     }
   };
 
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'info':
-        return <InfoIcon color="info" />;
+        return <Info className="w-4 h-4 text-blue-600" />;
       case 'success':
-        return <CheckCircleIcon color="success" />;
+        return <CheckCircle className="w-4 h-4 text-green-600" />;
       case 'warning':
-        return <WarningIcon color="warning" />;
+        return <AlertTriangle className="w-4 h-4 text-yellow-600" />;
       case 'error':
-        return <ErrorIcon color="error" />;
+        return <AlertCircle className="w-4 h-4 text-red-600" />;
       case 'system':
-        return <NotificationsIcon color="primary" />;
+        return <Bell className="w-4 h-4 text-purple-600" />;
       case 'user':
-        return <PersonIcon color="primary" />;
+        return <UserIcon className="w-4 h-4 text-blue-600" />;
       case 'work':
-        return <WorkIcon color="primary" />;
+        return <Briefcase className="w-4 h-4 text-orange-600" />;
       case 'event':
-        return <EventIcon color="primary" />;
+        return <Calendar className="w-4 h-4 text-pink-600" />;
       case 'assignment':
-        return <AssignmentIcon color="primary" />;
+        return <FileText className="w-4 h-4 text-indigo-600" />;
       case 'payment':
-        return <PaymentIcon color="primary" />;
+        return <CreditCard className="w-4 h-4 text-teal-600" />;
       case 'security':
-        return <SecurityIcon color="primary" />;
+        return <Shield className="w-4 h-4 text-red-600" />;
       default:
-        return <NotificationsIcon />;
+        return <Bell className="w-4 h-4 text-gray-600" />;
     }
   };
 
@@ -503,602 +374,765 @@ const Notifications: React.FC = () => {
 
   const totalPages = Math.ceil(filteredNotifications.length / itemsPerPage);
 
+  // Loading state
   if (loading) {
     return (
-      <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <Typography>Loading notifications...</Typography>
-      </Box>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading notifications...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Notifications
-        </Typography>
-        <Box>
-          <Button
-            variant="outlined"
-            startIcon={<ArchiveIcon />}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
+          <p className="text-gray-600">Manage and track system notifications</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button
             onClick={handleArchiveAll}
-            sx={{ mr: 1 }}
+            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2"
           >
-            Archive All
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
+            <Archive className="w-4 h-4" />
+            <span>Archive All</span>
+          </button>
+          <button
             onClick={handleRefresh}
-            sx={{ mr: 1 }}
+            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2"
           >
-            Refresh
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
+            <RefreshCw className="w-4 h-4" />
+            <span>Refresh</span>
+          </button>
+          <button
             onClick={handleCreateNotification}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
           >
-            Create Notification
-          </Button>
-        </Box>
-      </Box>
+            <Plus className="w-4 h-4" />
+            <span>Create Notification</span>
+          </button>
+        </div>
+      </div>
 
       {/* Error Alert */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-600 mr-3" />
+            <p className="text-red-800">{error}</p>
+          </div>
+          <button onClick={() => setError('')} className="text-red-600 hover:text-red-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       )}
 
-      {/* Statistics Cards */}
+      {/* Stats Cards */}
       {stats && (
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Notifications
-            </Typography>
-            <Typography variant="h4" component="div">
-                  {stats.total}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              All time
-            </Typography>
-          </CardContent>
-        </Card>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Unread
-            </Typography>
-            <Typography variant="h4" component="div" color="error">
-                  {stats.unread}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Require attention
-            </Typography>
-          </CardContent>
-        </Card>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Pinned
-            </Typography>
-            <Typography variant="h4" component="div" color="warning.main">
-                  {stats.pinned}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Important notifications
-            </Typography>
-          </CardContent>
-        </Card>
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Today
-            </Typography>
-            <Typography variant="h4" component="div" color="primary.main">
-                  {stats.today}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              New today
-            </Typography>
-          </CardContent>
-        </Card>
-          </Grid>
-        </Grid>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <DashboardCard
+            name="Total Notifications"
+            value={stats.total}
+            icon={Bell}
+            color="blue"
+          />
+          <DashboardCard
+            name="Unread"
+            value={stats.unread}
+            icon={BellRing}
+            color="red"
+          />
+          <DashboardCard
+            name="Pinned"
+            value={stats.pinned}
+            icon={Pin}
+            color="yellow"
+          />
+          <DashboardCard
+            name="Today"
+            value={stats.today}
+            icon={Clock}
+            color="green"
+          />
+        </div>
       )}
 
-      {/* Filters */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <FilterIcon />
-          Filters
-        </Typography>
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 4 }}>
-          <TextField
-            fullWidth
+      {/* Search and Filters */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
               placeholder="Search notifications..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </Grid>
-          <Grid size={{ xs: 12, md: 2 }}>
-          <FormControl fullWidth>
-            <InputLabel>Type</InputLabel>
-            <Select
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+            <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-              label="Type"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <MenuItem value="">All Types</MenuItem>
-              <MenuItem value="info">Info</MenuItem>
-              <MenuItem value="success">Success</MenuItem>
-              <MenuItem value="warning">Warning</MenuItem>
-              <MenuItem value="error">Error</MenuItem>
-              <MenuItem value="system">System</MenuItem>
-              <MenuItem value="user">User</MenuItem>
-              <MenuItem value="work">Work</MenuItem>
-              <MenuItem value="event">Event</MenuItem>
-              <MenuItem value="assignment">Assignment</MenuItem>
-              <MenuItem value="payment">Payment</MenuItem>
-              <MenuItem value="security">Security</MenuItem>
-            </Select>
-          </FormControl>
-          </Grid>
-          <Grid size={{ xs: 12, md: 2 }}>
-          <FormControl fullWidth>
-            <InputLabel>Priority</InputLabel>
-            <Select
+              <option value="">All Types</option>
+              <option value="info">Info</option>
+              <option value="success">Success</option>
+              <option value="warning">Warning</option>
+              <option value="error">Error</option>
+              <option value="system">System</option>
+              <option value="user">User</option>
+              <option value="work">Work</option>
+              <option value="event">Event</option>
+              <option value="assignment">Assignment</option>
+              <option value="payment">Payment</option>
+              <option value="security">Security</option>
+            </select>
+
+            <select
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
-              label="Priority"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <MenuItem value="">All Priorities</MenuItem>
-              <MenuItem value="low">Low</MenuItem>
-              <MenuItem value="medium">Medium</MenuItem>
-              <MenuItem value="high">High</MenuItem>
-              <MenuItem value="urgent">Urgent</MenuItem>
-            </Select>
-          </FormControl>
-          </Grid>
-          <Grid size={{ xs: 12, md: 2 }}>
-          <FormControl fullWidth>
-            <InputLabel>Category</InputLabel>
-            <Select
+              <option value="">All Priorities</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+
+            <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-              label="Category"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <MenuItem value="">All Categories</MenuItem>
+              <option value="">All Categories</option>
               {categories.map(category => (
-                <MenuItem key={category.id} value={category.name}>
+                <option key={category.id} value={category.name}>
                   {category.name}
-                </MenuItem>
+                </option>
               ))}
-            </Select>
-          </FormControl>
-          </Grid>
-          <Grid size={{ xs: 12, md: 2 }}>
-          <FormControl fullWidth>
-            <InputLabel>Status</InputLabel>
-            <Select
+            </select>
+
+            <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-              label="Status"
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <MenuItem value="all">All</MenuItem>
-              <MenuItem value="unread">Unread</MenuItem>
-              <MenuItem value="read">Read</MenuItem>
-              <MenuItem value="pinned">Pinned</MenuItem>
-            </Select>
-          </FormControl>
-          </Grid>
-        </Grid>
-      </Paper>
+              <option value="all">All Status</option>
+              <option value="unread">Unread</option>
+              <option value="read">Read</option>
+              <option value="pinned">Pinned</option>
+            </select>
+
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setTypeFilter('');
+                setPriorityFilter('');
+                setCategoryFilter('');
+                setStatusFilter('all');
+              }}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+            >
+              <Filter className="w-4 h-4" />
+              <span>Clear</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Notifications Table */}
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-        <TableContainer>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell>Type</TableCell>
-                <TableCell>Title</TableCell>
-                <TableCell>Priority</TableCell>
-                <TableCell>Category</TableCell>
-                <TableCell>Recipient</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Created</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recipient</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
               {paginatedNotifications.map((notification) => (
-                <TableRow key={notification.id} hover>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <tr key={notification.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-2">
                       {getNotificationIcon(notification.type)}
-                      <Chip
-                        label={notification.type}
-                        size="small"
-                        sx={{
-                          bgcolor: getTypeColor(notification.type),
-                          color: 'white',
-                          fontWeight: 'bold'
-                        }}
-                      />
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box>
-                      <Typography variant="subtitle2" fontWeight="bold">
+                      <span 
+                        className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white"
+                        style={{ backgroundColor: getTypeColor(notification.type) }}
+                      >
+                        {notification.type}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
                         {notification.title}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary" noWrap sx={{ maxWidth: 300 }}>
+                      </div>
+                      <div className="text-sm text-gray-500 max-w-xs truncate">
                         {notification.message}
-                      </Typography>
+                      </div>
                       {notification.isPinned && (
-                        <Chip
-                          label="Pinned"
-                          size="small"
-                          variant="outlined"
-                          color="warning"
-                          sx={{ mt: 0.5 }}
-                        />
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mt-1">
+                          <Pin className="w-3 h-3 mr-1" />
+                          Pinned
+                        </span>
                       )}
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={notification.priority}
-                      size="small"
-                      sx={{
-                        bgcolor: getPriorityColor(notification.priority),
-                        color: 'white',
-                        fontWeight: 'bold'
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span 
+                      className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white"
+                      style={{ backgroundColor: getPriorityColor(notification.priority) }}
+                    >
+                      {notification.priority}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm text-gray-900">
                       {notification.category}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar sx={{ width: 24, height: 24 }}>
-                        <PersonIcon />
-                      </Avatar>
-                      <Typography variant="body2">
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                        <UserIcon className="w-4 h-4 text-gray-600" />
+                      </div>
+                      <span className="text-sm text-gray-900">
                         {getUserName(notification.recipientId)}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-2">
                       {notification.isRead ? (
-                        <CheckCircleIcon color="success" fontSize="small" />
+                        <CheckCircle className="w-4 h-4 text-green-600" />
                       ) : (
-                        <NotificationsActiveIcon color="error" fontSize="small" />
+                        <BellRing className="w-4 h-4 text-red-600" />
                       )}
-                      <Chip
-                        label={notification.isRead ? 'Read' : 'Unread'}
-                        size="small"
-                        variant="outlined"
-                        color={notification.isRead ? 'success' : 'error'}
-                      />
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
+                      <span className={cn(
+                        "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                        notification.isRead 
+                          ? "bg-green-100 text-green-800" 
+                          : "bg-red-100 text-red-800"
+                      )}>
+                        {notification.isRead ? 'Read' : 'Unread'}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
                       {new Date(notification.createdAt).toLocaleDateString()}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary">
+                    </div>
+                    <div className="text-xs text-gray-500">
                       {new Date(notification.createdAt).toLocaleTimeString()}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="View Details">
-                        <IconButton
-                          size="small"
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center space-x-2">
+                      <button
                           onClick={() => handleViewNotification(notification)}
-                          color="primary"
+                        className="text-blue-600 hover:text-blue-900"
+                        title="View Details"
                         >
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
+                        <Eye className="w-4 h-4" />
+                      </button>
                       {!notification.isRead && (
-                        <Tooltip title="Mark as Read">
-                          <IconButton
-                            size="small"
+                        <button
                             onClick={() => handleMarkAsRead(notification.id)}
-                            color="success"
+                          className="text-green-600 hover:text-green-900"
+                          title="Mark as Read"
                           >
-                            <CheckCircleIcon />
-                          </IconButton>
-                        </Tooltip>
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
                       )}
-                      <Tooltip title={notification.isPinned ? "Unpin" : "Pin"}>
-                        <IconButton
-                          size="small"
+                      <button
                           onClick={() => handleTogglePin(notification.id, notification.isPinned)}
-                          color={notification.isPinned ? "warning" : "default"}
-                        >
-                          <PushPinIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit Notification">
-                        <IconButton
-                          size="small"
+                        className={cn(
+                          "hover:text-yellow-900",
+                          notification.isPinned ? "text-yellow-600" : "text-gray-600"
+                        )}
+                        title={notification.isPinned ? "Unpin" : "Pin"}
+                      >
+                        <Pin className="w-4 h-4" />
+                      </button>
+                      <button
                           onClick={() => handleEditNotification(notification)}
-                          color="primary"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete Notification">
-                        <IconButton
-                          size="small"
+                        className="text-green-600 hover:text-green-900"
+                        title="Edit Notification"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
                           onClick={() => handleDeleteNotification(notification)}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                </TableRow>
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete Notification"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(_, page) => setCurrentPage(page)}
-            color="primary"
-            showFirstButton
-            showLastButton
-          />
-        </Box>
+        <div className="flex justify-center mt-6">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              First
+            </button>
+            <button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  "px-3 py-2 text-sm font-medium border-t border-b border-gray-300",
+                  page === currentPage
+                    ? "bg-blue-50 text-blue-600 border-blue-300"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                )}
+              >
+                {page}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Last
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Create/Edit/View Dialog */}
-      <Dialog 
-        open={isDialogOpen} 
-        onClose={() => setIsDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            backdropFilter: 'blur(8px)',
-            backgroundColor: 'rgba(255, 255, 255, 0.9)'
-          }
-        }}
-      >
-        <DialogTitle>
+      {isDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setIsDialogOpen(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
           {isViewMode ? 'View Notification' : selectedNotification ? 'Edit Notification' : 'Create Notification'}
-        </DialogTitle>
-        <DialogContent>
+              </h3>
+              <button
+                onClick={() => setIsDialogOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           {isViewMode ? (
-            <Box>
-              <Typography variant="h6" gutterBottom>{selectedNotification?.title}</Typography>
-              <Typography variant="body1" paragraph>{selectedNotification?.message}</Typography>
-              <Grid container spacing={2}>
-                <Grid size={{ xs: 6 }}>
-                  <Typography variant="subtitle2">Type: {selectedNotification?.type}</Typography>
-                </Grid>
-                <Grid size={{ xs: 6 }}>
-                  <Typography variant="subtitle2">Priority: {selectedNotification?.priority}</Typography>
-                </Grid>
-                <Grid size={{ xs: 6 }}>
-                  <Typography variant="subtitle2">Category: {selectedNotification?.category}</Typography>
-                </Grid>
-                <Grid size={{ xs: 6 }}>
-                  <Typography variant="subtitle2">Recipient: {getUserName(selectedNotification?.recipientId || '')}</Typography>
-                </Grid>
-                <Grid size={{ xs: 6 }}>
-                  <Typography variant="subtitle2">Status: {selectedNotification?.isRead ? 'Read' : 'Unread'}</Typography>
-                </Grid>
-                <Grid size={{ xs: 6 }}>
-                  <Typography variant="subtitle2">Created: {selectedNotification?.createdAt ? new Date(selectedNotification.createdAt).toLocaleString() : ''}</Typography>
-                </Grid>
-              </Grid>
-            </Box>
-          ) : (
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Title"
+                // View Mode - grouped sections, read-only
+                <div className="p-4">
+                  {/* Modal Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-2.5">
+                      <div className="p-1.5 bg-primary-100 rounded-lg">
+                        <Eye className="w-5 h-5 text-primary-600" />
+                      </div>
+                      <h3 className="text-base font-semibold text-gray-900">Notification Details</h3>
+                    </div>
+                    <button
+                      onClick={() => setIsDialogOpen(false)}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Notification Details Content */}
+                  <div className="space-y-6">
+                    {/* Notification Header */}
+                    <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                      <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+                        <Bell className="w-8 h-8 text-primary-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-xl font-semibold text-gray-900">{selectedNotification?.title}</h4>
+                        <p className="text-gray-600">{selectedNotification?.category}</p>
+                        <div className="flex items-center space-x-4 mt-2">
+                          <span className={cn(
+                            "px-2 py-1 text-xs font-medium rounded-full",
+                            selectedNotification?.type === 'info' ? 'bg-blue-100 text-blue-800' :
+                            selectedNotification?.type === 'success' ? 'bg-green-100 text-green-800' :
+                            selectedNotification?.type === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                            selectedNotification?.type === 'error' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          )}>
+                            {selectedNotification?.type}
+                          </span>
+                          <span className={cn(
+                            "px-2 py-1 text-xs font-medium rounded-full",
+                            selectedNotification?.priority === 'low' ? 'bg-green-100 text-green-800' :
+                            selectedNotification?.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                            selectedNotification?.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                            'bg-red-100 text-red-800'
+                          )}>
+                            {selectedNotification?.priority}
+                          </span>
+                          <span className={cn(
+                            "px-2 py-1 text-xs font-medium rounded-full",
+                            selectedNotification?.isRead ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                          )}>
+                            {selectedNotification?.isRead ? 'Read' : 'Unread'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Notification Information */}
+                      <div className="space-y-4">
+                        <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Notification Information</h5>
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <FileText className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Type</p>
+                              <span className={cn(
+                                "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                                selectedNotification?.type === 'info' ? 'bg-blue-100 text-blue-800' :
+                                selectedNotification?.type === 'success' ? 'bg-green-100 text-green-800' :
+                                selectedNotification?.type === 'warning' ? 'bg-yellow-100 text-yellow-800' :
+                                selectedNotification?.type === 'error' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                              )}>
+                                {selectedNotification?.type}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                              <AlertCircle className="w-4 h-4 text-red-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Priority</p>
+                              <span className={cn(
+                                "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                                selectedNotification?.priority === 'low' ? 'bg-green-100 text-green-800' :
+                                selectedNotification?.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                selectedNotification?.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                                'bg-red-100 text-red-800'
+                              )}>
+                                {selectedNotification?.priority}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                              <Bell className="w-4 h-4 text-purple-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Category</p>
+                              <p className="text-sm text-gray-600">{selectedNotification?.category}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Status</p>
+                              <span className={cn(
+                                "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                                selectedNotification?.isRead ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                              )}>
+                                {selectedNotification?.isRead ? 'Read' : 'Unread'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Recipient & Timeline */}
+                      <div className="space-y-4">
+                        <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Recipient & Timeline</h5>
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <UserIcon className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Recipient</p>
+                              <p className="text-sm text-gray-600">{getUserName(selectedNotification?.recipientId || '') || '—'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                              <Clock className="w-4 h-4 text-indigo-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Created</p>
+                              <p className="text-sm text-gray-600">
+                                {selectedNotification?.createdAt ? new Date(selectedNotification.createdAt).toLocaleString() : '—'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                              <Calendar className="w-4 h-4 text-orange-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">Expires At</p>
+                              <p className="text-sm text-gray-600">
+                                {selectedNotification?.expiresAt ? new Date(selectedNotification.expiresAt).toLocaleString() : '—'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Message Section */}
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Message</h5>
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-900">{selectedNotification?.message || '—'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+                    <button
+                      onClick={() => setIsDialogOpen(false)}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input
+                      type="text"
                   value={formData.title}
                   onChange={(e) => handleFormChange('title', e.target.value)}
                   required
-                />
-              </Grid>
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Message"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                    <textarea
                   value={formData.message}
                   onChange={(e) => handleFormChange('message', e.target.value)}
-                  multiline
                   rows={3}
                   required
-                />
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Type</InputLabel>
-                  <Select
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                      <select
                     value={formData.type}
                     onChange={(e) => handleFormChange('type', e.target.value)}
-                    label="Type"
-                  >
-                    <MenuItem value="info">Info</MenuItem>
-                    <MenuItem value="success">Success</MenuItem>
-                    <MenuItem value="warning">Warning</MenuItem>
-                    <MenuItem value="error">Error</MenuItem>
-                    <MenuItem value="system">System</MenuItem>
-                    <MenuItem value="user">User</MenuItem>
-                    <MenuItem value="work">Work</MenuItem>
-                    <MenuItem value="event">Event</MenuItem>
-                    <MenuItem value="assignment">Assignment</MenuItem>
-                    <MenuItem value="payment">Payment</MenuItem>
-                    <MenuItem value="security">Security</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Priority</InputLabel>
-                  <Select
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="info">Info</option>
+                        <option value="success">Success</option>
+                        <option value="warning">Warning</option>
+                        <option value="error">Error</option>
+                        <option value="system">System</option>
+                        <option value="user">User</option>
+                        <option value="work">Work</option>
+                        <option value="event">Event</option>
+                        <option value="assignment">Assignment</option>
+                        <option value="payment">Payment</option>
+                        <option value="security">Security</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                      <select
                     value={formData.priority}
                     onChange={(e) => handleFormChange('priority', e.target.value)}
-                    label="Priority"
-                  >
-                    <MenuItem value="low">Low</MenuItem>
-                    <MenuItem value="medium">Medium</MenuItem>
-                    <MenuItem value="high">High</MenuItem>
-                    <MenuItem value="urgent">Urgent</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Category</InputLabel>
-                  <Select
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                      <select
                     value={formData.category}
                     onChange={(e) => handleFormChange('category', e.target.value)}
-                    label="Category"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                        <option value="">Select Category</option>
                     {categories.map((category) => (
-                      <MenuItem key={category.id} value={category.name}>
+                          <option key={category.id} value={category.name}>
                         {category.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 6 }}>
-                <FormControl fullWidth required>
-                  <InputLabel>Recipient</InputLabel>
-                  <Select
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Recipient</label>
+                      <select
                     value={formData.recipientId}
                     onChange={(e) => handleFormChange('recipientId', e.target.value)}
-                    label="Recipient"
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
+                        <option value="">Select Recipient</option>
                     {users.map((user) => (
-                      <MenuItem key={user.id} value={user.id}>
+                          <option key={user.id} value={user.id}>
                         {user.firstName} {user.lastName}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 12 }}>
-                <TextField
-                  fullWidth
-                  label="Expires At (Optional)"
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Expires At (Optional)</label>
+                    <input
                   type="datetime-local"
                   value={formData.expiresAt}
                   onChange={(e) => handleFormChange('expiresAt', e.target.value)}
-                  InputLabelProps={{
-                    shrink: true,
-                  }}
-                />
-              </Grid>
-            </Grid>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsDialogOpen(false)}>
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setIsDialogOpen(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
             {isViewMode ? 'Close' : 'Cancel'}
-          </Button>
+              </button>
           {!isViewMode && (
-            <Button onClick={handleFormSubmit} variant="contained">
+                <button
+                  onClick={handleFormSubmit}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
               {selectedNotification ? 'Update' : 'Create'}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        PaperProps={{
-          sx: {
-            backdropFilter: 'blur(8px)',
-            backgroundColor: 'rgba(255, 255, 255, 0.9)'
-          }
-        }}
-      >
-        <DialogTitle>Delete Notification</DialogTitle>
-        <DialogContent>
-          <Typography>
+      {isDeleteDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setIsDeleteDialogOpen(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <span>Delete Notification</span>
+              </h3>
+              <button
+                onClick={() => setIsDeleteDialogOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-gray-700 mb-4">
             Are you sure you want to permanently delete this notification? This action cannot be undone.
-          </Typography>
+              </p>
           {notificationToDelete && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-              <Typography variant="subtitle2" fontWeight="bold">
+                <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+                  <h4 className="text-sm font-semibold text-gray-900 mb-1">
                 {notificationToDelete.title}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
+                  </h4>
+                  <p className="text-sm text-gray-600">
                 {notificationToDelete.message}
-              </Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsDeleteDialogOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleConfirmDelete} color="error" variant="contained">
-            Delete Permanently
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-      >
-        <Alert
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setIsDeleteDialogOpen(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

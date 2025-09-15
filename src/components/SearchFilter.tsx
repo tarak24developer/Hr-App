@@ -14,8 +14,24 @@ import {
   MenuItem,
   Button,
   useTheme,
-  Paper
+  Paper,
+  SxProps,
+  Theme
 } from '@mui/material';
+
+interface SearchFilterProps {
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  filters?: Record<string, any>;
+  onFilterChange?: (filters: Record<string, any>) => void;
+  onClear?: () => void;
+  onApply?: () => void;
+  showAdvanced?: boolean;
+  onToggleAdvanced?: () => void;
+  placeholder?: string;
+  sx?: SxProps<Theme>;
+  [key: string]: any;
+}
 import {
   Search as SearchIcon,
   FilterList as FilterIcon,
@@ -24,14 +40,14 @@ import {
   ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 
-const SearchFilter = ({
+const SearchFilter: React.FC<SearchFilterProps> = ({
   searchValue = '',
   onSearchChange,
   filters = {},
   onFilterChange,
   onClearAll,
   searchPlaceholder = 'Search...',
-  showAdvancedFilters = false,
+  // showAdvancedFilters = false,
   filterOptions = [],
   loading = false,
   sx = {}
@@ -49,7 +65,7 @@ const SearchFilter = ({
     setLocalFilters(filters);
   }, [filters]);
 
-  const handleSearchChange = (event) => {
+  const handleSearchChange = (event: any) => {
     const value = event.target.value;
     setLocalSearchValue(value);
     if (onSearchChange) {
@@ -57,7 +73,7 @@ const SearchFilter = ({
     }
   };
 
-  const handleFilterChange = (filterKey, value) => {
+  const handleFilterChange = (filterKey: string, value: any) => {
     const newFilters = { ...localFilters, [filterKey]: value };
     setLocalFilters(newFilters);
     if (onFilterChange) {
@@ -72,12 +88,12 @@ const SearchFilter = ({
     }
   };
 
-  const handleClearFilters = () => {
-    setLocalFilters({});
-    if (onFilterChange) {
-      onFilterChange({});
-    }
-  };
+  // const handleClearFilters = () => {
+  //   setLocalFilters({});
+  //   if (onFilterChange) {
+  //     onFilterChange({});
+  //   }
+  // };
 
   const handleClearAll = () => {
     setLocalSearchValue('');
@@ -165,7 +181,7 @@ const SearchFilter = ({
       <Collapse in={showFilters}>
         <Box sx={{ pt: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
           <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-            {filterOptions.map((option) => (
+            {filterOptions.map((option: any) => (
               <FormControl key={option.key} size="small" sx={{ minWidth: 150 }}>
                 <InputLabel>{option.label}</InputLabel>
                 <Select
@@ -226,7 +242,7 @@ const SearchFilter = ({
                   <MenuItem value="">
                     <em>All {option.label}</em>
                   </MenuItem>
-                  {option.options.map((opt) => (
+                  {option.options.map((opt: any) => (
                     <MenuItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </MenuItem>
@@ -246,8 +262,8 @@ const SearchFilter = ({
                 {Object.entries(localFilters).map(([key, value]) => {
                   if (!value || value === '') return null;
                   
-                  const filterOption = filterOptions.find(opt => opt.key === key);
-                  const optionLabel = filterOption?.options.find(opt => opt.value === value)?.label || value;
+                  const filterOption = filterOptions.find((opt: any) => opt.key === key);
+                  const optionLabel = filterOption?.options.find((opt: any) => opt.value === value)?.label || value;
                   
                   return (
                     <Chip

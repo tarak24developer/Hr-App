@@ -2,7 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import dataService from '../services/dataService';
 import React from 'react'; // Added missing import for React
 
-export const useDataService = (endpoint, options = {}) => {
+interface UseDataServiceOptions {
+  autoFetch?: boolean;
+  filters?: Record<string, any>;
+  orderBy?: any;
+  limit?: number | null;
+  onSuccess?: ((data: any) => void) | null;
+  onError?: ((error: any) => void) | null;
+  dependencies?: any[];
+}
+
+export const useDataService = (endpoint: string, options: UseDataServiceOptions = {}) => {
   // Validate endpoint
   if (!endpoint || typeof endpoint !== 'string') {
     console.error('Invalid endpoint provided to useDataService:', endpoint);
@@ -33,7 +43,7 @@ export const useDataService = (endpoint, options = {}) => {
     const cleaned = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
-        cleaned[key] = value;
+        (cleaned as any)[key] = value;
       }
     });
     return cleaned;
@@ -53,7 +63,7 @@ export const useDataService = (endpoint, options = {}) => {
       const result = await dataService.fetchData(endpoint, {
         filters: cleanFilters,
         orderBy,
-        limit
+        limit: limit as any
       });
 
       if (result.success) {
@@ -62,10 +72,10 @@ export const useDataService = (endpoint, options = {}) => {
         setMessage(result.message || '');
         
         if (onSuccess) {
-          onSuccess(result.data, result.source);
+          onSuccess(result.data);
         }
       } else {
-        setError(result.error);
+        setError(result.error as any);
         setData([]);
         
         if (onError) {
@@ -73,8 +83,8 @@ export const useDataService = (endpoint, options = {}) => {
         }
       }
     } catch (err) {
-      const errorMessage = err.message || 'Failed to fetch data';
-      setError(errorMessage);
+      const errorMessage = (err as Error).message || 'Failed to fetch data';
+      setError(errorMessage as any);
       setData([]);
       
       if (onError) {
@@ -85,7 +95,7 @@ export const useDataService = (endpoint, options = {}) => {
     }
   }, [endpoint, cleanFilters, orderBy, limit, onSuccess, onError, ...dependencies]);
 
-  const createItem = useCallback(async (itemData) => {
+  const createItem = useCallback(async (itemData: any) => {
     try {
       setLoading(true);
       const result = await dataService.create(endpoint, itemData);
@@ -98,13 +108,13 @@ export const useDataService = (endpoint, options = {}) => {
         return { success: false, error: result.error };
       }
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: (err as Error).message };
     } finally {
       setLoading(false);
     }
   }, [endpoint, fetchData]);
 
-  const updateItem = useCallback(async (itemId, updateData) => {
+  const updateItem = useCallback(async (itemId: string, updateData: any) => {
     try {
       setLoading(true);
       const updateEndpoint = `${endpoint}/${itemId}`;
@@ -118,13 +128,13 @@ export const useDataService = (endpoint, options = {}) => {
         return { success: false, error: result.error };
       }
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: (err as Error).message };
     } finally {
       setLoading(false);
     }
   }, [endpoint, fetchData]);
 
-  const deleteItem = useCallback(async (itemId) => {
+  const deleteItem = useCallback(async (itemId: string) => {
     try {
       setLoading(true);
       const deleteEndpoint = `${endpoint}/${itemId}`;
@@ -138,7 +148,7 @@ export const useDataService = (endpoint, options = {}) => {
         return { success: false, error: result.error };
       }
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: (err as Error).message };
     } finally {
       setLoading(false);
     }
@@ -176,7 +186,7 @@ export const useEmployees = (filters = {}) => {
     const cleaned = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
-        cleaned[key] = value;
+        (cleaned as any)[key] = value;
       }
     });
     return cleaned;
@@ -200,7 +210,7 @@ export const useAttendance = (filters = {}) => {
     const cleaned = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
-        cleaned[key] = value;
+        (cleaned as any)[key] = value;
       }
     });
     return cleaned;
@@ -216,7 +226,7 @@ export const useLeaves = (filters = {}) => {
     const cleaned = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
-        cleaned[key] = value;
+        (cleaned as any)[key] = value;
       }
     });
     return cleaned;
@@ -260,7 +270,7 @@ export const useDocuments = (filters = {}) => {
     const cleaned = {};
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
-        cleaned[key] = value;
+        (cleaned as any)[key] = value;
       }
     });
     return cleaned;

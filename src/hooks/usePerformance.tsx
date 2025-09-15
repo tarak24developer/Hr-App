@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 // Performance monitoring hook
-export const usePerformance = (componentName) => {
+export const usePerformance = (componentName: string) => {
   const renderCount = useRef(0);
   const lastRenderTime = useRef(performance.now());
   const mountTime = useRef(performance.now());
@@ -26,7 +26,7 @@ export const usePerformance = (componentName) => {
     };
   }, [componentName]);
 
-  const measureOperation = useCallback((operationName, operation) => {
+  const measureOperation = useCallback((operationName: string, operation: () => any) => {
     const start = performance.now();
     const result = operation();
     const duration = performance.now() - start;
@@ -43,7 +43,7 @@ export const usePerformance = (componentName) => {
 
 // Memory usage monitoring hook
 export const useMemoryUsage = () => {
-  const memoryInfo = useRef(null);
+  const memoryInfo = useRef<any>(null);
 
   useEffect(() => {
     if ('memory' in performance) {
@@ -67,7 +67,7 @@ export const useMemoryUsage = () => {
 
 // Network performance monitoring hook
 export const useNetworkPerformance = () => {
-  const networkInfo = useRef(null);
+  const networkInfo = useRef<any>(null);
 
   useEffect(() => {
     if ('connection' in navigator) {

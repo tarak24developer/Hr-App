@@ -1,63 +1,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Box,
-  Paper,
-  Typography,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Chip,
-  Alert,
-  Card,
-  CardContent,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  CircularProgress,
-  Snackbar,
-  Tooltip,
-  Stack,
-  Container,
-  Fade,
-  TablePagination,
-  Avatar,
-  Switch,
-  FormControlLabel,
-  useTheme,
-  alpha,
-  InputAdornment,
-  Pagination
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Search as SearchIcon,
-  Visibility as ViewIcon,
-  Block as BlockIcon,
-  CheckCircle as ActiveIcon,
-  Person as PersonIcon,
-  AdminPanelSettings as AdminIcon,
-  Work as EmployeeIcon,
-  SupervisorAccount as ManagerIcon,
-  Security as SecurityIcon,
-  FilterList as FilterIcon,
-  Refresh as RefreshIcon,
-  Download as DownloadIcon
-} from '@mui/icons-material';
-import { User, UserRole } from '../types';
+  Plus,
+  Edit,
+  Trash2,
+  Search,
+  Eye,
+  UserX,
+  CheckCircle,
+  User,
+  Shield,
+  Briefcase,
+  Users,
+  Filter,
+  RefreshCw,
+  Download,
+  X,
+  Mail,
+  Phone,
+  Building,
+  AlertCircle
+} from 'lucide-react';
+import { cn } from '../utils/cn';
+import { User as UserType, UserRole } from '../types';
 import userService from '../services/userService';
+import { showNotification } from '../utils/notification';
+import DashboardCard from '../components/DashboardCard';
 
 interface UserFormData {
   firstName: string;
@@ -68,21 +35,29 @@ interface UserFormData {
   position: string;
   phone: string;
   isActive: boolean;
+  hireDate: string;
+  status: 'active' | 'inactive' | 'terminated';
+  avatar: string | null;
+  address: string;
+  emergencyContact: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
+  createdAt: string;
+  updatedAt: string;
 }
 
-const Users: React.FC = () => {
-  const theme = useTheme();
-  const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+const UsersPage: React.FC = () => {
+  const [users, setUsers] = useState<UserType[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<UserType[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
-  const [roles, setRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [departmentFilter, setDepartmentFilter] = useState<string>('');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -95,83 +70,63 @@ const Users: React.FC = () => {
     department: '',
     position: '',
     phone: '',
-    isActive: true
-  });
-  const [snackbar, setSnackbar] = useState({ 
-    open: false, 
-    message: '', 
-    severity: 'success' as 'success' | 'error' 
+    isActive: true,
+    hireDate: new Date().toISOString(),
+    status: 'active',
+    avatar: null,
+    address: '',
+    emergencyContact: {
+      name: '',
+      phone: '',
+      relationship: ''
+    },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [processing, setProcessing] = useState(false);
+  const [rowsPerPage] = useState(10);
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Load data from Firebase
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Load users from Firebase
-        const usersResult = await userService.getUsers();
-        if (usersResult && usersResult.success && Array.isArray(usersResult.data)) {
-          setUsers(usersResult.data);
-        } else {
-          console.warn('No users data received or request failed:', usersResult);
-          setUsers([]);
-        }
-
-        // Load departments
-        try {
-          const departmentsResult = await userService.getDepartments();
-          setDepartments(departmentsResult || []);
-        } catch (err) {
-          console.warn('Failed to load departments:', err);
-          setDepartments([]);
-        }
-
-        // Load roles
-        try {
-          const rolesResult = await userService.getRoles();
-          setRoles(rolesResult || ['admin', 'hr', 'manager', 'employee']);
-        } catch (err) {
-          console.warn('Failed to load roles:', err);
-          setRoles(['admin', 'hr', 'manager', 'employee']);
-        }
-
-      } catch (err: any) {
-        console.error('Error loading data:', err);
-        setError(err.message || 'Failed to load data');
-        setSnackbar({
-          open: true,
-          message: 'Failed to load data from Firebase',
-          severity: 'error'
-        });
-      } finally {
-        setLoading(false);
+  // Load users
+  const loadUsers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const result = await userService.getUsers();
+      if (result.success && result.data) {
+        const usersData = result.data as UserType[];
+        setUsers(usersData);
+        setFilteredUsers(usersData);
+        
+        // Extract unique departments
+        const uniqueDepartments = [...new Set(usersData.map((user: UserType) => user.department))];
+      setDepartments(uniqueDepartments);
+      } else {
+        setUsers([]);
+        setFilteredUsers([]);
+        setDepartments([]);
       }
-    };
-
-    loadData();
+    } catch (error) {
+      console.error('Error loading users:', error);
+      showNotification('Failed to load users', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Update filtered users when users or filters change
   useEffect(() => {
-    applyFilters();
-  }, [users, searchTerm, roleFilter, statusFilter, departmentFilter]);
+    loadUsers();
+  }, [loadUsers]);
 
-  const applyFilters = useCallback(() => {
-    let filtered = [...users];
+  // Filter users
+  useEffect(() => {
+    let filtered = users;
 
     if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(user =>
-        user.firstName.toLowerCase().includes(searchLower) ||
-        user.lastName.toLowerCase().includes(searchLower) ||
-        user.email.toLowerCase().includes(searchLower) ||
-        user.department.toLowerCase().includes(searchLower) ||
-        user.position.toLowerCase().includes(searchLower)
+        user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.position.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -181,8 +136,7 @@ const Users: React.FC = () => {
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter(user => 
-        (statusFilter === 'active' && user.status === 'active') ||
-        (statusFilter === 'inactive' && user.status === 'inactive')
+        statusFilter === 'active' ? user.isActive : !user.isActive
       );
     }
 
@@ -194,37 +148,102 @@ const Users: React.FC = () => {
     setCurrentPage(1);
   }, [users, searchTerm, roleFilter, statusFilter, departmentFilter]);
 
-  const loadUsers = async () => {
-    try {
-      setLoading(true);
-      const usersResult = await userService.getUsers();
-      if (usersResult && usersResult.success && Array.isArray(usersResult.data)) {
-        setUsers(usersResult.data);
-      } else {
-        setUsers([]);
-      }
-    } catch (err: any) {
-      setError('Failed to load users');
-      setSnackbar({
-        open: true,
-        message: 'Failed to load users',
-        severity: 'error'
-      });
-    } finally {
-      setLoading(false);
+  // Pagination
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
+
+  // Statistics
+  const getTotalUsers = () => users.length;
+  const getActiveUsers = () => users.filter(user => user.isActive).length;
+  const getInactiveUsers = () => users.filter(user => !user.isActive).length;
+  const getAdminUsers = () => users.filter(user => user.role === 'admin').length;
+  const getEmployeeUsers = () => users.filter(user => user.role === 'employee').length;
+
+  const getRoleIcon = (role: UserRole) => {
+    switch (role) {
+      case 'admin':
+        return <Shield className="w-4 h-4" />;
+      case 'manager':
+        return <Users className="w-4 h-4" />;
+      case 'employee':
+        return <Briefcase className="w-4 h-4" />;
+      case 'hr':
+        return <User className="w-4 h-4" />;
+      default:
+        return <User className="w-4 h-4" />;
     }
   };
 
-  const handleRefresh = () => {
-    loadUsers();
-    setSnackbar({
-      open: true,
-      message: 'Users refreshed successfully',
-      severity: 'success'
-    });
+  const getRoleColor = (role: UserRole) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-red-100 text-red-800';
+      case 'manager':
+        return 'bg-blue-100 text-blue-800';
+      case 'employee':
+        return 'bg-green-100 text-green-800';
+      case 'hr':
+        return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
-  const handleCreateClick = () => {
+  const handleCreateUser = async () => {
+    try {
+      const result = await userService.createUser(formData);
+      if (result.success && result.data) {
+        const newUser = result.data as UserType;
+      setUsers(prev => [...prev, newUser]);
+      setShowCreateDialog(false);
+      resetForm();
+      showNotification('User created successfully', 'success');
+      } else {
+        showNotification('Failed to create user', 'error');
+      }
+    } catch (error) {
+      console.error('Error creating user:', error);
+      showNotification('Failed to create user', 'error');
+    }
+  };
+
+  const handleUpdateUser = async () => {
+    if (!selectedUser) return;
+
+    try {
+      const result = await userService.updateUser(selectedUser.id, formData);
+      if (result.success && result.data) {
+        const updatedUser = result.data as UserType;
+      setUsers(prev => prev.map(user => user.id === selectedUser.id ? updatedUser : user));
+      setShowEditDialog(false);
+      resetForm();
+      showNotification('User updated successfully', 'success');
+      } else {
+        showNotification('Failed to update user', 'error');
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      showNotification('Failed to update user', 'error');
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+
+    try {
+      await userService.deleteUser(selectedUser.id);
+      setUsers(prev => prev.filter(user => user.id !== selectedUser.id));
+      setShowDeleteDialog(false);
+      showNotification('User deleted successfully', 'success');
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      showNotification('Failed to delete user', 'error');
+    }
+  };
+
+  const resetForm = () => {
     setFormData({
       firstName: '',
       lastName: '',
@@ -233,782 +252,878 @@ const Users: React.FC = () => {
       department: '',
       position: '',
       phone: '',
-      isActive: true
+      isActive: true,
+      hireDate: new Date().toISOString(),
+      status: 'active',
+      avatar: null,
+      address: '',
+      emergencyContact: {
+        name: '',
+        phone: '',
+        relationship: ''
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
-    setShowCreateDialog(true);
   };
 
-  const handleEditClick = (user: User) => {
+  const handleEditUser = (user: UserType) => {
     setSelectedUser(user);
     setFormData({
-      firstName: user.firstName || '',
-      lastName: user.lastName || '',
-      email: user.email || '',
-      role: user.role || 'employee',
-      department: user.department || '',
-      position: user.position || '',
-      phone: user.phone || '',
-      isActive: user.status === 'active'
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      department: user.department,
+      position: user.position,
+      phone: user.phone,
+      isActive: user.isActive ?? true,
+      hireDate: user.hireDate,
+      status: user.status,
+      avatar: user.avatar,
+      address: user.address,
+      emergencyContact: user.emergencyContact,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
     });
     setShowEditDialog(true);
   };
 
-  const handleViewClick = (user: User) => {
+  const handleViewUser = (user: UserType) => {
     setSelectedUser(user);
     setShowViewDialog(true);
   };
 
-  const handleDeleteClick = (user: User) => {
+  const handleDeleteClick = (user: UserType) => {
     setSelectedUser(user);
     setShowDeleteDialog(true);
   };
 
-  const handleFormSubmit = async () => {
-    try {
-      setProcessing(true);
-      
-      if (showCreateDialog) {
-        const userData = {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          role: formData.role,
-          department: formData.department,
-          position: formData.position,
-          phone: formData.phone,
-          hireDate: new Date().toISOString().split('T')[0],
-          status: formData.isActive ? 'active' : 'inactive',
-          avatar: null,
-          address: '',
-          emergencyContact: {
-            name: '',
-            phone: '',
-            relationship: ''
-          },
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          isActive: formData.isActive
-        };
-        
-        const result = await userService.createUser(userData);
-        if (result && result.success) {
-          setUsers(prev => [result.data, ...prev]);
-        setSnackbar({ open: true, message: 'User created successfully', severity: 'success' });
-        setShowCreateDialog(false);
-        } else {
-          throw new Error(result?.error || 'Failed to create user');
-        }
-      } else if (showEditDialog && selectedUser) {
-        const updateData = {
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          role: formData.role,
-          department: formData.department,
-          position: formData.position,
-          phone: formData.phone,
-          status: formData.isActive ? 'active' : 'inactive',
-          isActive: formData.isActive,
-          updatedAt: new Date().toISOString()
-        };
-        
-        const result = await userService.updateUser(selectedUser.id, updateData);
-        if (result && result.success) {
-        setUsers(prev => prev.map(user => 
-            user.id === selectedUser.id ? result.data : user
-        ));
-        setSnackbar({ open: true, message: 'User updated successfully', severity: 'success' });
-        setShowEditDialog(false);
-        } else {
-          throw new Error(result?.error || 'Failed to update user');
-      }
-      }
-    } catch (err: any) {
-      setSnackbar({ open: true, message: err.message || 'Operation failed', severity: 'error' });
-    } finally {
-      setProcessing(false);
+  const handleFilterChange = (field: string, value: string) => {
+    switch (field) {
+      case 'search':
+        setSearchTerm(value);
+        break;
+      case 'role':
+        setRoleFilter(value as UserRole | 'all');
+        break;
+      case 'status':
+        setStatusFilter(value as 'all' | 'active' | 'inactive');
+        break;
+      case 'department':
+        setDepartmentFilter(value);
+        break;
     }
   };
 
-  const handleDelete = async () => {
-    try {
-      if (selectedUser) {
-        const result = await userService.deleteUser(selectedUser.id);
-        if (result && result.success) {
-          setUsers(prev => prev.map(user => 
-            user.id === selectedUser.id 
-              ? { ...user, isActive: false, status: 'inactive' }
-              : user
-          ));
-          setSnackbar({ open: true, message: 'User deactivated successfully', severity: 'success' });
-        setShowDeleteDialog(false);
-        setSelectedUser(null);
-        } else {
-          throw new Error(result?.error || 'Failed to delete user');
-      }
-      }
-    } catch (err: any) {
-      setSnackbar({ open: true, message: err.message || 'Failed to delete user', severity: 'error' });
-    }
-  };
-
-  const handleStatusToggle = async (userId: string) => {
-    try {
-      const user = users.find(u => u.id === userId);
-      if (user) {
-        const newStatus = !user.isActive;
-        const result = await userService.updateUserStatus(userId, newStatus);
-        if (result && result.success) {
-          setUsers(prev => prev.map(u => 
-            u.id === userId 
-              ? { 
-                  ...u, 
-                  status: newStatus ? 'active' : 'inactive',
-                  isActive: newStatus,
-              updatedAt: new Date().toISOString()
-            }
-              : u
-      ));
-      setSnackbar({ 
-        open: true, 
-            message: `User ${newStatus ? 'activated' : 'deactivated'} successfully`, 
-        severity: 'success' 
-      });
-        } else {
-          throw new Error(result?.error || 'Failed to update status');
-        }
-      }
-    } catch (err: any) {
-      setSnackbar({ open: true, message: err.message || 'Failed to update status', severity: 'error' });
-    }
-  };
-
-  const getRoleIcon = (role: UserRole) => {
-    switch (role) {
-      case 'admin': return <AdminIcon color="error" />;
-      case 'hr': return <SecurityIcon color="warning" />;
-      case 'manager': return <ManagerIcon color="info" />;
-      default: return <EmployeeIcon color="success" />;
-    }
-  };
-
-  const getRoleColor = (role: UserRole) => {
-    switch (role) {
-      case 'admin': return 'error';
-      case 'hr': return 'warning';
-      case 'manager': return 'info';
-      default: return 'success';
-    }
-  };
-
-  const handleExportUsers = () => {
-    const csv = convertToCSV(filteredUsers);
-    downloadCSV(csv, 'users.csv');
-    setSnackbar({
-      open: true,
-      message: 'User data exported successfully',
-      severity: 'success'
-    });
-  };
-
-  const convertToCSV = (data: User[]): string => {
-    const headers = [
-      'S.No', 'First Name', 'Last Name', 'Email', 'Role', 'Department', 'Position', 
-      'Phone', 'Status', 'Hire Date', 'Last Login', 'Created At'
-    ];
-    
-    const csvContent = [
-      headers.join(','),
-      ...data.map((user, index) => [
-        index + 1,
-        user.firstName,
-        user.lastName,
-        user.email,
-        user.role,
-        user.department,
-        user.position,
-        user.phone,
-        user.status,
-        user.hireDate,
-        user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : 'Never',
-        new Date(user.createdAt).toLocaleDateString()
-      ].join(','))
-    ].join('\n');
-    return csvContent;
-  };
-
-  const downloadCSV = (csvContent: string, filename: string) => {
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    if (link.download !== undefined) {
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  };
-
-  const paginatedUsers = filteredUsers.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-
-  // Show loading state
+  // Loading state
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress size={60} />
-        <Typography variant="h6" sx={{ ml: 2 }}>
-          Loading Users...
-        </Typography>
-      </Box>
-    );
-  }
-
-  // Show error state
-  if (error) {
-  return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-        <Button variant="contained" onClick={loadUsers}>
-          Retry
-        </Button>
-      </Box>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading users...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Fade in timeout={300}>
-        <Box>
-          {/* Header */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h4" component="h1" sx={{ fontWeight: 600 }}>
-              User Management
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant="outlined"
-                startIcon={<DownloadIcon />}
-                onClick={handleExportUsers}
-              >
-                Export Users
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={handleRefresh}
-                disabled={loading}
-              >
-                Refresh
-              </Button>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleCreateClick}
-              sx={{
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                },
-              }}
-            >
-              Add User
-            </Button>
-            </Box>
-          </Box>
-
-          {/* Stats Cards */}
-          <Box sx={{ 
-            display: 'grid', 
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-            gap: 3, 
-            mb: 3 
-          }}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                      Total Users
-                    </Typography>
-                <Typography variant="h4" component="div">
-                  {users.length}
-                </Typography>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                      Active Users
-                    </Typography>
-                <Typography variant="h4" component="div" color="success.main">
-                  {users.filter(u => u.isActive !== false).length}
-                </Typography>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                      Administrators
-                    </Typography>
-                <Typography variant="h4" component="div" color="error.main">
-                  {users.filter(u => u.role === 'admin').length}
-                </Typography>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Departments
-                    </Typography>
-                <Typography variant="h4" component="div" color="primary.main">
-                  {departments.length}
-                    </Typography>
-              </CardContent>
-            </Card>
-          </Box>
-
-          {/* Filters */}
-          <Paper sx={{ p: 2, mb: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <FilterIcon sx={{ mr: 1 }} />
-              <Typography variant="h6">Filters</Typography>
-            </Box>
-            <Box sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-              gap: 2 
-            }}>
-              <TextField
-                fullWidth
-                label="Search Users"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  )
-                }}
-              />
-              <FormControl fullWidth>
-                <InputLabel>Role</InputLabel>
-                <Select
-                  value={roleFilter}
-                  label="Role"
-                  onChange={(e) => setRoleFilter(e.target.value as UserRole | 'all')}
-                >
-                  <MenuItem value="all">All Roles</MenuItem>
-                  {roles.map(role => (
-                    <MenuItem key={role} value={role}>
-                      {role.charAt(0).toUpperCase() + role.slice(1)}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={statusFilter}
-                  label="Status"
-                  onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-                >
-                  <MenuItem value="all">All Status</MenuItem>
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="inactive">Inactive</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>Department</InputLabel>
-                <Select
-                  value={departmentFilter}
-                  label="Department"
-                  onChange={(e) => setDepartmentFilter(e.target.value)}
-                >
-                  <MenuItem value="">All Departments</MenuItem>
-                  {departments.map(dept => (
-                    <MenuItem key={dept} value={dept}>
-                      {dept}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Box>
-          </Paper>
-
-          {/* Users Table */}
-          <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-            <TableContainer>
-              <Table stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>User</TableCell>
-                    <TableCell>Role</TableCell>
-                    <TableCell>Department</TableCell>
-                    <TableCell>Contact</TableCell>
-                    <TableCell>Status</TableCell>
-                    <TableCell>Last Login</TableCell>
-                    <TableCell align="center">Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {paginatedUsers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body1" color="textSecondary">
-                          {users.length === 0 ? 'No users found. Add your first user to get started.' : 'No users match the current filters.'}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    paginatedUsers.map((user) => (
-                      <TableRow key={user.id} hover>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>
-                              {user.firstName.charAt(0)}{user.lastName.charAt(0)}
-                            </Avatar>
-                            <Box>
-                              <Typography variant="subtitle2" fontWeight="bold">
-                                {user.firstName} {user.lastName}
-                              </Typography>
-                              <Typography variant="caption" color="textSecondary">
-                                {user.email}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            icon={getRoleIcon(user.role || 'employee')}
-                            label={(user.role || 'employee').toUpperCase()}
-                            size="small"
-                            color={getRoleColor(user.role || 'employee') as any}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Box>
-                            <Typography variant="body2">{user.department || 'N/A'}</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {user.position || 'N/A'}
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">{user.phone || 'N/A'}</Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={user.isActive !== false ? 'Active' : 'Inactive'}
-                            size="small"
-                            color={user.isActive !== false ? 'success' : 'default'}
-                            sx={{ textTransform: 'capitalize' }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {user.lastLoginAt 
-                              ? new Date(user.lastLoginAt).toLocaleDateString()
-                              : 'Never'
-                            }
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Box sx={{ display: 'flex', gap: 0.5 }}>
-                            <Tooltip title="View Details">
-                              <IconButton size="small" onClick={() => handleViewClick(user)}>
-                                <ViewIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Edit User">
-                              <IconButton size="small" onClick={() => handleEditClick(user)}>
-                                <EditIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title={user.isActive !== false ? 'Deactivate' : 'Activate'}>
-                              <IconButton 
-                                size="small" 
-                                onClick={() => handleStatusToggle(user.id)}
-                                color={user.isActive !== false ? 'warning' : 'success'}
-                              >
-                                {user.isActive !== false ? <BlockIcon /> : <ActiveIcon />}
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Delete User">
-                              <IconButton size="small" onClick={() => handleDeleteClick(user)}>
-                                <DeleteIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-              <Pagination
-                count={totalPages}
-                page={currentPage}
-                onChange={(_, page) => setCurrentPage(page)}
-                color="primary"
-                showFirstButton
-                showLastButton
-              />
-            </Box>
-          )}
-
-          {/* Create/Edit Dialog */}
-          <Dialog 
-            open={showCreateDialog || showEditDialog} 
-            onClose={() => {
-              setShowCreateDialog(false);
-              setShowEditDialog(false);
-            }} 
-            maxWidth="md" 
-            fullWidth
+    <div className="space-y-6 p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
+          <p className="text-gray-600">Manage user accounts, roles, and permissions</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button 
+            onClick={() => setShowCreateDialog(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
           >
-            <DialogTitle>
-              {showCreateDialog ? 'Create New User' : 'Edit User'}
-            </DialogTitle>
-            <DialogContent>
-              <Stack spacing={3} sx={{ mt: 1 }}>
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                  <TextField
-                    label="First Name"
+            <Plus className="w-4 h-4" />
+            <span>Add User</span>
+          </button>
+          <button 
+            onClick={loadUsers}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center space-x-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Refresh</span>
+          </button>
+          <button 
+            onClick={() => {/* Export functionality */}}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <DashboardCard
+          name="Total Users"
+          value={getTotalUsers()}
+          icon={User}
+          color="blue"
+        />
+        <DashboardCard
+          name="Active Users"
+          value={getActiveUsers()}
+          icon={CheckCircle}
+          color="green"
+        />
+        <DashboardCard
+          name="Inactive Users"
+          value={getInactiveUsers()}
+          icon={UserX}
+          color="gray"
+        />
+        <DashboardCard
+          name="Admins"
+          value={getAdminUsers()}
+          icon={Shield}
+          color="red"
+        />
+        <DashboardCard
+          name="Employees"
+          value={getEmployeeUsers()}
+          icon={Briefcase}
+          color="yellow"
+        />
+      </div>
+
+      {/* Search and Filters */}
+      {users.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  value={searchTerm}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+              >
+                <Filter className="w-4 h-4" />
+                <span>Filters</span>
+              </button>
+              
+              {(roleFilter !== 'all' || statusFilter !== 'all' || departmentFilter) && (
+                <button
+                  onClick={() => {
+                    setRoleFilter('all');
+                    setStatusFilter('all');
+                    setDepartmentFilter('');
+                  }}
+                  className="px-4 py-2 text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Options */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    value={roleFilter}
+                    onChange={(e) => handleFilterChange('role', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="admin">Admin</option>
+                    <option value="hr">HR</option>
+                    <option value="manager">Manager</option>
+                    <option value="employee">Employee</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <select
+                    value={departmentFilter}
+                    onChange={(e) => handleFilterChange('department', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Departments</option>
+                    {departments.map(dept => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Users Table */}
+      {users.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {paginatedUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
+                            <User className="w-5 h-5 text-gray-600" />
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {user.firstName} {user.lastName}
+                          </div>
+                          <div className="text-sm text-gray-500">{user.position}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={cn(
+                        "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                        getRoleColor(user.role)
+                      )}>
+                        <span className="flex items-center space-x-1">
+                          {getRoleIcon(user.role)}
+                          <span>{user.role}</span>
+                        </span>
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <Building className="w-4 h-4 text-gray-400 mr-2" />
+                        <div className="text-sm text-gray-900">{user.department}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={cn(
+                        "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                        user.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      )}>
+                        {user.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 flex items-center">
+                        <Mail className="w-4 h-4 text-gray-400 mr-2" />
+                        {user.email}
+                      </div>
+                      {user.phone && (
+                        <div className="text-sm text-gray-500 flex items-center">
+                          <Phone className="w-4 h-4 text-gray-400 mr-2" />
+                          {user.phone}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleViewUser(user)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEditUser(user)}
+                          className="text-green-600 hover:text-green-900"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(user)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* No Results */}
+      {filteredUsers.length === 0 && users.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
+          <p className="text-gray-500">Try adjusting your search or filter parameters</p>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {users.length === 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <User className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-medium text-gray-900 mb-2">No Users Yet</h3>
+          <p className="text-gray-500 mb-6">Start by adding your first user to get started with user management</p>
+          <button
+            onClick={() => setShowCreateDialog(true)}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 mx-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add First User</span>
+          </button>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {filteredUsers.length > rowsPerPage && (
+        <div className="flex justify-center">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {Array.from({ length: Math.ceil(filteredUsers.length / rowsPerPage) }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  "px-3 py-2 text-sm font-medium rounded-lg",
+                  page === currentPage
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 bg-white border border-gray-300 hover:bg-gray-50"
+                )}
+              >
+                {page}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setCurrentPage(Math.min(Math.ceil(filteredUsers.length / rowsPerPage), currentPage + 1))}
+              disabled={currentPage === Math.ceil(filteredUsers.length / rowsPerPage)}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {showCreateDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreateDialog(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                <Plus className="w-5 h-5" />
+                <span>Create New User</span>
+              </h3>
+              <button
+                onClick={() => setShowCreateDialog(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <input
+                    type="text"
                     value={formData.firstName}
                     onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
-                    fullWidth
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
-                  <TextField
-                    label="Last Name"
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <input
+                    type="text"
                     value={formData.lastName}
                     onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
-                    fullWidth
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
-                </Box>
-
-                <TextField
-                  label="Email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  fullWidth
-                  required
-                />
-
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                  <FormControl fullWidth>
-                    <InputLabel>Role</InputLabel>
-                    <Select
-                      value={formData.role}
-                      label="Role"
-                      onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
-                    >
-                      <MenuItem value="admin">Administrator</MenuItem>
-                      <MenuItem value="hr">HR</MenuItem>
-                      <MenuItem value="manager">Manager</MenuItem>
-                      <MenuItem value="employee">Employee</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <FormControl fullWidth>
-                    <InputLabel>Department</InputLabel>
-                    <Select
-                    value={formData.department}
-                      label="Department"
-                    onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
-                    >
-                      <MenuItem value="">Select Department</MenuItem>
-                      {departments.map(dept => (
-                        <MenuItem key={dept} value={dept}>
-                          {dept}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Box>
-
-                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                  <TextField
-                    label="Position"
-                    value={formData.position}
-                    onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
-                    fullWidth
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   />
-
-                  <TextField
-                    label="Phone"
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <input
+                    type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    fullWidth
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                </Box>
-
-                <FormControlLabel
-                  control={
-                    <Switch
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="employee">Employee</option>
+                    <option value="manager">Manager</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <input
+                    type="text"
+                    value={formData.department}
+                    onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                  <input
+                    type="text"
+                    value={formData.position}
+                    onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
                       checked={formData.isActive}
                       onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
-                  }
-                  label="Active User"
-                />
-              </Stack>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => {
-                setShowCreateDialog(false);
-                setShowEditDialog(false);
-              }}>
-                Cancel
-              </Button>
-              <Button 
-                variant="contained" 
-                onClick={handleFormSubmit}
-                disabled={processing || !formData.firstName || !formData.lastName || !formData.email}
+                    <span className="text-sm font-medium text-gray-700">Active User</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowCreateDialog(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
               >
-                {processing ? <CircularProgress size={20} /> : (showCreateDialog ? 'Create' : 'Update')}
-              </Button>
-            </DialogActions>
-          </Dialog>
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateUser}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Create User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-          {/* View Dialog */}
-          <Dialog open={showViewDialog} onClose={() => setShowViewDialog(false)} maxWidth="md" fullWidth>
-            <DialogTitle>User Details</DialogTitle>
-            <DialogContent>
-              {selectedUser && (
-                <Box sx={{ mt: 1 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                    <Avatar
-                      sx={{ width: 80, height: 80, mr: 3, bgcolor: 'primary.main' }}
-                      src={selectedUser.avatar || undefined}
-                    >
-                      {selectedUser.firstName.charAt(0)}{selectedUser.lastName.charAt(0)}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h5" sx={{ fontWeight: 600 }}>
-                        {selectedUser.firstName} {selectedUser.lastName}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {selectedUser.email}
-                      </Typography>
-                      <Box sx={{ mt: 1 }}>
-                        <Chip
-                          icon={getRoleIcon(selectedUser.role || 'employee')}
-                          label={(selectedUser.role || 'employee').toUpperCase()}
-                          size="small"
-                          color={getRoleColor(selectedUser.role || 'employee') as any}
-                          sx={{ mr: 1 }}
-                        />
-                        <Chip
-                          label={selectedUser.status || 'inactive'}
-                          size="small"
-                          color={(selectedUser.status || 'inactive') === 'active' ? 'success' : 'default'}
-                          sx={{ textTransform: 'capitalize' }}
-                        />
-                      </Box>
-                    </Box>
-                  </Box>
+      {/* Edit User Modal */}
+      {showEditDialog && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowEditDialog(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                <Edit className="w-5 h-5" />
+                <span>Edit User - {selectedUser.firstName} {selectedUser.lastName}</span>
+              </h3>
+              <button
+                onClick={() => setShowEditDialog(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <input
+                    type="text"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    value={formData.role}
+                    onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="employee">Employee</option>
+                    <option value="manager">Manager</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <input
+                    type="text"
+                    value={formData.department}
+                    onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                  <input
+                    type="text"
+                    value={formData.position}
+                    onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.isActive}
+                      onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Active User</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowEditDialog(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateUser}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Update User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3 }}>
-                    <Box>
-                      <Typography variant="h6" sx={{ mb: 2 }}>Work Information</Typography>
-                      <Stack spacing={2}>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Department</Typography>
-                          <Typography variant="body1">{selectedUser.department}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Position</Typography>
-                          <Typography variant="body1">{selectedUser.position}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Hire Date</Typography>
-                          <Typography variant="body1">
-                            {new Date(selectedUser.hireDate).toLocaleDateString()}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </Box>
+      {/* View User Modal */}
+      {showViewDialog && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowViewDialog(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between mb-4 p-4">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-1.5 bg-primary-100 rounded-lg">
+                  <Eye className="w-5 h-5 text-primary-600" />
+                </div>
+                <h3 className="text-base font-semibold text-gray-900">User Details</h3>
+              </div>
+              <button
+                onClick={() => setShowViewDialog(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-                    <Box>
-                      <Typography variant="h6" sx={{ mb: 2 }}>Contact Information</Typography>
-                      <Stack spacing={2}>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Phone</Typography>
-                          <Typography variant="body1">{selectedUser.phone}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Address</Typography>
-                          <Typography variant="body1">{selectedUser.address}</Typography>
-                        </Box>
-                        <Box>
-                          <Typography variant="body2" color="text.secondary">Emergency Contact</Typography>
-                          <Typography variant="body1">
-                            {selectedUser.emergencyContact.name} ({selectedUser.emergencyContact.relationship})
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {selectedUser.emergencyContact.phone}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </Box>
-                  </Box>
-                </Box>
-              )}
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setShowViewDialog(false)}>Close</Button>
-            </DialogActions>
-          </Dialog>
+            {/* User Details Content */}
+            <div className="p-4 space-y-6">
+              {/* User Header */}
+              <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+                  <span className="text-primary-600 font-semibold text-xl">
+                    {selectedUser.firstName.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-xl font-semibold text-gray-900">
+                    {selectedUser.firstName} {selectedUser.lastName}
+                  </h4>
+                  <p className="text-gray-600">{selectedUser.email}</p>
+                  <div className="flex items-center space-x-4 mt-2">
+                    <span className={cn(
+                      "px-2 py-1 text-xs font-medium rounded-full",
+                      selectedUser.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    )}>
+                      {selectedUser.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                    <span className="text-sm text-gray-500">{selectedUser.department}</span>
+                    <span className="text-sm text-gray-500">{selectedUser.position}</span>
+                  </div>
+                </div>
+              </div>
 
-          {/* Delete Confirmation Dialog */}
-          <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)}>
-            <DialogTitle>Delete User</DialogTitle>
-            <DialogContent>
-              <Typography>
-                Are you sure you want to delete "{selectedUser?.firstName} {selectedUser?.lastName}"? 
+              {/* Details Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Personal Information */}
+                <div className="space-y-4">
+                  <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Personal Information</h5>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <User className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Full Name</p>
+                        <p className="text-sm text-gray-600">
+                          {selectedUser.firstName} {selectedUser.lastName}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <Mail className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Email</p>
+                        <p className="text-sm text-gray-600">{selectedUser.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                        <Phone className="w-4 h-4 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Phone</p>
+                        <p className="text-sm text-gray-600">{selectedUser.phone || '—'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Work Information */}
+                <div className="space-y-4">
+                  <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Work Information</h5>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                        <Shield className="w-4 h-4 text-yellow-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Role</p>
+                        <span className={cn(
+                          "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                          getRoleColor(selectedUser.role)
+                        )}>
+                          <span className="flex items-center space-x-1">
+                            {getRoleIcon(selectedUser.role)}
+                            <span>{selectedUser.role}</span>
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Building className="w-4 h-4 text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Department</p>
+                        <p className="text-sm text-gray-600">{selectedUser.department}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <Briefcase className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Position</p>
+                        <p className="text-sm text-gray-600">{selectedUser.position}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <CheckCircle className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Status</p>
+                        <span className={cn(
+                          "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                          selectedUser.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        )}>
+                          {selectedUser.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="mt-6 flex justify-end border-t border-gray-200 pt-4 p-4">
+              <button
+                onClick={() => setShowViewDialog(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors mr-3"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowViewDialog(false);
+                  handleEditUser(selectedUser);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                Edit User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Modal */}
+      {showDeleteDialog && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowDeleteDialog(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                <Trash2 className="w-5 h-5" />
+                <span>Delete User</span>
+              </h3>
+              <button
+                onClick={() => setShowDeleteDialog(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Are you sure you want to delete <strong>{selectedUser.firstName} {selectedUser.lastName}</strong>? 
                 This action cannot be undone.
-              </Typography>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
-              <Button variant="contained" color="error" onClick={handleDelete}>
-                Delete
-              </Button>
-            </DialogActions>
-          </Dialog>
-
-          {/* Snackbar */}
-          <Snackbar
-            open={snackbar.open}
-            autoHideDuration={6000}
-            onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          >
-            <Alert severity={snackbar.severity} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}>
-              {snackbar.message}
-            </Alert>
-          </Snackbar>
-        </Box>
-      </Fade>
-    </Box>
+              </p>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDeleteDialog(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
-export default Users;
+export default UsersPage;

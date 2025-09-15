@@ -1,57 +1,24 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Chip,
-  IconButton,
-  Tooltip,
-  Avatar,
-  LinearProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Checkbox,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Alert,
-  Snackbar
-} from '@mui/material';
-import { Grid } from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Visibility as ViewIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Assignment as AssignmentIcon,
-  ExitToApp as ExitIcon,
-  CalendarToday as CalendarIcon,
-  ExpandMore as ExpandMoreIcon,
-  PlayArrow as StartIcon,
-  Stop as StopIcon
-} from '@mui/icons-material';
+  Search, 
+  Users, 
+  TrendingUp, 
+  AlertCircle, 
+  CheckCircle,
+  X,
+  Plus,
+  Download,
+  Eye,
+  Edit,
+  Trash2,
+  Clock,
+  Play,
+  FileText,
+} from 'lucide-react';
+import { cn } from '../utils/cn';
 import firebaseService from '../services/firebaseService';
-import type { User } from '../types';
+import DashboardCard from '../components/DashboardCard';
+// import type { User } from '../types';
 
 interface ExitChecklistItem {
   id: string;
@@ -75,62 +42,35 @@ interface ExitProcess {
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   checklist: ExitChecklistItem[];
-  notes?: string;
+  notes?: string | undefined;
   initiatedBy: string;
   initiatedAt: Date;
-  completedAt?: Date;
+  completedAt?: Date | undefined;
   lastUpdated: Date;
 }
 
-interface Employee {
-  id: string;
-  name: string;
-  email: string;
-  department: string;
-  position: string;
-}
+// Employee interface not needed in this page after UI simplification
 
 const ExitProcess: React.FC = () => {
-  console.log('ExitProcess component rendering');
-  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'overview' | 'processes' | 'employees' | 'reports'>('overview');
   const [exitProcesses, setExitProcesses] = useState<ExitProcess[]>([]);
-  const [filteredProcesses, setFilteredProcesses] = useState<ExitProcess[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  // const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState<string>('');
+
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProcess, setSelectedProcess] = useState<ExitProcess | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isViewMode, setIsViewMode] = useState(false);
-  const [isCreateMode, setIsCreateMode] = useState(false);
-  const [filters, setFilters] = useState({
-    status: '',
-    priority: '',
-    department: '',
-    search: ''
-  });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'warning' | 'info';
-  }>({
-    open: false,
-    message: '',
-    severity: 'info'
-  });
 
-  // Delete confirmation state
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    open: boolean;
-    processId: string | null;
-    processName: string;
-  }>({
-    open: false,
-    processId: null,
-    processName: ''
-  });
-
-  // Form state for creating/editing processes
+  // Form data
   const [formData, setFormData] = useState<Partial<ExitProcess>>({
     employeeId: '',
     employeeName: '',
@@ -143,57 +83,29 @@ const ExitProcess: React.FC = () => {
     checklist: []
   });
 
-  // Reset form data when dialog opens/closes
-  useEffect(() => {
-    if (isDialogOpen && isCreateMode) {
-      setFormData({
-        employeeId: '',
-        employeeName: '',
-        employeeEmail: '',
-        employeeDepartment: '',
-        exitDate: new Date(),
-        reason: '',
-        priority: 'medium',
-        notes: '',
-        checklist: []
-      });
-    } else if (isDialogOpen && selectedProcess && !isCreateMode) {
-      setFormData({
-        employeeId: selectedProcess.employeeId,
-        employeeName: selectedProcess.employeeName,
-        employeeEmail: selectedProcess.employeeEmail,
-        employeeDepartment: selectedProcess.employeeDepartment,
-        exitDate: selectedProcess.exitDate,
-        reason: selectedProcess.reason,
-        priority: selectedProcess.priority,
-        notes: selectedProcess.notes,
-        checklist: selectedProcess.checklist
-      });
-    }
-  }, [isDialogOpen, isCreateMode, selectedProcess]);
+  const isFormValid = useMemo(() => {
+    const email = (formData.employeeEmail || '').trim();
+    const requiredFilled = Boolean(
+      (formData.employeeId || '').trim() &&
+      (formData.employeeName || '').trim() &&
+      email
+    );
+    const emailOk = /.+@.+\..+/.test(email);
+    return requiredFilled && emailOk;
+  }, [formData.employeeId, formData.employeeName, formData.employeeEmail]);
 
+  // Load data
   useEffect(() => {
-    console.log('ExitProcess useEffect - loading data');
-    // Load data from Firebase
     loadExitProcesses();
-    loadEmployees();
+    // loadEmployees();
   }, []);
-
-  useEffect(() => {
-    console.log('ExitProcess useEffect - applying filters');
-    applyFilters();
-  }, [exitProcesses, filters]);
 
   const loadExitProcesses = async () => {
     setLoading(true);
     try {
-      // Fetch exit processes from Firebase
       const response = await firebaseService.getCollection('exitProcesses');
-      console.log('Raw Firebase response:', response);
       if (response.success && response.data) {
-        // Transform Firebase data to ExitProcess format
         const processes: ExitProcess[] = response.data.map((doc: any) => {
-          // Helper function to safely convert dates
           const safeDate = (dateValue: any): Date => {
             if (!dateValue) return new Date();
             try {
@@ -204,17 +116,8 @@ const ExitProcess: React.FC = () => {
             }
           };
 
-          // Ensure we get the correct Firebase document ID
-          const documentId = doc.id || doc['id'] || doc.docId || doc.documentId;
-          console.log('Processing document:', { 
-            originalId: doc.id, 
-            fallbackId: doc['id'], 
-            finalId: documentId,
-            docData: doc 
-          });
-          
-          return {
-            id: documentId, // Use Firebase document ID
+          const base: Omit<ExitProcess, 'completedAt'> & { completedAt?: Date } = {
+            id: doc.id || doc['id'],
             employeeId: doc.employeeId || '',
             employeeName: doc.employeeName || '',
             employeeEmail: doc.employeeEmail || '',
@@ -224,87 +127,60 @@ const ExitProcess: React.FC = () => {
             status: doc.status || 'pending',
             priority: doc.priority || 'medium',
             checklist: (doc.checklist || []).map((item: any) => ({
-              ...item,
+              id: item.id,
+              task: item.task,
+              category: item.category,
+              status: item.status,
+              assignedTo: item.assignedTo,
               dueDate: safeDate(item.dueDate),
-              completedAt: item.completedAt ? safeDate(item.completedAt) : undefined
+              ...(item.completedAt ? { completedAt: safeDate(item.completedAt) } : {}),
+              ...(item.notes ? { notes: item.notes } : {})
             })),
-            notes: doc.notes || '',
+            ...(doc.notes ? { notes: doc.notes } : {}),
             initiatedBy: doc.initiatedBy || '',
             initiatedAt: safeDate(doc.initiatedAt),
-            completedAt: doc.completedAt ? safeDate(doc.completedAt) : undefined,
+            ...(doc.completedAt ? { completedAt: safeDate(doc.completedAt) } : {}),
             lastUpdated: safeDate(doc.lastUpdated)
           };
+
+          return base as ExitProcess;
         });
-        console.log('Loaded exit processes from Firebase:', processes.map(p => ({ id: p.id, employeeName: p.employeeName })));
         setExitProcesses(processes);
       } else {
-        console.error('Error loading exit processes:', response.error);
-        setSnackbar({
-          open: true,
-          message: 'Error loading exit processes',
-          severity: 'error'
-        });
+        setExitProcesses([]);
       }
     } catch (error) {
       console.error('Error loading exit processes:', error);
-      setSnackbar({
-        open: true,
-        message: 'Error loading exit processes',
-        severity: 'error'
-      });
+      setError('Failed to load exit processes');
     } finally {
       setLoading(false);
     }
   };
 
-  const loadEmployees = async () => {
-    try {
-      // Fetch employees from Firebase users collection
-      const response = await firebaseService.getCollection<User>('users');
-      if (response.success && response.data) {
-        const employeeList: Employee[] = response.data.map(user => ({
-          id: user.id,
-          name: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-          department: user.department || '',
-          position: user.position || ''
-        }));
-        setEmployees(employeeList);
-      } else {
-        console.error('Error loading employees:', response.error);
-        setSnackbar({
-          open: true,
-          message: 'Error loading employees',
-          severity: 'error'
-        });
-      }
-    } catch (error) {
-      console.error('Error loading employees:', error);
-      setSnackbar({
-        open: true,
-        message: 'Error loading employees',
-        severity: 'error'
-      });
-    }
-  };
+  // const loadEmployees = async () => {
+  //   try {
+  //     const response = await firebaseService.getCollection<User>('users');
+  //     if (response.success && response.data) {
+  //       const employeeList: Employee[] = response.data.map(user => ({
+  //         id: user.id,
+  //         name: `${user.firstName} ${user.lastName}`.trim() || user.displayName || user.email || 'Employee',
+  //         email: user.email,
+  //         department: user.department || 'General',
+  //         position: user.position || 'Employee'
+  //       }));
+  //       setEmployees(employeeList);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error loading employees:', error);
+  //   }
+  // };
 
-  const applyFilters = useCallback(() => {
+  // Filtered processes
+  const filteredProcesses = useMemo(() => {
     let filtered = [...exitProcesses];
 
-    if (filters.status) {
-      filtered = filtered.filter(process => process.status === filters.status);
-    }
-
-    if (filters.priority) {
-      filtered = filtered.filter(process => process.priority === filters.priority);
-    }
-
-    if (filters.department) {
-      filtered = filtered.filter(process => process.employeeDepartment === filters.department);
-    }
-
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
       filtered = filtered.filter(process =>
         process.employeeName.toLowerCase().includes(searchLower) ||
         process.employeeEmail.toLowerCase().includes(searchLower) ||
@@ -312,174 +188,186 @@ const ExitProcess: React.FC = () => {
       );
     }
 
-    setFilteredProcesses(filtered);
-    setCurrentPage(1);
-  }, [exitProcesses, filters]);
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(process => process.status === statusFilter);
+    }
 
+    if (priorityFilter !== 'all') {
+      filtered = filtered.filter(process => process.priority === priorityFilter);
+    }
+
+    if (departmentFilter !== 'all') {
+      filtered = filtered.filter(process => process.employeeDepartment === departmentFilter);
+    }
+
+    return filtered;
+  }, [exitProcesses, searchQuery, statusFilter, priorityFilter, departmentFilter]);
+
+  // Statistics
+  const stats = useMemo(() => {
+    const total = exitProcesses.length;
+    const pending = exitProcesses.filter(p => p.status === 'pending').length;
+    const inProgress = exitProcesses.filter(p => p.status === 'in_progress').length;
+    const completed = exitProcesses.filter(p => p.status === 'completed').length;
+    const urgent = exitProcesses.filter(p => p.priority === 'urgent').length;
+
+    return { total, pending, inProgress, completed, urgent };
+  }, [exitProcesses]);
+
+  // Action handlers
   const handleCreateProcess = () => {
-    console.log('handleCreateProcess called');
-    setSelectedProcess(null);
-    setIsViewMode(false);
-    setIsCreateMode(true);
-    setIsDialogOpen(true);
-  };
-
-  const handleEditProcess = (process: ExitProcess) => {
-    console.log('handleEditProcess called with:', process);
-    setSelectedProcess(process);
-    setIsViewMode(false);
-    setIsCreateMode(false);
-    setIsDialogOpen(true);
+    setFormData({
+      employeeId: '',
+      employeeName: '',
+      employeeEmail: '',
+      employeeDepartment: '',
+      exitDate: new Date(),
+      reason: '',
+      priority: 'medium',
+      notes: '',
+      checklist: []
+    });
+    setShowCreateModal(true);
   };
 
   const handleViewProcess = (process: ExitProcess) => {
-    console.log('handleViewProcess called with:', process);
     setSelectedProcess(process);
-    setIsViewMode(true);
-    setIsCreateMode(false);
-    setIsDialogOpen(true);
+    setShowViewModal(true);
   };
 
-  const handleDeleteProcess = async (processId: string) => {
-    console.log('handleDeleteProcess called with ID:', processId);
-    console.log('Process to delete:', exitProcesses.find(p => p.id === processId));
-    console.log('All processes before delete:', exitProcesses.map(p => ({ id: p.id, employeeName: p.employeeName })));
+  const handleEditProcess = (process: ExitProcess) => {
+    setSelectedProcess(process);
+    setFormData(process);
+    setShowEditModal(true);
+  };
+
+  const handleDeleteProcess = (process: ExitProcess) => {
+    setSelectedProcess(process);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteProcess = async () => {
+    if (!selectedProcess) return;
     
     try {
-      // First, let's check if the document actually exists in Firebase
-      console.log('Attempting to delete document with ID:', processId);
-      console.log('Document ID type:', typeof processId);
-      console.log('Document ID length:', processId.length);
-      
-      // Delete from Firebase
-      const response = await firebaseService.deleteDocument('exitProcesses', processId);
-      console.log('Firebase delete response:', response);
-      
-      if (response.success) {
-        // Update local state
-        setExitProcesses(prev => {
-          const filtered = prev.filter(process => process.id !== processId);
-          console.log('Processes after local state update:', filtered.map(p => ({ id: p.id, employeeName: p.employeeName })));
-          return filtered;
-        });
-        setSnackbar({
-          open: true,
-          message: 'Exit process deleted successfully',
-          severity: 'success'
-        });
+      await firebaseService.deleteDocument('exitProcesses', selectedProcess.id);
+      setExitProcesses(prev => prev.filter(p => p.id !== selectedProcess.id));
+      setShowDeleteModal(false);
+      setSuccessMessage('Exit process deleted successfully');
+    } catch (error) {
+      setError('Failed to delete exit process');
+    }
+  };
+
+  const handleSaveProcess = async () => {
+    if (!isFormValid) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const processData: ExitProcess = {
+        id: selectedProcess?.id || '',
+        employeeId: formData.employeeId || '',
+        employeeName: formData.employeeName || '',
+        employeeEmail: formData.employeeEmail || '',
+        employeeDepartment: formData.employeeDepartment || '',
+        exitDate: formData.exitDate || new Date(),
+        reason: formData.reason || '',
+        status: (formData.status as ExitProcess['status']) || 'pending',
+        priority: (formData.priority as ExitProcess['priority']) || 'medium',
+        checklist: formData.checklist || [],
+        ...(formData.notes ? { notes: formData.notes } : {}),
+        initiatedBy: 'current-user', // Replace with actual user
+        initiatedAt: new Date(),
+        lastUpdated: new Date(),
+        ...(formData.completedAt ? { completedAt: formData.completedAt } : {})
+      };
+
+      if (selectedProcess) {
+        // Update existing process
+        await firebaseService.updateDocument('exitProcesses', selectedProcess.id, processData);
+        setExitProcesses(prev => prev.map(p => p.id === selectedProcess.id ? processData : p));
+        setShowEditModal(false);
+        setSuccessMessage('Exit process updated successfully');
       } else {
-        throw new Error(response.error || 'Failed to delete exit process');
+        // Create new process
+        const response = await firebaseService.addDocument('exitProcesses', processData);
+        if (response.success && response.data) {
+          setExitProcesses(prev => [...prev, response.data as ExitProcess]);
+          setShowCreateModal(false);
+          setSuccessMessage('Exit process created successfully');
+        }
       }
     } catch (error) {
-      console.error('Error deleting exit process:', error);
-      setSnackbar({
-        open: true,
-        message: 'Error deleting exit process: ' + (error instanceof Error ? error.message : 'Unknown error'),
-        severity: 'error'
-      });
-      // Don't update local state if Firebase delete failed
+      setError('Failed to save exit process');
     }
   };
 
   const handleStartProcess = async (processId: string) => {
-    console.log('Starting process with ID:', processId);
-    console.log('Available processes:', exitProcesses.map(p => ({ id: p.id, employeeName: p.employeeName })));
-    console.log('Process to start:', exitProcesses.find(p => p.id === processId));
-    
     try {
-      // Update status in Firebase
-      const response = await firebaseService.updateDocument('exitProcesses', processId, {
+      await firebaseService.updateDocument('exitProcesses', processId, {
         status: 'in_progress',
         lastUpdated: new Date()
       });
-      
-      if (response.success) {
-        // Update local state
         setExitProcesses(prev => prev.map(process =>
           process.id === processId
             ? { ...process, status: 'in_progress', lastUpdated: new Date() }
             : process
         ));
-        setSnackbar({
-          open: true,
-          message: 'Exit process started successfully',
-          severity: 'success'
-        });
-      } else {
-        throw new Error(response.error || 'Failed to start exit process');
-      }
+      setSuccessMessage('Exit process started successfully');
     } catch (error) {
-      console.error('Error starting exit process:', error);
-      setSnackbar({
-        open: true,
-        message: 'Error starting exit process: ' + (error instanceof Error ? error.message : 'Unknown error'),
-        severity: 'error'
-      });
+      setError('Failed to start exit process');
     }
   };
 
   const handleCompleteProcess = async (processId: string) => {
     try {
-      // Update status in Firebase
-      const response = await firebaseService.updateDocument('exitProcesses', processId, {
+      await firebaseService.updateDocument('exitProcesses', processId, {
         status: 'completed',
         completedAt: new Date(),
         lastUpdated: new Date()
       });
-      
-      if (response.success) {
-        // Update local state
         setExitProcesses(prev => prev.map(process =>
           process.id === processId
             ? { ...process, status: 'completed', completedAt: new Date(), lastUpdated: new Date() }
             : process
         ));
-        setSnackbar({
-          open: true,
-          message: 'Exit process completed successfully',
-          severity: 'success'
-        });
-      } else {
-        throw new Error(response.error || 'Failed to complete exit process');
-      }
+      setSuccessMessage('Exit process completed successfully');
     } catch (error) {
-      console.error('Error completing exit process:', error);
-      setSnackbar({
-        open: true,
-        message: 'Error completing exit process: ' + (error instanceof Error ? error.message : 'Unknown error'),
-        severity: 'error'
-      });
+      setError('Failed to complete exit process');
     }
   };
 
-  // (Temporary cleanup utilities removed)
+  // confirmDeleteProcess removed (replaced by inline delete)
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending':
-        return <WarningIcon color="warning" />;
-      case 'in_progress':
-        return <AssignmentIcon color="primary" />;
-      case 'completed':
-        return <CheckCircleIcon color="success" />;
-      case 'cancelled':
-        return <StopIcon color="error" />;
-      default:
-        return <WarningIcon />;
+      case 'pending': return AlertCircle;
+      case 'in_progress': return Clock;
+      case 'completed': return CheckCircle;
+      case 'cancelled': return X;
+      default: return AlertCircle;
     }
   };
 
-  const getPriorityIcon = (priority: string) => {
+  const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent':
-      case 'high':
-        return <WarningIcon color="error" />;
-      case 'medium':
-        return <WarningIcon color="warning" />;
-      case 'low':
-        return <CheckCircleIcon color="success" />;
-      default:
-        return <WarningIcon />;
+      case 'urgent': return 'bg-red-100 text-red-800';
+      case 'high': return 'bg-orange-100 text-orange-800';
+      case 'medium': return 'bg-blue-100 text-blue-800';
+      case 'low': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'in_progress': return 'bg-blue-100 text-blue-800';
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -489,805 +377,926 @@ const ExitProcess: React.FC = () => {
     return totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
   };
 
-  const getDepartmentCount = (departmentName: string) => {
-    return exitProcesses.filter(process => process.employeeDepartment === departmentName).length;
-  };
+  const tabs = [
+    { id: 'overview', name: 'Overview', icon: TrendingUp },
+    { id: 'processes', name: 'Processes', icon: FileText },
+    { id: 'employees', name: 'Employees', icon: Users },
+    { id: 'reports', name: 'Reports', icon: Download }
+  ] as const;
 
-  const getStatusCount = (statusName: string) => {
-    return exitProcesses.filter(process => process.status === statusName).length;
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading exit processes...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const paginatedProcesses = filteredProcesses.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const totalPages = Math.ceil(filteredProcesses.length / itemsPerPage);
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Exit Process Management
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
+    <div className="space-y-6 p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Exit Process Management</h1>
+          <p className="text-gray-600">Manage employee exit processes, checklists, and documentation</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button 
           onClick={handleCreateProcess}
-          sx={{ bgcolor: 'primary.main', mr: 2 }}
-        >
-          Initiate Exit Process
-        </Button>
-        
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Initiate Exit Process</span>
+          </button>
+          <button 
+            onClick={() => {/* Export functionality */}}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export Report</span>
+          </button>
+        </div>
+      </div>
 
-      </Box>
+      {/* Success/Error Messages */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+            <p className="text-green-800">{successMessage}</p>
+          </div>
+        </div>
+      )}
 
-      {/* Statistics Cards */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2, mb: 3 }}>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h4" color="primary">
-            {exitProcesses.length}
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            Total Processes
-          </Typography>
-        </Paper>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h4" color="warning.main">
-            {getStatusCount('pending')}
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            Pending
-          </Typography>
-        </Paper>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h4" color="info.main">
-            {getStatusCount('in_progress')}
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            In Progress
-          </Typography>
-        </Paper>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
-          <Typography variant="h4" color="success.main">
-            {getStatusCount('completed')}
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            Completed
-          </Typography>
-        </Paper>
-      </Box>
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+            <p className="text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
 
-      {/* Main Table */}
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Employee</TableCell>
-              <TableCell>Exit Date</TableCell>
-              <TableCell>Reason</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Priority</TableCell>
-              <TableCell>Progress</TableCell>
-              <TableCell>Last Updated</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={8} align="center">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
-                    <Typography variant="h6" color="textSecondary">
-                      Loading exit processes...
-                    </Typography>
-                  </Box>
-                </TableCell>
-              </TableRow>
-            ) : paginatedProcesses.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} align="center">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <ExitIcon sx={{ fontSize: 64, color: 'action.disabled', mb: 2 }} />
-                      <Typography variant="h6" color="textSecondary" gutterBottom>
-                        No Exit Processes Found
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <DashboardCard
+          name="Total Processes"
+          value={stats.total}
+          icon={FileText}
+          color="blue"
+        />
+        <DashboardCard
+          name="Pending"
+          value={stats.pending}
+          icon={AlertCircle}
+          color="yellow"
+        />
+        <DashboardCard
+          name="In Progress"
+          value={stats.inProgress}
+          icon={Clock}
+          color="indigo"
+        />
+        <DashboardCard
+          name="Completed"
+          value={stats.completed}
+          icon={CheckCircle}
+          color="green"
+        />
+        <DashboardCard
+          name="Urgent"
+          value={stats.urgent}
+          icon={AlertCircle}
+          color="red"
+        />
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                  activeTab === tab.id
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.name}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* Recent Processes (table format) */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Recent Exit Processes</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exit Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredProcesses.slice(0, 5).map((process, index) => {
+                    const StatusIcon = getStatusIcon(process.status);
+                    return (
+                      <tr key={process.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-8 w-8">
+                              <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                                <span className="text-primary-600 font-semibold text-xs">
+                                  {process.employeeName.split(' ').map(n => n[0]).join('')}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="ml-3">
+                              <div className="text-sm font-medium text-gray-900">{process.employeeName}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{process.employeeDepartment || '-'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {process.exitDate instanceof Date ? process.exitDate.toLocaleDateString() : new Date(process.exitDate).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium", getStatusColor(process.status))}>
+                            {process.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium", getPriorityColor(process.priority))}>
+                            {process.priority}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 flex items-center gap-2">
+                          <StatusIcon className="w-4 h-4 text-gray-400" />
+                          {Math.round(getChecklistProgress(process.checklist))}%
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center space-x-2">
+                            <button onClick={() => handleViewProcess(process)} className="text-blue-600 hover:text-blue-900">
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => handleEditProcess(process)} className="text-green-600 hover:text-green-900">
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            {process.status === 'pending' && (
+                              <button onClick={() => handleStartProcess(process.id)} className="text-green-600 hover:text-green-900" title="Start Process">
+                                <Play className="w-4 h-4" />
+                              </button>
+                            )}
+                            {process.status === 'in_progress' && (
+                              <button onClick={() => handleCompleteProcess(process.id)} className="text-green-600 hover:text-green-900" title="Complete Process">
+                                <CheckCircle className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Processes Tab */}
+      {activeTab === 'processes' && (
+        <div className="space-y-6">
+          {/* Filters */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex flex-col md:flex-row md:items-center gap-4">
+              <div className="relative flex-1 min-w-[220px]">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search processes by employee name, email, or reason"
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                />
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                >
+                  <option value="all">All Priority</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                <select
+                  value={departmentFilter}
+                  onChange={(e) => setDepartmentFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                >
+                  <option value="all">All Departments</option>
+                  {[...new Set(exitProcesses.map(p => p.employeeDepartment))].map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Processes Table */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            {filteredProcesses.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No exit processes found</h3>
+                <p className="text-gray-600 mb-4">
                         {exitProcesses.length === 0 
                           ? 'No exit processes have been created yet. Click "Initiate Exit Process" to get started.'
                           : 'No processes match the current filters. Try adjusting your search criteria.'
                         }
-                      </Typography>
-                    </Box>
-                  </Box>
-                </TableCell>
-              </TableRow>
+                </p>
+                {exitProcesses.length === 0 && (
+                  <button
+                    onClick={handleCreateProcess}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2 mx-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Initiate Exit Process</span>
+                  </button>
+                )}
+              </div>
             ) : (
-              paginatedProcesses.map((process) => (
-                <TableRow key={process.id} hover>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exit Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredProcesses.map((process, index) => {
+                      const StatusIcon = getStatusIcon(process.status);
+                      return (
+                        <tr key={process.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="flex-shrink-0 h-8 w-8">
+                                <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                                  <span className="text-primary-600 font-semibold text-xs">
                         {process.employeeName.split(' ').map(n => n[0]).join('')}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight="bold">
-                          {process.employeeName}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          {process.employeeId} • {process.employeeDepartment}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CalendarIcon fontSize="small" color="action" />
-                      <Typography variant="body2">
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="ml-3">
+                                <div className="text-sm font-medium text-gray-900">{process.employeeName}</div>
+                                <div className="text-xs text-gray-500">{process.employeeId}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{process.employeeDepartment || '-'}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         {process.exitDate instanceof Date ? process.exitDate.toLocaleDateString() : new Date(process.exitDate).toLocaleDateString()}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
-                      {process.reason}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {getStatusIcon(process.status)}
-                      <Chip
-                        label={process.status.replace('_', ' ')}
-                        size="small"
-                        sx={{
-                          bgcolor: process.status === 'pending' ? '#ff9800' : 
-                                   process.status === 'in_progress' ? '#2196f3' : 
-                                   process.status === 'completed' ? '#4caf50' : '#f44336',
-                          color: 'white',
-                          fontWeight: 'bold',
-                          textTransform: 'capitalize'
-                        }}
-                      />
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {getPriorityIcon(process.priority)}
-                      <Chip
-                        label={process.priority}
-                        size="small"
-                        sx={{
-                          bgcolor: process.priority === 'urgent' ? '#f44336' : 
-                                   process.priority === 'high' ? '#ff9800' : 
-                                   process.priority === 'medium' ? '#2196f3' : '#4caf50',
-                          color: 'white',
-                          fontWeight: 'bold',
-                          textTransform: 'capitalize'
-                        }}
-                      />
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ width: '100%', maxWidth: 100 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                        <Typography variant="caption" color="textSecondary">
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium", getStatusColor(process.status))}>
+                              {process.status.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium", getPriorityColor(process.priority))}>
+                              {process.priority}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 flex items-center gap-2">
+                            <StatusIcon className="w-4 h-4 text-gray-400" />
                           {Math.round(getChecklistProgress(process.checklist))}%
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          {process.checklist.filter(item => item.status === 'completed').length}/
-                          {process.checklist.length}
-                        </Typography>
-                      </Box>
-                      <LinearProgress
-                        variant="determinate"
-                        value={getChecklistProgress(process.checklist)}
-                        sx={{ height: 6, borderRadius: 1 }}
-                      />
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {process.lastUpdated instanceof Date ? process.lastUpdated.toLocaleDateString() : new Date(process.lastUpdated).toLocaleDateString()}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      {process.lastUpdated instanceof Date ? process.lastUpdated.toLocaleTimeString() : new Date(process.lastUpdated).toLocaleTimeString()}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="View Details">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleViewProcess(process)}
-                          color="primary"
-                        >
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Edit Process">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditProcess(process)}
-                          color="primary"
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex items-center space-x-2">
+                              <button onClick={() => handleViewProcess(process)} className="text-blue-600 hover:text-blue-900">
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleEditProcess(process)} className="text-green-600 hover:text-green-900">
+                                <Edit className="w-4 h-4" />
+                              </button>
                       {process.status === 'pending' && (
-                        <Tooltip title="Start Process">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleStartProcess(process.id)}
-                            color="success"
-                          >
-                            <StartIcon />
-                          </IconButton>
-                        </Tooltip>
+                                <button onClick={() => handleStartProcess(process.id)} className="text-green-600 hover:text-green-900" title="Start Process">
+                                  <Play className="w-4 h-4" />
+                                </button>
                       )}
                       {process.status === 'in_progress' && (
-                        <Tooltip title="Complete Process">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleCompleteProcess(process.id)}
-                            color="success"
-                          >
-                            <CheckCircleIcon />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      <Tooltip title="Delete Process">
-                        <IconButton
-                          size="small"
-                          onClick={() => setDeleteConfirm({
-                            open: true,
-                            processId: process.id,
-                            processName: process.employeeName
-                          })}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))
+                                <button onClick={() => handleCompleteProcess(process.id)} className="text-green-600 hover:text-green-900" title="Complete Process">
+                                  <CheckCircle className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button onClick={() => handleDeleteProcess(process)} className="text-red-600 hover:text-red-900">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+          </div>
+        </div>
+      )}
 
-      {/* Create/Edit/View Dialog */}
-      <Dialog
-        open={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          {isViewMode ? 'View Exit Process' : isCreateMode ? 'Create New Exit Process' : 'Edit Exit Process'}
-        </DialogTitle>
-        <DialogContent>
-          {isViewMode && selectedProcess ? (
-            // View Mode - Display process details
-            <Box sx={{ mt: 2 }}>
-              <Grid container spacing={3}>
-                <Grid xs={12} md={6}>
-                  <Typography variant="h6" gutterBottom>Employee Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemIcon>
-                        <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-                          {selectedProcess.employeeName.split(' ').map(n => n[0]).join('')}
-                        </Avatar>
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Employee Name"
-                        secondary={selectedProcess.employeeName}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <AssignmentIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Department"
-                        secondary={selectedProcess.employeeDepartment}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <WarningIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Status"
-                        secondary={selectedProcess.status.replace('_', ' ')}
-                      />
-                      <Chip
-                        label={selectedProcess.status.replace('_', ' ')}
-                        size="small"
-                        sx={{
-                          bgcolor: selectedProcess.status === 'pending' ? '#ff9800' : 
-                                   selectedProcess.status === 'in_progress' ? '#2196f3' : 
-                                   selectedProcess.status === 'completed' ? '#4caf50' : '#f44336',
-                          color: 'white',
-                          textTransform: 'capitalize'
-                        }}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <WarningIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Priority"
-                        secondary={selectedProcess.priority}
-                      />
-                      <Chip
-                        label={selectedProcess.priority}
-                        size="small"
-                        sx={{
-                          bgcolor: selectedProcess.priority === 'urgent' ? '#f44336' : 
-                                   selectedProcess.priority === 'high' ? '#ff9800' : 
-                                   selectedProcess.priority === 'medium' ? '#2196f3' : '#4caf50',
-                          color: 'white',
-                          textTransform: 'capitalize'
-                        }}
-                      />
-                    </ListItem>
-                  </List>
-                </Grid>
-                <Grid xs={12} md={6}>
-                  <Typography variant="h6" gutterBottom>Process Details</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemIcon>
-                        <CalendarIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Exit Date"
-                        secondary={selectedProcess.exitDate instanceof Date ? selectedProcess.exitDate.toLocaleDateString() : new Date(selectedProcess.exitDate).toLocaleDateString()}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <ExitIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Reason"
-                        secondary={selectedProcess.reason}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <AssignmentIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Initiated By"
-                        secondary={selectedProcess.initiatedBy}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <CalendarIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Initiated At"
-                        secondary={selectedProcess.initiatedAt instanceof Date ? selectedProcess.initiatedAt.toLocaleDateString() : new Date(selectedProcess.initiatedAt).toLocaleDateString()}
-                      />
-                    </ListItem>
-                  </List>
-                </Grid>
-                <Grid xs={12}>
-                  <Typography variant="h6" gutterBottom>Checklist Progress</Typography>
-                  <Accordion>
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Typography>
-                        Checklist Items ({selectedProcess.checklist.filter(item => item.status === 'completed').length}/{selectedProcess.checklist.length})
-                      </Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <List dense>
-                        {selectedProcess.checklist.map((item) => (
-                          <ListItem key={item.id}>
-                            <ListItemIcon>
-                              <Checkbox 
-                                checked={item.status === 'completed'} 
-                                disabled 
-                                color="primary" 
-                              />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary={item.task}
-                              secondary={
-                                <>
-                                  <Typography variant="caption" display="block">
-                                    Assigned to: {item.assignedTo}
-                                  </Typography>
-                                  <Typography variant="caption" display="block">
-                                    Due: {item.dueDate instanceof Date ? item.dueDate.toLocaleDateString() : new Date(item.dueDate).toLocaleDateString()}
-                                  </Typography>
-                                  {item.notes && (
-                                    <Typography variant="caption" display="block">
-                                      Notes: {item.notes}
-                                    </Typography>
-                                  )}
-                                </>
-                              }
-                            />
-                            <Chip
-                              label={item.status}
-                              size="small"
-                              sx={{
-                                bgcolor: item.status === 'completed' ? '#4caf50' : 
-                                         item.status === 'in_progress' ? '#2196f3' : '#ff9800',
-                                color: 'white',
-                                textTransform: 'capitalize'
-                              }}
-                            />
-                          </ListItem>
-                        ))}
-                      </List>
-                    </AccordionDetails>
-                  </Accordion>
-                </Grid>
-              </Grid>
-            </Box>
-          ) : (
-            // Create/Edit Mode - Show form
-            <Box sx={{ mt: 2 }}>
-              <Grid container spacing={3}>
-                <Grid xs={12} md={6}>
-                  <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel>Select Employee *</InputLabel>
-                    <Select
-                      value={formData.employeeId}
-                      label="Select Employee *"
-                      onChange={(e) => {
-                        const selectedEmployee = employees.find(emp => emp.id === e.target.value);
-                        if (selectedEmployee) {
-                          setFormData(prev => ({
-                            ...prev,
-                            employeeId: selectedEmployee.id,
-                            employeeName: selectedEmployee.name,
-                            employeeEmail: selectedEmployee.email,
-                            employeeDepartment: selectedEmployee.department
-                          }));
-                        }
-                      }}
+      {/* Other tabs content will be added later */}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreateModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-3xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Create Exit Process</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID *</label>
+                    <input
+                      type="text"
+                      value={formData.employeeId || ''}
+                      onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2",
+                        (formData.employeeId || '').trim() ? "border-gray-300 focus:ring-primary-500" : "border-red-300 focus:ring-red-500"
+                      )}
+                      placeholder="Enter employee ID"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee Name *</label>
+                    <input
+                      type="text"
+                      value={formData.employeeName || ''}
+                      onChange={(e) => setFormData({ ...formData, employeeName: e.target.value })}
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2",
+                        (formData.employeeName || '').trim() ? "border-gray-300 focus:ring-primary-500" : "border-red-300 focus:ring-red-500"
+                      )}
+                      placeholder="Enter employee name"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee Email *</label>
+                    <input
+                      type="email"
+                      value={formData.employeeEmail || ''}
+                      onChange={(e) => setFormData({ ...formData, employeeEmail: e.target.value })}
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2",
+                        /.+@.+\..+/.test((formData.employeeEmail || '').trim()) ? "border-gray-300 focus:ring-primary-500" : "border-red-300 focus:ring-red-500"
+                      )}
+                      placeholder="Enter employee email"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                    <input
+                      type="text"
+                      value={formData.employeeDepartment || ''}
+                      onChange={(e) => setFormData({ ...formData, employeeDepartment: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      placeholder="Enter department"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Exit Date</label>
+                    <input
+                      type="date"
+                      value={formData.exitDate ? (formData.exitDate instanceof Date ? formData.exitDate.toISOString().split('T')[0] : new Date(formData.exitDate).toISOString().split('T')[0]) : ''}
+                      onChange={(e) => setFormData({ ...formData, exitDate: new Date(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                    <select
+                      value={formData.priority || 'medium'}
+                      onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     >
-                      {employees.map((employee) => (
-                        <MenuItem key={employee.id} value={employee.id}>
-                          {employee.name} - {employee.department}
-                        </MenuItem>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+                  <textarea
+                    value={formData.reason || ''}
+                    onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    rows={3}
+                    placeholder="Enter exit reason"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={formData.notes || ''}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    rows={2}
+                    placeholder="Additional notes"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveProcess}
+                disabled={!isFormValid}
+                className={cn(
+                  "px-4 py-2 rounded-lg transition-colors",
+                  isFormValid
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                )}
+              >
+                Create Process
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Modal - grouped sections, read-only */}
+      {showViewModal && selectedProcess && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[200] p-3">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto z-[210]">
+            <div className="p-4">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-1.5 bg-primary-100 rounded-lg">
+                    <Eye className="w-5 h-5 text-primary-600" />
+                </div>
+                  <h3 className="text-base font-semibold text-gray-900">Exit Process Details</h3>
+              </div>
+              <button
+                onClick={() => setShowViewModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                  <X className="w-4 h-4" />
+              </button>
+            </div>
+              {/* Process Details Content */}
+              <div className="space-y-6">
+                {/* Process Header */}
+                <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+                    <span className="text-primary-600 font-semibold text-xl">
+                      {selectedProcess.employeeName.split(' ').map(n => n[0]).join('')}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-xl font-semibold text-gray-900">{selectedProcess.employeeName}</h4>
+                    <p className="text-gray-600">{selectedProcess.employeeId}</p>
+                    <div className="flex items-center space-x-4 mt-2">
+                      <span className={cn(
+                        "px-2 py-1 text-xs font-medium rounded-full",
+                        selectedProcess.status === 'pending' ? "bg-yellow-100 text-yellow-800" :
+                        selectedProcess.status === 'in_progress' ? "bg-blue-100 text-blue-800" :
+                        selectedProcess.status === 'completed' ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      )}>
+                        {selectedProcess.status.charAt(0).toUpperCase() + selectedProcess.status.slice(1)}
+                      </span>
+                      <span className="text-sm text-gray-500">{selectedProcess.employeeDepartment}</span>
+                      <span className="text-sm text-gray-500">{selectedProcess.priority}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Basic Information */}
+                  <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Basic Information</h5>
+                    <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <Users className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div>
+                          <p className="text-sm font-medium text-gray-900">Employee Name</p>
+                          <p className="text-sm text-gray-600">{selectedProcess.employeeName}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                          <p className="text-sm font-medium text-gray-900">Employee ID</p>
+                          <p className="text-sm text-gray-600">{selectedProcess.employeeId}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                          <Users className="w-4 h-4 text-purple-600" />
+                      </div>
+                      <div>
+                          <p className="text-sm font-medium text-gray-900">Email</p>
+                          <p className="text-sm text-gray-600">{selectedProcess.employeeEmail || '—'}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Users className="w-4 h-4 text-orange-600" />
+                      </div>
+                      <div>
+                          <p className="text-sm font-medium text-gray-900">Department</p>
+                          <p className="text-sm text-gray-600">{selectedProcess.employeeDepartment || '—'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                  {/* Process Information */}
+                  <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Process Information</h5>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Process ID</span>
+                        <span className="text-sm text-gray-900">{selectedProcess.id}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Status</span>
+                        <span className={cn(
+                          "px-2 py-1 text-xs font-medium rounded-full",
+                          selectedProcess.status === 'pending' ? "bg-yellow-100 text-yellow-800" :
+                          selectedProcess.status === 'in_progress' ? "bg-blue-100 text-blue-800" :
+                          selectedProcess.status === 'completed' ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                        )}>
+                          {selectedProcess.status.charAt(0).toUpperCase() + selectedProcess.status.slice(1)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Priority</span>
+                        <span className={cn(
+                          "px-2 py-1 text-xs font-medium rounded-full",
+                          selectedProcess.priority === 'urgent' ? "bg-red-100 text-red-800" :
+                          selectedProcess.priority === 'high' ? "bg-orange-100 text-orange-800" :
+                          selectedProcess.priority === 'medium' ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"
+                        )}>
+                          {selectedProcess.priority.charAt(0).toUpperCase() + selectedProcess.priority.slice(1)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Exit Date</span>
+                        <span className="text-sm text-gray-900">
+                          {selectedProcess.exitDate instanceof Date 
+                            ? selectedProcess.exitDate.toLocaleDateString() 
+                            : new Date(selectedProcess.exitDate).toLocaleDateString()}
+                        </span>
+                    </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Initiated By</span>
+                        <span className="text-sm text-gray-900">{selectedProcess.initiatedBy}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Initiated At</span>
+                        <span className="text-sm text-gray-900">
+                          {selectedProcess.initiatedAt instanceof Date 
+                            ? selectedProcess.initiatedAt.toLocaleDateString() 
+                            : new Date(selectedProcess.initiatedAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Information */}
+                  <div className="space-y-4">
+                  <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Additional Information</h5>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500 mb-2">Exit Reason</p>
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-900">{selectedProcess.reason}</p>
+                      </div>
+                    </div>
+                    {selectedProcess.notes && (
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 mb-2">Notes</p>
+                        <div className="p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-900">{selectedProcess.notes}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Checklist Progress */}
+                {selectedProcess.checklist && selectedProcess.checklist.length > 0 && (
+                  <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Checklist Progress</h5>
+                    <div className="space-y-2">
+                      {selectedProcess.checklist.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className={cn(
+                              "w-4 h-4 rounded-full flex items-center justify-center",
+                              item.status === 'completed' ? "bg-green-100" : 
+                              item.status === 'in_progress' ? "bg-yellow-100" : "bg-gray-100"
+                            )}>
+                              {item.status === 'completed' && <CheckCircle className="w-3 h-3 text-green-600" />}
+                              {item.status === 'in_progress' && <Clock className="w-3 h-3 text-yellow-600" />}
+                              {item.status === 'pending' && <div className="w-2 h-2 bg-gray-400 rounded-full" />}
+              </div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{item.task}</p>
+                              <p className="text-xs text-gray-500">{item.category} • {item.assignedTo}</p>
+                            </div>
+                          </div>
+                          <span className={cn(
+                            "px-2 py-1 text-xs font-medium rounded-full",
+                            item.status === 'completed' ? "bg-green-100 text-green-800" :
+                            item.status === 'in_progress' ? "bg-yellow-100 text-yellow-800" : "bg-gray-100 text-gray-800"
+                          )}>
+                            {item.status.replace('_', ' ')}
+                          </span>
+                        </div>
                       ))}
-                    </Select>
-                  </FormControl>
+                    </div>
+                  </div>
+                )}
+            </div>
 
-                  <TextField
-                    fullWidth
-                    label="Employee Name"
-                    value={formData.employeeName}
-                    disabled
-                    sx={{ mb: 2 }}
-                  />
+              {/* Modal Footer */}
+              <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+              <button
+                onClick={() => setShowViewModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-                  <TextField
-                    fullWidth
-                    label="Employee Email"
-                    value={formData.employeeEmail}
-                    disabled
-                    sx={{ mb: 2 }}
-                  />
-
-                  <TextField
-                    fullWidth
-                    label="Department"
-                    value={formData.employeeDepartment}
-                    disabled
-                    sx={{ mb: 2 }}
-                  />
-                </Grid>
-
-                <Grid xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Exit Date"
+      {/* Edit Modal */}
+      {showEditModal && selectedProcess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowEditModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Edit Exit Process</h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID *</label>
+                    <input
+                      type="text"
+                      value={formData.employeeId || ''}
+                      onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2",
+                        (formData.employeeId || '').trim() ? "border-gray-300 focus:ring-primary-500" : "border-red-300 focus:ring-red-500"
+                      )}
+                      placeholder="Enter employee ID"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee Name *</label>
+                    <input
+                      type="text"
+                      value={formData.employeeName || ''}
+                      onChange={(e) => setFormData({ ...formData, employeeName: e.target.value })}
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2",
+                        (formData.employeeName || '').trim() ? "border-gray-300 focus:ring-primary-500" : "border-red-300 focus:ring-red-500"
+                      )}
+                      placeholder="Enter employee name"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee Email *</label>
+                    <input
+                      type="email"
+                      value={formData.employeeEmail || ''}
+                      onChange={(e) => setFormData({ ...formData, employeeEmail: e.target.value })}
+                      className={cn(
+                        "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2",
+                        /.+@.+\..+/.test((formData.employeeEmail || '').trim()) ? "border-gray-300 focus:ring-primary-500" : "border-red-300 focus:ring-red-500"
+                      )}
+                      placeholder="Enter employee email"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                    <input
+                      type="text"
+                      value={formData.employeeDepartment || ''}
+                      onChange={(e) => setFormData({ ...formData, employeeDepartment: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      placeholder="Enter department"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Exit Date</label>
+                    <input
                     type="date"
-                    value={formData.exitDate && formData.exitDate instanceof Date && !isNaN(formData.exitDate.getTime()) 
-                      ? formData.exitDate.toISOString().split('T')[0] 
-                      : ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, exitDate: new Date(e.target.value) }))}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{ mb: 2 }}
-                  />
-
-                  <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel>Priority</InputLabel>
-                    <Select
-                      value={formData.priority}
-                      label="Priority"
-                      onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as any }))}
+                      value={formData.exitDate ? (formData.exitDate instanceof Date ? formData.exitDate.toISOString().split('T')[0] : new Date(formData.exitDate).toISOString().split('T')[0]) : ''}
+                      onChange={(e) => setFormData({ ...formData, exitDate: new Date(e.target.value) })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                    <select
+                      value={formData.priority || 'medium'}
+                      onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     >
-                      <MenuItem value="low">Low</MenuItem>
-                      <MenuItem value="medium">Medium</MenuItem>
-                      <MenuItem value="high">High</MenuItem>
-                      <MenuItem value="urgent">Urgent</MenuItem>
-                    </Select>
-                  </FormControl>
-
-                  <TextField
-                    fullWidth
-                    label="Reason for Exit *"
-                    value={formData.reason}
-                    onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
-                    multiline
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+                  <textarea
+                    value={formData.reason || ''}
+                    onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     rows={3}
-                    sx={{ mb: 2 }}
-                    required
+                    placeholder="Enter exit reason"
                   />
-
-                  <TextField
-                    fullWidth
-                    label="Additional Notes"
-                    value={formData.notes}
-                    onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                    multiline
-                    rows={3}
-                    sx={{ mb: 2 }}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={formData.notes || ''}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    rows={2}
+                    placeholder="Additional notes"
                   />
-                </Grid>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveProcess}
+                disabled={!isFormValid}
+                className={cn(
+                  "px-4 py-2 rounded-lg transition-colors",
+                  isFormValid
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-gray-300 text-gray-600 cursor-not-allowed"
+                )}
+              >
+                Update Process
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-                <Grid xs={12}>
-                  <Typography variant="h6" gutterBottom>
-                    Default Checklist Items
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                    The following checklist items will be automatically created for this exit process:
-                  </Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemIcon>
-                        <Checkbox checked disabled color="primary" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Return company equipment (IT Department)"
-                        secondary="Laptop, phone, access cards, etc. - Due in 7 days"
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <Checkbox checked disabled color="primary" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Complete exit interview (HR Department)"
-                        secondary="Final exit interview with HR - Due in 3 days"
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <Checkbox checked disabled color="primary" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Return access badges (Security Department)"
-                        secondary="Building access, parking, etc. - Due in 1 day"
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <Checkbox checked disabled color="primary" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Final salary and benefits processing (Finance Department)"
-                        secondary="Final paycheck, benefits termination - Due in 14 days"
-                      />
-                    </ListItem>
-                  </List>
-                </Grid>
-              </Grid>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsDialogOpen(false)}>
-            {isViewMode ? 'Close' : 'Cancel'}
-          </Button>
-          {!isViewMode && (
-            <Button 
-              onClick={async () => {
-                if (!formData.employeeId || !formData.employeeName || !formData.reason) {
-                  setSnackbar({
-                    open: true,
-                    message: 'Please fill in all required fields (Employee, Reason)',
-                    severity: 'error'
-                  });
-                  return;
-                }
-
-                try {
-                  if (isCreateMode) {
-                    // Create new process - remove the id field to let Firebase generate it
-                    const processData = {
-                      employeeId: formData.employeeId,
-                      employeeName: formData.employeeName,
-                      employeeEmail: formData.employeeEmail || '',
-                      employeeDepartment: formData.employeeDepartment || '',
-                      exitDate: formData.exitDate || new Date(),
-                      reason: formData.reason,
-                      status: 'pending' as const,
-                      priority: formData.priority || 'medium',
-                      checklist: formData.checklist && formData.checklist.length > 0 ? formData.checklist : [
-                        {
-                          id: Date.now().toString() + '_1',
-                          task: 'Return company equipment',
-                          category: 'it' as const,
-                          status: 'pending' as const,
-                          assignedTo: 'IT Department',
-                          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-                          notes: 'Laptop, phone, access cards, etc.'
-                        },
-                        {
-                          id: Date.now().toString() + '_2',
-                          task: 'Complete exit interview',
-                          category: 'hr' as const,
-                          status: 'pending' as const,
-                          assignedTo: 'HR Department',
-                          dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-                          notes: 'Final exit interview with HR'
-                        },
-                        {
-                          id: Date.now().toString() + '_3',
-                          task: 'Return access badges',
-                          category: 'security' as const,
-                          status: 'pending' as const,
-                          assignedTo: 'Security Department',
-                          dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-                          notes: 'Building access, parking, etc.'
-                        },
-                        {
-                          id: Date.now().toString() + '_4',
-                          task: 'Final salary and benefits processing',
-                          category: 'finance' as const,
-                          status: 'pending' as const,
-                          assignedTo: 'Finance Department',
-                          dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-                          notes: 'Final paycheck, benefits termination'
-                        }
-                      ],
-                      notes: formData.notes || '',
-                      initiatedBy: 'Current User',
-                      initiatedAt: new Date(),
-                      lastUpdated: new Date()
-                    };
-
-                    const response = await firebaseService.addDocument('exitProcesses', processData);
-                    console.log('Firebase response:', response);
-                    if (response.success && response.data) {
-                      const createdProcess = response.data as ExitProcess;
-                      console.log('Created process with ID:', createdProcess.id);
-                      
-                      setExitProcesses(prev => [createdProcess, ...prev]);
-                      setSnackbar({
-                        open: true,
-                        message: 'Exit process created successfully',
-                        severity: 'success'
-                      });
-                      setIsDialogOpen(false);
-                    } else {
-                      throw new Error(response.error || 'Failed to create exit process');
-                    }
-                  } else {
-                    // Update existing process
-                    if (selectedProcess) {
-                      const updateData = {
-                        employeeId: formData.employeeId || selectedProcess.employeeId,
-                        employeeName: formData.employeeName || selectedProcess.employeeName,
-                        employeeEmail: formData.employeeEmail || selectedProcess.employeeEmail,
-                        employeeDepartment: formData.employeeDepartment || selectedProcess.employeeDepartment,
-                        exitDate: formData.exitDate || selectedProcess.exitDate,
-                        reason: formData.reason || selectedProcess.reason,
-                        priority: formData.priority || selectedProcess.priority,
-                        notes: formData.notes || selectedProcess.notes,
-                        lastUpdated: new Date()
-                      };
-                      
-                      const response = await firebaseService.updateDocument('exitProcesses', selectedProcess.id, updateData);
-                      
-                      if (response.success) {
-                        setExitProcesses(prev => prev.map(process =>
-                          process.id === selectedProcess.id
-                            ? { ...process, ...updateData }
-                            : process
-                        ));
-                        setSnackbar({
-                          open: true,
-                          message: 'Exit process updated successfully',
-                          severity: 'success'
-                        });
-                        setIsDialogOpen(false);
-                      } else {
-                        throw new Error(response.error || 'Failed to update exit process');
-                      }
-                    }
-                  }
-                } catch (error) {
-                  console.error('Error saving exit process:', error);
-                  setSnackbar({
-                    open: true,
-                    message: 'Error saving exit process: ' + (error instanceof Error ? error.message : 'Unknown error'),
-                    severity: 'error'
-                  });
-                }
-              }}
-              variant="contained" 
-              color="primary"
-              disabled={!formData.employeeId || !formData.employeeName || !formData.reason}
-            >
-              {isCreateMode ? 'Create Process' : 'Update Process'}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
-
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-      >
-        <Alert 
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
-          severity={snackbar.severity}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteConfirm.open}
-        onClose={() => setDeleteConfirm(prev => ({ ...prev, open: false }))}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <DeleteIcon color="error" />
-            <Typography variant="h6">Confirm Delete</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" sx={{ mt: 2 }}>
-            Are you sure you want to delete the exit process for <strong>{deleteConfirm.processName}</strong>?
-          </Typography>
-          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-            This action cannot be undone. All process data and checklist items will be permanently removed.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => setDeleteConfirm(prev => ({ ...prev, open: false }))}
-            color="primary"
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedProcess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowDeleteModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Confirm Delete</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to delete the exit process for <strong>{selectedProcess.employeeName}</strong>? 
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           >
             Cancel
-          </Button>
-          <Button 
-            onClick={() => {
-              if (deleteConfirm.processId) {
-                handleDeleteProcess(deleteConfirm.processId);
-                setDeleteConfirm(prev => ({ ...prev, open: false }));
-              }
-            }}
-            variant="contained" 
-            color="error"
-            startIcon={<DeleteIcon />}
+              </button>
+              <button
+                onClick={confirmDeleteProcess}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
           >
             Delete Process
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

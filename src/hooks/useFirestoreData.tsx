@@ -1,8 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
 import firebaseService from '../services/firebaseService';
 
+interface UseFirestoreDataOptions {
+  filters?: any[];
+  orderBy?: any;
+  limit?: number | null;
+  autoFetch?: boolean;
+  onSuccess?: ((data: any) => void) | null;
+  onError?: ((error: any) => void) | null;
+}
+
+interface UseFirestoreDataReturn {
+  data: any[];
+  loading: boolean;
+  error: string | null;
+  message: string;
+  fetchData: () => Promise<void>;
+  updateDocument: (updateData: any) => Promise<{ success: boolean; error?: string }>;
+  refresh: () => Promise<void>;
+  addItem: (itemData: any) => Promise<{ success: boolean; data?: any; error?: string | undefined }>;
+  updateItem: (itemId: string, updateData: any) => Promise<{ success: boolean; data?: any; error?: string | undefined }>;
+  deleteItem: (itemId: string) => Promise<{ success: boolean; error?: string | undefined }>;
+}
+
 // Custom hook for fetching Firestore data with fallback
-export const useFirestoreData = (collectionName, options = {}) => {
+export const useFirestoreData = (collectionName: string, options: UseFirestoreDataOptions = {}): UseFirestoreDataReturn => {
   const {
     filters = [],
     orderBy = null,
@@ -12,10 +34,10 @@ export const useFirestoreData = (collectionName, options = {}) => {
     onError = null
   } = options;
 
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [message, setMessage] = useState('');
+  const [data, setData] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string>('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -24,7 +46,7 @@ export const useFirestoreData = (collectionName, options = {}) => {
       setMessage('');
 
       console.log(`Fetching ${collectionName} with fallback...`);
-      const result = await firebaseService.getCollectionWithFallback(
+      const result = await (firebaseService as any).getCollectionWithFallback(
         collectionName,
         [], // Use default sample data
         filters,
@@ -33,7 +55,7 @@ export const useFirestoreData = (collectionName, options = {}) => {
       );
 
       if (result.success) {
-        setData(result.data);
+        setData(result.data || []);
         setMessage(result.message || '');
         
         if (onSuccess) {
@@ -52,7 +74,7 @@ export const useFirestoreData = (collectionName, options = {}) => {
         console.error(`❌ Failed to fetch ${collectionName}:`, result.error);
       }
     } catch (err) {
-      const errorMessage = err.message || 'An unexpected error occurred';
+      const errorMessage = (err as Error).message || 'An unexpected error occurred';
       setError(errorMessage);
       setData([]);
       
@@ -66,11 +88,11 @@ export const useFirestoreData = (collectionName, options = {}) => {
     }
   }, [collectionName, filters, orderBy, limit, onSuccess, onError]);
 
-  const refresh = useCallback(() => {
-    fetchData();
+  const refresh = useCallback(async () => {
+    await fetchData();
   }, [fetchData]);
 
-  const addItem = useCallback(async (itemData) => {
+  const addItem = useCallback(async (itemData: any) => {
     try {
       const result = await firebaseService.addDocument(collectionName, itemData);
       
@@ -83,11 +105,11 @@ export const useFirestoreData = (collectionName, options = {}) => {
       }
     } catch (error) {
       console.error(`Error adding item to ${collectionName}:`, error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }, [collectionName, fetchData]);
 
-  const updateItem = useCallback(async (itemId, updateData) => {
+  const updateItem = useCallback(async (itemId: string, updateData: any) => {
     try {
       const result = await firebaseService.updateDocument(collectionName, itemId, updateData);
       
@@ -100,11 +122,11 @@ export const useFirestoreData = (collectionName, options = {}) => {
       }
     } catch (error) {
       console.error(`Error updating item in ${collectionName}:`, error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }, [collectionName, fetchData]);
 
-  const deleteItem = useCallback(async (itemId) => {
+  const deleteItem = useCallback(async (itemId: string) => {
     try {
       const result = await firebaseService.deleteDocument(collectionName, itemId);
       
@@ -117,7 +139,7 @@ export const useFirestoreData = (collectionName, options = {}) => {
       }
     } catch (error) {
       console.error(`Error deleting item from ${collectionName}:`, error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }, [collectionName, fetchData]);
 
@@ -134,6 +156,7 @@ export const useFirestoreData = (collectionName, options = {}) => {
     error,
     message,
     fetchData,
+    updateDocument: async () => ({ success: false, error: 'Not implemented' }),
     refresh,
     addItem,
     updateItem,
@@ -142,12 +165,12 @@ export const useFirestoreData = (collectionName, options = {}) => {
 };
 
 // Hook for fetching a single document
-export const useFirestoreDocument = (collectionName, documentId, options = {}) => {
+export const useFirestoreDocument = (collectionName: string, documentId: string, options: any = {}) => {
   const { autoFetch = true, onSuccess = null, onError = null } = options;
 
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchDocument = useCallback(async () => {
     if (!documentId) {
@@ -181,7 +204,7 @@ export const useFirestoreDocument = (collectionName, documentId, options = {}) =
         console.error(`❌ Failed to fetch document ${documentId}:`, result.error);
       }
     } catch (err) {
-      const errorMessage = err.message || 'An unexpected error occurred';
+      const errorMessage = (err as Error).message || 'An unexpected error occurred';
       setError(errorMessage);
       setData(null);
       
@@ -195,7 +218,7 @@ export const useFirestoreDocument = (collectionName, documentId, options = {}) =
     }
   }, [collectionName, documentId, onSuccess, onError]);
 
-  const updateDocument = useCallback(async (updateData) => {
+  const updateDocument = useCallback(async (updateData: any) => {
     try {
       const result = await firebaseService.updateDocument(collectionName, documentId, updateData);
       
@@ -208,7 +231,7 @@ export const useFirestoreDocument = (collectionName, documentId, options = {}) =
       }
     } catch (error) {
       console.error(`Error updating document ${documentId}:`, error);
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }, [collectionName, documentId, fetchDocument]);
 

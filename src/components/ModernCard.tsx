@@ -9,9 +9,27 @@ import {
   Grow,
   useTheme,
   alpha,
+  SxProps,
+  Theme,
 } from '@mui/material';
 
-const ModernCard = ({
+interface ModernCardProps {
+  title?: string;
+  subtitle?: string;
+  value?: string | number;
+  icon?: React.ReactNode;
+  color?: 'primary' | 'secondary' | 'success' | 'error' | 'warning' | 'info';
+  trend?: 'up' | 'down' | 'neutral';
+  trendValue?: string | number;
+  trendColor?: 'success' | 'error' | 'warning' | 'info';
+  onClick?: () => void;
+  children?: React.ReactNode;
+  sx?: SxProps<Theme>;
+  delay?: number;
+  [key: string]: any;
+}
+
+const ModernCard: React.FC<ModernCardProps> = ({
   title,
   subtitle,
   value,
@@ -28,7 +46,7 @@ const ModernCard = ({
 }) => {
   const theme = useTheme();
 
-  const getColorGradient = (colorName) => {
+  const getColorGradient = (colorName: string) => {
     const gradients = {
       primary: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
       success: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
@@ -36,10 +54,10 @@ const ModernCard = ({
       error: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
       info: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
     };
-    return gradients[colorName] || gradients.primary;
+    return gradients[colorName as keyof typeof gradients] || gradients.primary;
   };
 
-  const getTrendColor = (trendColorName) => {
+  const getTrendColor = (trendColorName: string) => {
     const colors = {
       success: theme.palette.success.main,
       warning: theme.palette.warning.main,
@@ -47,7 +65,7 @@ const ModernCard = ({
       info: theme.palette.info.main,
       primary: theme.palette.primary.main,
     };
-    return colors[trendColorName] || colors.success;
+    return colors[trendColorName as keyof typeof colors] || colors.success;
   };
 
   return (

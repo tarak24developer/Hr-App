@@ -14,9 +14,21 @@ import {
   Grow,
   useTheme,
   alpha,
+  SxProps,
+  Theme,
 } from '@mui/material';
 
-const ModernList = ({
+interface ModernListProps {
+  items?: any[];
+  renderItem?: (item: any, index: number) => React.ReactNode;
+  emptyMessage?: string;
+  emptyIcon?: React.ReactNode;
+  loading?: boolean;
+  sx?: SxProps<Theme>;
+  [key: string]: any;
+}
+
+const ModernList: React.FC<ModernListProps> = ({
   items = [],
   renderItem,
   emptyMessage = "No items found",
@@ -92,7 +104,7 @@ const ModernList = ({
       {items.map((item, index) => (
         <Grow in timeout={800 + index * 100} key={item.id || index}>
           {renderItem ? (
-            renderItem(item, index)
+            <>{renderItem(item, index)}</>
           ) : (
             <ListItem>
               <ListItemAvatar>
@@ -131,7 +143,7 @@ const ModernList = ({
                     )}
                     {item.details && (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        {item.details.map((detail, detailIndex) => (
+                        {item.details.map((detail: any, detailIndex: number) => (
                           <Box key={detailIndex} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             {detail.icon && detail.icon}
                             <Typography variant="caption" color="text.secondary">
@@ -147,14 +159,14 @@ const ModernList = ({
               <ListItemSecondaryAction>
                 {item.actions && (
                   <Box sx={{ display: 'flex', gap: 1 }}>
-                    {item.actions.map((action, actionIndex) => (
+                    {item.actions.map((action: any, actionIndex: number) => (
                       <Tooltip key={actionIndex} title={action.tooltip}>
                         <IconButton
                           onClick={action.onClick}
                           sx={{
                             color: action.color || 'primary.main',
                             '&:hover': {
-                              background: alpha(theme.palette[action.color || 'primary'].main, 0.1),
+                              background: alpha((theme.palette as any)[action.color || 'primary'].main, 0.1),
                             },
                           }}
                         >

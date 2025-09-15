@@ -1,33 +1,53 @@
 import firebaseService from './firebaseService';
 import { User, UserRole } from '../types';
 
+interface UserFilters {
+  role?: string;
+  department?: string;
+  status?: string;
+  isActive?: boolean;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  limit?: number;
+  [key: string]: any;
+}
+
+interface QueryOptions {
+  where?: Array<{ field: string; operator: string; value: any }>;
+  orderBy?: Array<{ field: string; direction: 'asc' | 'desc' }>;
+  limit?: number;
+  [key: string]: any;
+}
+
 class UserService {
+  private collection: string;
+
   constructor() {
     this.collection = 'users';
   }
 
   // Get all users
-  async getUsers(filters = {}) {
+  async getUsers(filters: UserFilters = {}) {
     try {
-      const options = {};
+      const options: QueryOptions = {};
       
       // Build where conditions
-      const whereConditions = [];
+      const whereConditions: Array<{ field: string; operator: string; value: any }> = [];
       
-      if (filters.role) {
-        whereConditions.push({ field: 'role', operator: '==', value: filters.role });
+      if (filters['role']) {
+        whereConditions.push({ field: 'role', operator: '==', value: filters['role'] });
       }
       
-      if (filters.department) {
-        whereConditions.push({ field: 'department', operator: '==', value: filters.department });
+      if (filters['department']) {
+        whereConditions.push({ field: 'department', operator: '==', value: filters['department'] });
       }
       
-      if (filters.status) {
-        whereConditions.push({ field: 'status', operator: '==', value: filters.status });
+      if (filters['status']) {
+        whereConditions.push({ field: 'status', operator: '==', value: filters['status'] });
       }
 
-      if (filters.isActive !== undefined) {
-        whereConditions.push({ field: 'isActive', operator: '==', value: filters.isActive });
+      if (filters['isActive'] !== undefined) {
+        whereConditions.push({ field: 'isActive', operator: '==', value: filters['isActive'] });
       }
 
       if (whereConditions.length > 0) {
@@ -35,18 +55,18 @@ class UserService {
       }
 
       // Apply ordering
-      if (filters.sortBy) {
-        options.orderBy = [{ 
-          field: filters.sortBy, 
-          direction: filters.sortOrder || 'asc' 
+      if (filters['sortBy']) {
+        options.orderBy = [{
+          field: filters['sortBy'],
+          direction: (filters['sortOrder'] || 'asc') as 'asc' | 'desc'
         }];
       } else {
         options.orderBy = [{ field: 'firstName', direction: 'asc' }];
       }
 
       // Apply limit
-      if (filters.limit) {
-        options.limit = filters.limit;
+      if (filters['limit']) {
+        options.limit = filters['limit'];
       }
 
       const result = await firebaseService.getCollection(this.collection, options);
@@ -137,7 +157,6 @@ class UserService {
     try {
       // Since Firestore doesn't support full-text search,
       // we'll implement a simple prefix search
-      const searchUpper = searchTerm.toUpperCase();
       
       // Search by name (prefix)
       const nameResults = await firebaseService.queryDocuments(
@@ -161,7 +180,7 @@ class UserService {
         ...(emailResults.success ? emailResults.data || [] : [])
       ];
       const uniqueResults = allResults.filter((user, index, self) => 
-        index === self.findIndex(u => u.id === user.id)
+        index === self.findIndex(u => u['id'] === user['id'])
       );
 
       return uniqueResults;
@@ -212,7 +231,7 @@ class UserService {
       }
       
       const allUsers = allUsersResult.data || [];
-      const activeUsers = allUsers.filter(user => user.isActive !== false);
+      const activeUsers = allUsers.filter(user => user['isActive'] !== false);
       
       const stats = {
         total: allUsers.length,
@@ -224,8 +243,8 @@ class UserService {
 
       // Count by role and department
       activeUsers.forEach(user => {
-        stats.roles[user.role] = (stats.roles[user.role] || 0) + 1;
-        stats.departments[user.department] = (stats.departments[user.department] || 0) + 1;
+        (stats as any).roles[user['role']] = ((stats as any).roles[user['role']] || 0) + 1;
+        (stats as any).departments[user['department']] = ((stats as any).departments[user['department']] || 0) + 1;
       });
 
       return stats;
@@ -236,27 +255,27 @@ class UserService {
   }
 
   // Get paginated users
-  async getPaginatedUsers(pageSize = 10, lastDoc = null, filters = {}) {
+  async getPaginatedUsers(pageSize = 10, _lastDoc: any = null, filters: UserFilters = {}) {
     try {
-      const options = {};
+      const options: QueryOptions = {};
       
       // Build where conditions
-      const whereConditions = [];
+      const whereConditions: Array<{ field: string; operator: string; value: any }> = [];
       
-      if (filters.role) {
-        whereConditions.push({ field: 'role', operator: '==', value: filters.role });
+      if (filters['role']) {
+        whereConditions.push({ field: 'role', operator: '==', value: filters['role'] });
       }
       
-      if (filters.department) {
-        whereConditions.push({ field: 'department', operator: '==', value: filters.department });
+      if (filters['department']) {
+        whereConditions.push({ field: 'department', operator: '==', value: filters['department'] });
       }
       
-      if (filters.status) {
-        whereConditions.push({ field: 'status', operator: '==', value: filters.status });
+      if (filters['status']) {
+        whereConditions.push({ field: 'status', operator: '==', value: filters['status'] });
       }
 
-      if (filters.isActive !== undefined) {
-        whereConditions.push({ field: 'isActive', operator: '==', value: filters.isActive });
+      if (filters['isActive'] !== undefined) {
+        whereConditions.push({ field: 'isActive', operator: '==', value: filters['isActive'] });
       }
 
       if (whereConditions.length > 0) {
@@ -302,7 +321,7 @@ class UserService {
       }
       
       const users = usersResult.data || [];
-      const departments = [...new Set(users.map(user => user.department))];
+      const departments = [...new Set(users.map(user => user['department']))];
       return departments.filter(dept => dept && dept.trim() !== '').sort();
     } catch (error) {
       console.error('Error fetching departments:', error);
@@ -321,7 +340,7 @@ class UserService {
       }
       
       const users = usersResult.data || [];
-      const roles = [...new Set(users.map(user => user.role))];
+      const roles = [...new Set(users.map(user => user['role']))];
       const filteredRoles = roles.filter(role => role && role.trim() !== '');
       
       // Ensure we always have the basic roles

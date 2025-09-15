@@ -25,7 +25,7 @@ const Login: React.FC = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors, isValid },
+    formState: { errors },
     reset
   } = useForm<LoginFormData>({
     mode: 'onChange'

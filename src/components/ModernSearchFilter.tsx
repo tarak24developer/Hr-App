@@ -11,12 +11,35 @@ import {
   Collapse,
   Grid,
   Typography,
-  IconButton,
-  Tooltip,
   Grow,
   useTheme,
   alpha,
+  SxProps,
+  Theme,
 } from '@mui/material';
+
+interface FilterOption {
+  value: string;
+  label: string;
+  field: string;
+  type?: string;
+  options?: Array<{ value: string; label: string }>;
+}
+
+interface ModernSearchFilterProps {
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  filters?: FilterOption[];
+  selectedFilters?: string[];
+  onFilterChange?: (filters: string[]) => void;
+  onClear?: () => void;
+  onSearch?: () => void;
+  placeholder?: string;
+  showAdvanced?: boolean;
+  onToggleAdvanced?: () => void;
+  sx?: SxProps<Theme>;
+  [key: string]: any;
+}
 import {
   Search as SearchIcon,
   FilterList as FilterIcon,
@@ -25,7 +48,7 @@ import {
   ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 
-const ModernSearchFilter = ({
+const ModernSearchFilter: React.FC<ModernSearchFilterProps> = ({
   searchValue = '',
   onSearchChange,
   filters = [],
@@ -36,12 +59,12 @@ const ModernSearchFilter = ({
   onToggleFilters,
   placeholder = "Search...",
   sx = {},
-  ...props
+  // ...props
 }) => {
   const theme = useTheme();
-  const [localFilters, setLocalFilters] = useState({});
+  const [localFilters, setLocalFilters] = useState<Record<string, any>>({});
 
-  const handleFilterChange = (field, value) => {
+  const handleFilterChange = (field: string, value: any) => {
     setLocalFilters(prev => ({
       ...prev,
       [field]: value
@@ -49,7 +72,7 @@ const ModernSearchFilter = ({
   };
 
   const handleApplyFilters = () => {
-    onFilterChange?.(localFilters);
+    onFilterChange?.(Object.keys(localFilters));
     onApplyFilters?.();
   };
 
@@ -164,7 +187,7 @@ const ModernSearchFilter = ({
             
             <Grid container spacing={3}>
               {filters.map((filter) => (
-                <Grid item xs={12} sm={6} md={4} key={filter.field}>
+                <Grid {...({ xs: 12, sm: 6, md: 4 } as any)} key={filter.field}>
                   {filter.type === 'select' ? (
                     <FormControl fullWidth size="small">
                       <InputLabel>{filter.label}</InputLabel>

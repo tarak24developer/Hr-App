@@ -1,64 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  CircularProgress,
-  Tooltip,
-  Pagination,
-  Alert,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Visibility as ViewIcon,
-  Delete as DeleteIcon,
-  Search as SearchIcon,
-  FilterList as FilterListIcon,
-  Category as CategoryIcon,
-  Computer as ComputerIcon,
-  Phone as PhoneIcon,
-  Print as PrinterIcon,
-  Chair as FurnitureIcon,
-  DirectionsCar as VehicleIcon,
-  Assignment as AssignmentIcon,
-  LocationOn as LocationIcon,
-  Build as BuildIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Error as ErrorIcon,
-  Refresh as RefreshIcon,
-  Download as DownloadIcon,
-  Archive as ArchiveIcon,
-  Person as PersonIcon
-} from '@mui/icons-material';
+  Plus,
+  Edit,
+  Eye,
+  Trash2,
+  Package,
+  Monitor,
+  Smartphone,
+  Printer,
+  Car,
+  UserCheck,
+  MapPin,
+  Wrench,
+  CheckCircle,
+  X,
+  Download,
+  User,
+  DollarSign,
+  AlertCircle,
+  Search,
+  Filter,
+  User as UserIcon,
+  Badge,
+  Calendar as CalendarIcon,
+  Clock as ClockIcon
+} from 'lucide-react';
+import { cn } from '../utils/cn';
 import firebaseService from '../services/firebaseService';
 import { showNotification } from '../utils/notification';
+import DashboardCard from '../components/DashboardCard';
 
 interface User {
   id: string;
@@ -74,24 +44,24 @@ interface Asset {
   serialNumber: string;
   model: string;
   manufacturer: string;
-  purchaseDate: any; // Can be Date, Firebase Timestamp, or string
+  purchaseDate: any;
   purchasePrice: number;
   currentValue: number;
   status: 'available' | 'assigned' | 'maintenance' | 'retired' | 'lost';
   assignedTo?: string;
   location: string;
   condition: 'excellent' | 'good' | 'fair' | 'poor';
-  warrantyExpiry?: any | null; // Can be Date, Firebase Timestamp, string, or null
+  warrantyExpiry?: any | null;
   description?: string;
   supplier?: string;
   supplierContact?: string;
   tags?: string[];
   notes?: string;
-  imageUrl?: string; // Asset image URL
+  imageUrl?: string;
   maintenanceHistory?: MaintenanceRecord[];
-  depreciationRate?: number; // Annual depreciation percentage
-  createdAt: any; // Can be Date, Firebase Timestamp, or string
-  updatedAt: any; // Can be Date, Firebase Timestamp, or string
+  depreciationRate?: number;
+  createdAt: any;
+  updatedAt: any;
 }
 
 interface MaintenanceRecord {
@@ -119,8 +89,10 @@ const AssetManagement: React.FC = () => {
     search: '',
     category: '',
     status: '',
-    condition: ''
+    condition: '',
+    location: ''
   });
+  const [showFilters, setShowFilters] = useState(false);
 
   const [assetForm, setAssetForm] = useState({
     name: '',
@@ -130,6 +102,7 @@ const AssetManagement: React.FC = () => {
     manufacturer: '',
     purchaseDate: '',
     purchasePrice: '',
+    currentValue: '',
     status: 'available' as Asset['status'],
     assignedTo: '',
     location: '',
@@ -138,30 +111,8 @@ const AssetManagement: React.FC = () => {
     description: '',
     supplier: '',
     supplierContact: '',
-    tags: '',
     notes: '',
-    imageUrl: '',
-    depreciationRate: '10'
-  });
-
-  const [maintenanceForm, setMaintenanceForm] = useState({
-    type: 'preventive' as MaintenanceRecord['type'],
-    description: '',
-    cost: '',
-    performedBy: '',
-    nextMaintenanceDate: ''
-  });
-
-  const [showMaintenanceDialog, setShowMaintenanceDialog] = useState(false);
-  const [selectedAssetForMaintenance, setSelectedAssetForMaintenance] = useState<Asset | null>(null);
-  const [bulkSelection, setBulkSelection] = useState<string[]>([]);
-
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    open: boolean;
-    assetId?: string;
-    assetName?: string;
-  }>({
-    open: false
+    depreciationRate: ''
   });
 
   // Firebase integration functions
@@ -204,7 +155,6 @@ const AssetManagement: React.FC = () => {
   };
 
   useEffect(() => {
-    // Load data from Firebase
     fetchAssets();
     fetchUsers();
   }, []);
@@ -221,8 +171,9 @@ const AssetManagement: React.FC = () => {
     const matchesCategory = !filters.category || asset.category === filters.category;
     const matchesStatus = !filters.status || asset.status === filters.status;
     const matchesCondition = !filters.condition || asset.condition === filters.condition;
+    const matchesLocation = !filters.location || asset.location === filters.location;
     
-    return matchesSearch && matchesCategory && matchesStatus && matchesCondition;
+    return matchesSearch && matchesCategory && matchesStatus && matchesCondition && matchesLocation;
   });
 
   const paginatedAssets = filteredAssets.slice(
@@ -231,7 +182,7 @@ const AssetManagement: React.FC = () => {
   );
 
   const getTotalAssets = () => {
-    return assets.reduce((total, asset) => total + asset.purchasePrice, 0);
+    return assets.length;
   };
 
   const getAvailableAssets = () => {
@@ -246,6 +197,10 @@ const AssetManagement: React.FC = () => {
     return assets.filter(asset => asset.status === 'maintenance');
   };
 
+  const getTotalValue = () => {
+    return assets.reduce((total, asset) => total + asset.currentValue, 0);
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -253,55 +208,29 @@ const AssetManagement: React.FC = () => {
     }).format(amount);
   };
 
+  const formatDate = (date: any) => {
+    if (!date) return 'N/A';
+    try {
+      const dateObj = date.toDate ? date.toDate() : new Date(date);
+      return dateObj.toLocaleDateString();
+    } catch {
+      return 'Invalid Date';
+    }
+  };
+
   const getCategoryIcon = (category: Asset['category']) => {
     switch (category) {
-      case 'computer': return <ComputerIcon />;
-      case 'mobile': return <PhoneIcon />;
-      case 'printer': return <PrinterIcon />;
-      case 'furniture': return <FurnitureIcon />;
-      case 'vehicle': return <VehicleIcon />;
-      default: return <CategoryIcon />;
+      case 'computer':
+        return <Monitor className="w-4 h-4" />;
+      case 'mobile':
+        return <Smartphone className="w-4 h-4" />;
+      case 'printer':
+        return <Printer className="w-4 h-4" />;
+      case 'vehicle':
+        return <Car className="w-4 h-4" />;
+      default:
+        return <Package className="w-4 h-4" />;
     }
-  };
-
-  // Helper function to safely convert Firebase date fields to ISO date strings
-  const convertToDateString = (dateField: any): string => {
-    if (!dateField) return '';
-    if (dateField instanceof Date) {
-      return dateField.toISOString().split('T')[0];
-    }
-    if (typeof dateField === 'string') {
-      try {
-        return new Date(dateField).toISOString().split('T')[0];
-      } catch {
-        return dateField;
-      }
-    }
-    // Handle Firebase Timestamp objects
-    if (dateField && typeof dateField.toDate === 'function') {
-      return dateField.toDate().toISOString().split('T')[0];
-    }
-    return '';
-  };
-
-  // Helper function to safely convert any date type to a display string
-  const convertToDisplayDate = (dateField: any): string => {
-    if (!dateField) return 'Not specified';
-    if (dateField instanceof Date) {
-      return dateField.toLocaleDateString();
-    }
-    if (typeof dateField === 'string') {
-      try {
-        return new Date(dateField).toLocaleDateString();
-      } catch {
-        return dateField;
-      }
-    }
-    // Handle Firebase Timestamp objects
-    if (dateField && typeof dateField.toDate === 'function') {
-      return dateField.toDate().toLocaleDateString();
-    }
-    return 'Invalid date';
   };
 
   const handleOpenDialog = (mode: 'add' | 'edit' | 'view', asset?: Asset) => {
@@ -314,20 +243,19 @@ const AssetManagement: React.FC = () => {
         serialNumber: asset.serialNumber,
         model: asset.model,
         manufacturer: asset.manufacturer,
-        purchaseDate: convertToDateString(asset.purchaseDate),
+        purchaseDate: formatDate(asset.purchaseDate),
         purchasePrice: asset.purchasePrice.toString(),
+        currentValue: asset.currentValue.toString(),
         status: asset.status,
         assignedTo: asset.assignedTo || '',
         location: asset.location,
         condition: asset.condition,
-        warrantyExpiry: convertToDateString(asset.warrantyExpiry),
+        warrantyExpiry: formatDate(asset.warrantyExpiry),
         description: asset.description || '',
         supplier: asset.supplier || '',
         supplierContact: asset.supplierContact || '',
-        tags: asset.tags ? asset.tags.join(', ') : '',
         notes: asset.notes || '',
-        imageUrl: asset.imageUrl || '',
-        depreciationRate: asset.depreciationRate ? asset.depreciationRate.toString() : '10'
+        depreciationRate: asset.depreciationRate?.toString() || ''
       });
     } else {
       setSelectedAsset(null);
@@ -339,6 +267,7 @@ const AssetManagement: React.FC = () => {
         manufacturer: '',
         purchaseDate: '',
         purchasePrice: '',
+        currentValue: '',
         status: 'available',
         assignedTo: '',
         location: '',
@@ -347,10 +276,8 @@ const AssetManagement: React.FC = () => {
         description: '',
         supplier: '',
         supplierContact: '',
-        tags: '',
         notes: '',
-        imageUrl: '',
-        depreciationRate: '10'
+        depreciationRate: ''
       });
     }
     setOpenDialog(true);
@@ -367,6 +294,7 @@ const AssetManagement: React.FC = () => {
       manufacturer: '',
       purchaseDate: '',
       purchasePrice: '',
+      currentValue: '',
       status: 'available',
       assignedTo: '',
       location: '',
@@ -375,43 +303,31 @@ const AssetManagement: React.FC = () => {
       description: '',
       supplier: '',
       supplierContact: '',
-      tags: '',
       notes: '',
-      imageUrl: '',
-      depreciationRate: '10'
+      depreciationRate: ''
     });
   };
 
   const handleSaveAsset = async () => {
-    if (!assetForm.name || !assetForm.serialNumber || !assetForm.model || !assetForm.manufacturer || !assetForm.purchasePrice) {
+    if (!assetForm.name || !assetForm.serialNumber || !assetForm.model || !assetForm.manufacturer) {
       showNotification('Please fill in all required fields', 'error');
       return;
     }
 
     try {
       setLoading(true);
-             const assetData = {
-         name: assetForm.name,
-         category: assetForm.category,
-         serialNumber: assetForm.serialNumber,
-         model: assetForm.model,
-         manufacturer: assetForm.manufacturer,
-         purchasePrice: parseFloat(assetForm.purchasePrice),
-         currentValue: parseFloat(assetForm.purchasePrice), // Initially same as purchase price
-         purchaseDate: new Date(assetForm.purchaseDate),
-         status: assetForm.status,
-         assignedTo: assetForm.assignedTo || '',
-         location: assetForm.location,
-         condition: assetForm.condition,
-         warrantyExpiry: assetForm.warrantyExpiry ? new Date(assetForm.warrantyExpiry) : null,
-         description: assetForm.description || '',
-         supplier: assetForm.supplier || '',
-         supplierContact: assetForm.supplierContact || '',
-         tags: assetForm.tags ? assetForm.tags.split(',').map(tag => tag.trim()) : [],
-         notes: assetForm.notes || '',
-         createdAt: new Date(),
-         updatedAt: new Date()
-       };
+      const assetData = {
+        ...assetForm,
+        purchasePrice: parseFloat(assetForm.purchasePrice),
+        currentValue: parseFloat(assetForm.currentValue),
+        purchaseDate: new Date(assetForm.purchaseDate),
+        warrantyExpiry: assetForm.warrantyExpiry ? new Date(assetForm.warrantyExpiry) : null,
+        depreciationRate: assetForm.depreciationRate ? parseFloat(assetForm.depreciationRate) : 0,
+        tags: [],
+        maintenanceHistory: [],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
 
       if (dialogMode === 'add') {
         const result = await firebaseService.addDocument('assets', assetData);
@@ -441,17 +357,19 @@ const AssetManagement: React.FC = () => {
   };
 
   const handleDeleteAsset = async (assetId: string) => {
-    try {
-      const result = await firebaseService.deleteDocument('assets', assetId);
-      if (result.success) {
-        showNotification('Asset deleted successfully!', 'success');
-        fetchAssets();
-      } else {
-        showNotification('Failed to delete asset', 'error');
+    if (window.confirm('Are you sure you want to delete this asset?')) {
+      try {
+        const result = await firebaseService.deleteDocument('assets', assetId);
+        if (result.success) {
+          showNotification('Asset deleted successfully!', 'success');
+          fetchAssets();
+        } else {
+          showNotification('Failed to delete asset', 'error');
+        }
+      } catch (error) {
+        console.error('Error deleting asset:', error);
+        showNotification('Error deleting asset', 'error');
       }
-    } catch (error) {
-      console.error('Error deleting asset:', error);
-      showNotification('Error deleting asset', 'error');
     }
   };
 
@@ -475,1064 +393,917 @@ const AssetManagement: React.FC = () => {
     }
   };
 
-  // CSV Export functions
-  const generateCSV = () => {
-    const headers = [
-      'Name', 'Category', 'Serial Number', 'Model', 'Manufacturer', 'Purchase Date', 
-      'Purchase Price', 'Current Value', 'Status', 'Condition', 'Location', 'Assigned To', 
-      'Warranty Expiry', 'Description', 'Supplier', 'Supplier Contact', 'Tags', 'Notes', 
-      'Created At', 'Updated At'
-    ];
-    
-    const csvRows = [headers.join(',')];
-    
-    assets.forEach(asset => {
-      const row = [
-        `"${asset.name}"`,
-        `"${asset.category}"`,
-        `"${asset.serialNumber}"`,
-        `"${asset.model}"`,
-        `"${asset.manufacturer}"`,
-        `"${convertToDisplayDate(asset.purchaseDate)}"`,
-        asset.purchasePrice,
-        asset.currentValue,
-        `"${asset.status}"`,
-        `"${asset.condition}"`,
-        `"${asset.location}"`,
-        `"${asset.assignedTo ? users.find(u => u.id === asset.assignedTo)?.name || 'Unknown' : 'Unassigned'}"`,
-        `"${asset.warrantyExpiry ? convertToDisplayDate(asset.warrantyExpiry) : 'Not specified'}"`,
-        `"${asset.description || ''}"`,
-        `"${asset.supplier || ''}"`,
-        `"${asset.supplierContact || ''}"`,
-        `"${asset.tags ? asset.tags.join(', ') : ''}"`,
-        `"${asset.notes || ''}"`,
-        `"${convertToDisplayDate(asset.createdAt)}"`,
-        `"${convertToDisplayDate(asset.updatedAt)}"`
-      ];
-      csvRows.push(row.join(','));
-    });
-    
-    return csvRows.join('\n');
-  };
-
-  const downloadCSV = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Bulk operations
-  const handleBulkAssign = () => {
-    // Implementation for bulk assignment
-    showNotification('Bulk assignment feature coming soon!', 'info');
-  };
-
-  const handleBulkSelection = (assetId: string) => {
-    setBulkSelection(prev => 
-      prev.includes(assetId) 
-        ? prev.filter(id => id !== assetId)
-        : [...prev, assetId]
-    );
-  };
-
-  // Maintenance functions
-  const handleAddMaintenance = async () => {
-    if (!selectedAssetForMaintenance || !maintenanceForm.description || !maintenanceForm.cost) {
-      showNotification('Please fill in all required maintenance fields', 'error');
-      return;
-    }
-
-    try {
-      const maintenanceRecord: MaintenanceRecord = {
-        id: Date.now().toString(),
-        date: new Date(),
-        type: maintenanceForm.type,
-        description: maintenanceForm.description,
-        cost: parseFloat(maintenanceForm.cost),
-        performedBy: maintenanceForm.performedBy,
-        nextMaintenanceDate: maintenanceForm.nextMaintenanceDate ? new Date(maintenanceForm.nextMaintenanceDate) : undefined
-      };
-
-      const updatedMaintenanceHistory = [
-        ...(selectedAssetForMaintenance.maintenanceHistory || []),
-        maintenanceRecord
-      ];
-
-      const result = await firebaseService.updateDocument('assets', selectedAssetForMaintenance.id, {
-        maintenanceHistory: updatedMaintenanceHistory,
-        updatedAt: new Date()
-      });
-
-      if (result.success) {
-        showNotification('Maintenance record added successfully!', 'success');
-        setShowMaintenanceDialog(false);
-        setMaintenanceForm({
-          type: 'preventive',
-          description: '',
-          cost: '',
-          performedBy: '',
-          nextMaintenanceDate: ''
-        });
-        fetchAssets();
-      } else {
-        showNotification('Failed to add maintenance record', 'error');
-      }
-    } catch (error) {
-      console.error('Error adding maintenance record:', error);
-      showNotification('Error adding maintenance record', 'error');
-    }
-  };
-
-  // Calculate depreciation
-  const calculateDepreciation = (asset: Asset) => {
-    if (!asset.depreciationRate || !asset.purchaseDate) return asset.currentValue;
-    
-    const purchaseDate = new Date(asset.purchaseDate);
-    const yearsSincePurchase = (new Date().getTime() - purchaseDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
-    const depreciationAmount = asset.purchasePrice * (asset.depreciationRate / 100) * yearsSincePurchase;
-    return Math.max(asset.purchasePrice - depreciationAmount, 0);
-  };
-
+  // Loading state
   if (assetsLoading || usersLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading asset data...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Asset Management
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
+    <div className="space-y-6 p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Asset Management</h1>
+          <p className="text-gray-600">Manage company assets, track assignments, and monitor maintenance</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button 
             onClick={() => handleOpenDialog('add')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
           >
-            Add Asset
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={() => {
-              fetchAssets();
-              fetchUsers();
-            }}
+            <Plus className="w-4 h-4" />
+            <span>Add Asset</span>
+          </button>
+          <button 
+            onClick={() => {/* Export functionality */}}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
           >
-            Refresh
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={() => {
-              // Export assets data to CSV
-              const csvContent = generateCSV();
-              downloadCSV(csvContent, 'assets-export.csv');
-            }}
-          >
-            Export
-          </Button>
-          {bulkSelection.length > 0 && (
-            <Button
-              variant="outlined"
-              color="secondary"
-              startIcon={<AssignmentIcon />}
-              onClick={() => handleBulkAssign()}
-            >
-              Bulk Assign ({bulkSelection.length})
-            </Button>
+            <Download className="w-4 h-4" />
+            <span>Export Report</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <DashboardCard
+          name="Total Assets"
+          value={getTotalAssets()}
+          icon={Package}
+          color="blue"
+        />
+        <DashboardCard
+          name="Available"
+          value={getAvailableAssets().length}
+          icon={CheckCircle}
+          color="green"
+        />
+        <DashboardCard
+          name="Assigned"
+          value={getAssignedAssets().length}
+          icon={UserCheck}
+          color="yellow"
+        />
+        <DashboardCard
+          name="Maintenance"
+          value={getMaintenanceAssets().length}
+          icon={Wrench}
+          color="indigo"
+        />
+        <DashboardCard
+          name="Total Value"
+          value={formatCurrency(getTotalValue())}
+          icon={DollarSign}
+          color="purple"
+        />
+      </div>
+
+      {/* Search and Filters */}
+      {assets.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search assets..."
+                  value={filters.search}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+              >
+                <Filter className="w-4 h-4" />
+                <span>Filters</span>
+              </button>
+              
+              {(filters.category || filters.status || filters.condition || filters.location) && (
+                <button
+                  onClick={() => setFilters({ search: '', category: '', status: '', condition: '', location: '' })}
+                  className="px-4 py-2 text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Options */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <select
+                    value={filters.category}
+                    onChange={(e) => handleFilterChange('category', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Categories</option>
+                    <option value="computer">Computer</option>
+                    <option value="mobile">Mobile</option>
+                    <option value="printer">Printer</option>
+                    <option value="furniture">Furniture</option>
+                    <option value="vehicle">Vehicle</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={filters.status}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="available">Available</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="retired">Retired</option>
+                    <option value="lost">Lost</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Condition</label>
+                  <select
+                    value={filters.condition}
+                    onChange={(e) => handleFilterChange('condition', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Conditions</option>
+                    <option value="excellent">Excellent</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                  <select
+                    value={filters.location}
+                    onChange={(e) => handleFilterChange('location', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Locations</option>
+                    {Array.from(new Set(assets.map(asset => asset.location))).map(location => (
+                      <option key={location} value={location}>
+                        {location}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
           )}
-        </Box>
-        
-      </Box>
-
-      {/* Statistics Cards */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-        gap: 3, 
-        mb: 3 
-      }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Assets
-            </Typography>
-            <Typography variant="h4" component="div">
-              {assets.length}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              {formatCurrency(getTotalAssets())} total value
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Available
-            </Typography>
-            <Typography variant="h4" component="div" color="success.main">
-              {getAvailableAssets().length}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Ready for assignment
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Assigned
-            </Typography>
-            <Typography variant="h4" component="div" color="primary.main">
-              {getAssignedAssets().length}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Currently in use
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Maintenance
-            </Typography>
-            <Typography variant="h4" component="div" color="warning.main">
-              {getMaintenanceAssets().length}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Under repair
-            </Typography>
-          </CardContent>
-        </Card>
-      </Box>
-
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterListIcon sx={{ mr: 1 }} />
-          <Typography variant="h6">Filters</Typography>
-        </Box>
-        <Box sx={{ 
-          display: 'grid', 
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-          gap: 2 
-        }}>
-          <TextField
-            fullWidth
-            label="Search"
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-            }}
-          />
-          <FormControl fullWidth>
-            <InputLabel>Category</InputLabel>
-            <Select
-              value={filters.category}
-              label="Category"
-              onChange={(e) => handleFilterChange('category', e.target.value)}
-            >
-              <MenuItem value="">All Categories</MenuItem>
-              <MenuItem value="computer">Computer</MenuItem>
-              <MenuItem value="mobile">Mobile</MenuItem>
-              <MenuItem value="printer">Printer</MenuItem>
-              <MenuItem value="furniture">Furniture</MenuItem>
-              <MenuItem value="vehicle">Vehicle</MenuItem>
-              <MenuItem value="other">Other</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={filters.status}
-              label="Status"
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-            >
-              <MenuItem value="">All Statuses</MenuItem>
-              <MenuItem value="available">Available</MenuItem>
-              <MenuItem value="assigned">Assigned</MenuItem>
-              <MenuItem value="maintenance">Maintenance</MenuItem>
-              <MenuItem value="retired">Retired</MenuItem>
-              <MenuItem value="lost">Lost</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Condition</InputLabel>
-            <Select
-              value={filters.condition}
-              label="Condition"
-              onChange={(e) => handleFilterChange('condition', e.target.value)}
-            >
-              <MenuItem value="">All Conditions</MenuItem>
-              <MenuItem value="excellent">Excellent</MenuItem>
-              <MenuItem value="good">Good</MenuItem>
-              <MenuItem value="fair">Fair</MenuItem>
-              <MenuItem value="poor">Poor</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
-      </Paper>
+        </div>
+      )}
 
       {/* Assets Table */}
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-        <TableContainer>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell>Asset</TableCell>
-                <TableCell>Serial Number</TableCell>
-                <TableCell>Value</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Assigned To</TableCell>
-                <TableCell>Location</TableCell>
-                <TableCell>Condition</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedAssets.map((asset) => {
-                const assignedUser = users.find(u => u.id === asset.assignedTo);
-                return (
-                  <TableRow key={asset.id} hover>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {getCategoryIcon(asset.category)}
-                        <Box>
-                          <Typography variant="subtitle2" fontWeight="bold">
-                            {asset.name}
-                          </Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            {asset.model} - {asset.manufacturer}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontFamily="monospace">
-                        {asset.serialNumber}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="subtitle2" fontWeight="bold">
-                        {formatCurrency(asset.currentValue)}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        Purchased: {formatCurrency(asset.purchasePrice)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={asset.status}
-                        size="small"
-                        color={
-                          asset.status === 'available' ? 'success' :
-                          asset.status === 'assigned' ? 'primary' :
-                          asset.status === 'maintenance' ? 'warning' :
-                          asset.status === 'retired' ? 'default' : 'error'
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {assignedUser ? (
-                        <Box>
-                          <Typography variant="body2">
-                            {assignedUser.name}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            {assignedUser.department}
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" color="textSecondary">
-                          Unassigned
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {asset.location}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={asset.condition}
-                        size="small"
-                        color={
-                          asset.condition === 'excellent' ? 'success' :
-                          asset.condition === 'good' ? 'primary' :
-                          asset.condition === 'fair' ? 'warning' : 'error'
-                        }
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Tooltip title="View Details">
-                          <IconButton
-                            size="small"
+      {assets.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Asset</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned To</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {paginatedAssets.map((asset) => {
+                  const assignedUser = users.find(u => u.id === asset.assignedTo);
+                  return (
+                    <tr key={asset.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                              {getCategoryIcon(asset.category)}
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{asset.name}</div>
+                            <div className="text-sm text-gray-500">{asset.serialNumber}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {asset.category}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={cn(
+                          "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                          asset.status === 'available' ? 'bg-green-100 text-green-800' :
+                          asset.status === 'assigned' ? 'bg-blue-100 text-blue-800' :
+                          asset.status === 'maintenance' ? 'bg-yellow-100 text-yellow-800' :
+                          asset.status === 'retired' ? 'bg-gray-100 text-gray-800' :
+                          'bg-red-100 text-red-800'
+                        )}>
+                          {asset.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <User className="w-4 h-4 text-gray-400 mr-2" />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">
+                              {assignedUser?.name || 'Unassigned'}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {assignedUser?.department || ''}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <MapPin className="w-4 h-4 text-gray-400 mr-2" />
+                          <div className="text-sm text-gray-900">{asset.location}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatCurrency(asset.currentValue)}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Condition: {asset.condition}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-2">
+                          <button
                             onClick={() => handleOpenDialog('view', asset)}
-                            color="info"
+                            className="text-blue-600 hover:text-blue-900"
                           >
-                            <ViewIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit Asset">
-                          <IconButton
-                            size="small"
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleOpenDialog('edit', asset)}
-                            color="primary"
+                            className="text-green-600 hover:text-green-900"
                           >
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <FormControl size="small" sx={{ minWidth: 120 }}>
-                          <Select
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <select
                             value={asset.status}
                             onChange={(e) => handleStatusChange(asset.id, e.target.value)}
-                            size="small"
+                            className="text-xs border border-gray-300 rounded px-2 py-1"
                           >
-                            <MenuItem value="available">Available</MenuItem>
-                            <MenuItem value="assigned">Assigned</MenuItem>
-                            <MenuItem value="maintenance">Maintenance</MenuItem>
-                            <MenuItem value="retired">Retired</MenuItem>
-                            <MenuItem value="lost">Lost</MenuItem>
-                          </Select>
-                        </FormControl>
-                                                 <Tooltip title="Add Maintenance">
-                           <IconButton
-                             size="small"
-                             onClick={() => {
-                               setSelectedAssetForMaintenance(asset);
-                               setShowMaintenanceDialog(true);
-                             }}
-                             color="secondary"
-                           >
-                             <BuildIcon />
-                           </IconButton>
-                         </Tooltip>
-                         <Tooltip title="Delete Asset">
-                           <IconButton
-                             size="small"
-                             onClick={() => setDeleteConfirm({
-                               open: true,
-                               assetId: asset.id,
-                               assetName: asset.name
-                             })}
-                             color="error"
-                           >
-                             <DeleteIcon />
-                           </IconButton>
-                         </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        
-        {filteredAssets.length === 0 && (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Typography color="textSecondary">
-              No assets found matching your criteria
-            </Typography>
-          </Box>
-        )}
-      </Paper>
+                            <option value="available">Available</option>
+                            <option value="assigned">Assigned</option>
+                            <option value="maintenance">Maintenance</option>
+                            <option value="retired">Retired</option>
+                            <option value="lost">Lost</option>
+                          </select>
+                          <button
+                            onClick={() => handleDeleteAsset(asset.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* No Results */}
+      {filteredAssets.length === 0 && assets.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No assets found</h3>
+          <p className="text-gray-500">Try adjusting your search or filter parameters</p>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {assets.length === 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-medium text-gray-900 mb-2">No Assets Yet</h3>
+          <p className="text-gray-500 mb-6">Start by adding your first asset to get started with asset management</p>
+          <button
+            onClick={() => handleOpenDialog('add')}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 mx-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add First Asset</span>
+          </button>
+        </div>
+      )}
 
       {/* Pagination */}
       {filteredAssets.length > rowsPerPage && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-          <Pagination
-            count={Math.ceil(filteredAssets.length / rowsPerPage)}
-            page={currentPage}
-            onChange={(_, page) => setCurrentPage(page)}
-            color="primary"
-          />
-        </Box>
+        <div className="flex justify-center">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {Array.from({ length: Math.ceil(filteredAssets.length / rowsPerPage) }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  "px-3 py-2 text-sm font-medium rounded-lg",
+                  page === currentPage
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 bg-white border border-gray-300 hover:bg-gray-50"
+                )}
+              >
+                {page}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setCurrentPage(Math.min(Math.ceil(filteredAssets.length / rowsPerPage), currentPage + 1))}
+              disabled={currentPage === Math.ceil(filteredAssets.length / rowsPerPage)}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* Add/Edit/View Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {dialogMode === 'add' ? <AddIcon /> : 
-             dialogMode === 'edit' ? <EditIcon /> : <ViewIcon />}
-            <Typography variant="h6">
-              {dialogMode === 'add' ? 'Add New Asset' :
-               dialogMode === 'edit' ? 'Edit Asset' : 'View Asset Details'}
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent dividers>
-          {dialogMode === 'view' && selectedAsset ? (
-            // View Mode - Display asset details in structured format
-            <Box sx={{ mt: 2 }}>
-              <Box sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
-                gap: 3 
-              }}>
-                <Box>
-                  <Typography variant="h6" gutterBottom>Asset Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemIcon>
-                        {getCategoryIcon(selectedAsset.category)}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Asset Name"
-                        secondary={selectedAsset.name}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <AssignmentIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Serial Number"
-                        secondary={selectedAsset.serialNumber}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <CategoryIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Category"
-                        secondary={selectedAsset.category.charAt(0).toUpperCase() + selectedAsset.category.slice(1)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <BuildIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Model"
-                        secondary={selectedAsset.model}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <BuildIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Manufacturer"
-                        secondary={selectedAsset.manufacturer}
-                      />
-                    </ListItem>
-                                         <ListItem>
-                       <ListItemIcon>
-                         <ScheduleIcon />
-                       </ListItemIcon>
-                       <ListItemText
-                         primary="Purchase Date"
-                         secondary={convertToDisplayDate(selectedAsset.purchaseDate)}
-                       />
-                     </ListItem>
-                  </List>
-                </Box>
-                <Box>
-                  <Typography variant="h6" gutterBottom>Asset Details</Typography>
-                  <List dense>
-                                         <ListItem>
-                       <ListItemIcon>
-                         <CheckCircleIcon />
-                       </ListItemIcon>
-                       <ListItemText
-                         primary="Status"
-                         secondary={selectedAsset.status.charAt(0).toUpperCase() + selectedAsset.status.slice(1)}
-                       />
-                       <Chip
-                         label={selectedAsset.status}
-                         size="small"
-                         sx={{
-                           bgcolor: selectedAsset.status === 'available' ? 'success.main' :
-                                    selectedAsset.status === 'assigned' ? 'primary.main' :
-                                    selectedAsset.status === 'maintenance' ? 'warning.main' :
-                                    selectedAsset.status === 'retired' ? 'default' : 'error.main',
-                           color: 'white',
-                           textTransform: 'capitalize'
-                         }}
-                       />
-                     </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <LocationIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Location"
-                        secondary={selectedAsset.location}
-                      />
-                    </ListItem>
-                                         <ListItem>
-                       <ListItemIcon>
-                         <WarningIcon />
-                       </ListItemIcon>
-                       <ListItemText
-                         primary="Condition"
-                         secondary={selectedAsset.condition.charAt(0).toUpperCase() + selectedAsset.condition.slice(1)}
-                       />
-                       <Chip
-                         label={selectedAsset.condition}
-                         size="small"
-                         sx={{
-                           bgcolor: selectedAsset.condition === 'excellent' ? 'success.main' :
-                                    selectedAsset.condition === 'good' ? 'primary.main' :
-                                    selectedAsset.condition === 'fair' ? 'warning.main' : 'error.main',
-                           color: 'white',
-                           textTransform: 'capitalize'
-                         }}
-                       />
-                     </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <AssignmentIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Assigned To"
-                        secondary={
-                          selectedAsset.assignedTo ? 
-                          users.find(u => u.id === selectedAsset.assignedTo)?.name || 'Unknown User' :
-                          'Unassigned'
-                        }
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <CheckCircleIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Purchase Price"
-                        secondary={formatCurrency(selectedAsset.purchasePrice)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <CheckCircleIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Current Value"
-                        secondary={formatCurrency(selectedAsset.currentValue)}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-              </Box>
-              
-              {selectedAsset.warrantyExpiry && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="h6" gutterBottom>Warranty Information</Typography>
-                  <List dense>
-                                         <ListItem>
-                       <ListItemIcon>
-                         <ScheduleIcon />
-                       </ListItemIcon>
-                       <ListItemText
-                         primary="Warranty Expiry"
-                         secondary={convertToDisplayDate(selectedAsset.warrantyExpiry)}
-                       />
-                     </ListItem>
-                  </List>
-                </Box>
+      {/* Add/Edit/View Modal */}
+      {openDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={handleCloseDialog}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            {dialogMode === 'view' ? (
+              // View Mode - New Design
+              <div className="p-4">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="p-1.5 bg-primary-100 rounded-lg">
+                      <Eye className="w-5 h-5 text-primary-600" />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900">Asset Details</h3>
+                  </div>
+                  <button
+                    onClick={handleCloseDialog}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Asset Details Content */}
+                <div className="space-y-6">
+                  {/* Asset Header */}
+                  <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+                      <Package className="w-8 h-8 text-primary-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-xl font-semibold text-gray-900">{assetForm.name}</h4>
+                      <p className="text-gray-600">{assetForm.serialNumber}</p>
+                      <div className="flex items-center space-x-4 mt-2">
+                        <span className={cn(
+                          "px-2 py-1 text-xs font-medium rounded-full",
+                          assetForm.status === 'available' ? "bg-green-100 text-green-800" :
+                          assetForm.status === 'assigned' ? "bg-blue-100 text-blue-800" :
+                          assetForm.status === 'maintenance' ? "bg-yellow-100 text-yellow-800" :
+                          assetForm.status === 'retired' ? "bg-gray-100 text-gray-800" :
+                          "bg-red-100 text-red-800"
+                        )}>
+                          {assetForm.status.charAt(0).toUpperCase() + assetForm.status.slice(1)}
+                        </span>
+                        <span className="text-sm text-gray-500">{assetForm.category}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Basic Information */}
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Basic Information</h5>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Package className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Asset Name</p>
+                            <p className="text-sm text-gray-600">{assetForm.name}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <Badge className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Category</p>
+                            <p className="text-sm text-gray-600">{assetForm.category}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                            <Monitor className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Serial Number</p>
+                            <p className="text-sm text-gray-600">{assetForm.serialNumber}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                            <Wrench className="w-4 h-4 text-orange-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Model</p>
+                            <p className="text-sm text-gray-600">{assetForm.model}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Financial Information */}
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Financial Information</h5>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <DollarSign className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Purchase Price</p>
+                            <p className="text-sm text-gray-600">₹{assetForm.purchasePrice}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <DollarSign className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Current Value</p>
+                            <p className="text-sm text-gray-600">₹{assetForm.currentValue}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                            <CalendarIcon className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Purchase Date</p>
+                            <p className="text-sm text-gray-600">{assetForm.purchaseDate}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                            <ClockIcon className="w-4 h-4 text-orange-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Depreciation Rate</p>
+                            <p className="text-sm text-gray-600">{assetForm.depreciationRate}%</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Assignment & Location Information */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Assignment & Location</h5>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <UserIcon className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Assigned To</p>
+                            <p className="text-sm text-gray-600">
+                              {assetForm.assignedTo ? 
+                                users.find(u => u.id === assetForm.assignedTo)?.name || 'Unknown' : 
+                                'Unassigned'
+                              }
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <MapPin className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Location</p>
+                            <p className="text-sm text-gray-600">{assetForm.location}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Status & Condition</h5>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <CheckCircle className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Status</p>
+                            <span className={cn(
+                              "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                              assetForm.status === 'available' ? "bg-green-100 text-green-800" :
+                              assetForm.status === 'assigned' ? "bg-blue-100 text-blue-800" :
+                              assetForm.status === 'maintenance' ? "bg-yellow-100 text-yellow-800" :
+                              assetForm.status === 'retired' ? "bg-gray-100 text-gray-800" :
+                              "bg-red-100 text-red-800"
+                            )}>
+                              {assetForm.status.charAt(0).toUpperCase() + assetForm.status.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <Wrench className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Condition</p>
+                            <span className={cn(
+                              "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                              assetForm.condition === 'excellent' ? "bg-green-100 text-green-800" :
+                              assetForm.condition === 'good' ? "bg-blue-100 text-blue-800" :
+                              assetForm.condition === 'fair' ? "bg-yellow-100 text-yellow-800" :
+                              "bg-red-100 text-red-800"
+                            )}>
+                              {assetForm.condition.charAt(0).toUpperCase() + assetForm.condition.slice(1)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional Information */}
+                  <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Additional Information</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Manufacturer</span>
+                          <span className="text-sm text-gray-900">{assetForm.manufacturer}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Supplier</span>
+                          <span className="text-sm text-gray-900">{assetForm.supplier || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Warranty Expiry</span>
+                          <span className="text-sm text-gray-900">{assetForm.warrantyExpiry || '—'}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Supplier Contact</span>
+                          <span className="text-sm text-gray-900">{assetForm.supplierContact || '—'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description Section */}
+                  {assetForm.description && (
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Description</h5>
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-900">{assetForm.description}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes Section */}
+                  {assetForm.notes && (
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Notes</h5>
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-900">{assetForm.notes}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+                  <button
+                    onClick={handleCloseDialog}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Add/Edit Mode - Original Design
+              <>
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                {dialogMode === 'add' && <Plus className="w-5 h-5" />}
+                {dialogMode === 'edit' && <Edit className="w-5 h-5" />}
+                <span>
+                      {dialogMode === 'add' ? 'Add New Asset' : 'Edit Asset'}
+                </span>
+              </h3>
+              <button
+                onClick={handleCloseDialog}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Asset Name</label>
+                  <input
+                    type="text"
+                    value={assetForm.name}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, name: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <select
+                    value={assetForm.category}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, category: e.target.value as Asset['category'] }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="computer">Computer</option>
+                    <option value="mobile">Mobile</option>
+                    <option value="printer">Printer</option>
+                    <option value="furniture">Furniture</option>
+                    <option value="vehicle">Vehicle</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
+                  <input
+                    type="text"
+                    value={assetForm.serialNumber}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, serialNumber: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                  <input
+                    type="text"
+                    value={assetForm.model}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, model: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Manufacturer</label>
+                  <input
+                    type="text"
+                    value={assetForm.manufacturer}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, manufacturer: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date</label>
+                  <input
+                    type="date"
+                    value={assetForm.purchaseDate}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, purchaseDate: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Price</label>
+                  <input
+                    type="number"
+                    value={assetForm.purchasePrice}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, purchasePrice: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Current Value</label>
+                  <input
+                    type="number"
+                    value={assetForm.currentValue}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, currentValue: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={assetForm.status}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, status: e.target.value as Asset['status'] }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="available">Available</option>
+                    <option value="assigned">Assigned</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="retired">Retired</option>
+                    <option value="lost">Lost</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                  <select
+                    value={assetForm.assignedTo}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, assignedTo: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Unassigned</option>
+                    {users.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} - {user.department}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                  <input
+                    type="text"
+                    value={assetForm.location}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, location: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Condition</label>
+                  <select
+                    value={assetForm.condition}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, condition: e.target.value as Asset['condition'] }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="excellent">Excellent</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Warranty Expiry</label>
+                  <input
+                    type="date"
+                    value={assetForm.warrantyExpiry}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, warrantyExpiry: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                  <input
+                    type="text"
+                    value={assetForm.supplier}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, supplier: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Contact</label>
+                  <input
+                    type="text"
+                    value={assetForm.supplierContact}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, supplierContact: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Depreciation Rate (%)</label>
+                  <input
+                    type="number"
+                    value={assetForm.depreciationRate}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, depreciationRate: e.target.value }))}
+                    disabled={false}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={assetForm.description}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, description: e.target.value }))}
+                    disabled={false}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={assetForm.notes}
+                    onChange={(e) => setAssetForm(prev => ({ ...prev, notes: e.target.value }))}
+                    disabled={false}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={handleCloseDialog}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                    Cancel
+              </button>
+                <button
+                  onClick={handleSaveAsset}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                >
+                  {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                  <span>Save</span>
+                </button>
+                </div>
+              </>
               )}
-              
-                             {selectedAsset.supplier && (
-                 <Box sx={{ mt: 3 }}>
-                   <Typography variant="h6" gutterBottom>Supplier Information</Typography>
-                   <List dense>
-                     <ListItem>
-                       <ListItemIcon>
-                         <PersonIcon />
-                       </ListItemIcon>
-                       <ListItemText
-                         primary="Supplier"
-                         secondary={selectedAsset.supplier}
-                       />
-                     </ListItem>
-                     {selectedAsset.supplierContact && (
-                       <ListItem>
-                         <ListItemIcon>
-                           <PersonIcon />
-                         </ListItemIcon>
-                         <ListItemText
-                           primary="Contact"
-                           secondary={selectedAsset.supplierContact}
-                         />
-                       </ListItem>
-                     )}
-                   </List>
-                 </Box>
-               )}
-               
-               {selectedAsset.tags && selectedAsset.tags.length > 0 && (
-                 <Box sx={{ mt: 3 }}>
-                   <Typography variant="h6" gutterBottom>Tags</Typography>
-                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                     {selectedAsset.tags.map((tag, index) => (
-                       <Chip key={index} label={tag} size="small" variant="outlined" />
-                     ))}
-                   </Box>
-                 </Box>
-               )}
-               
-               {selectedAsset.description && (
-                 <Box sx={{ mt: 3 }}>
-                   <Typography variant="h6" gutterBottom>Description</Typography>
-                   <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                     <Typography variant="body2">
-                       {selectedAsset.description}
-                     </Typography>
-                   </Paper>
-                 </Box>
-               )}
-               
-               {selectedAsset.notes && (
-                 <Box sx={{ mt: 3 }}>
-                   <Typography variant="h6" gutterBottom>Notes</Typography>
-                   <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                     <Typography variant="body2">
-                       {selectedAsset.notes}
-                     </Typography>
-                   </Paper>
-                 </Box>
-               )}
-            </Box>
-          ) : (
-            // Edit/Add Mode - Show form fields
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3, mt: 2 }}>
-              <TextField
-                fullWidth
-                label="Asset Name"
-                value={assetForm.name}
-                onChange={(e) => setAssetForm(prev => ({ ...prev, name: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-                InputProps={{
-                  startAdornment: <CategoryIcon sx={{ color: 'action.active', mr: 1 }} />
-                }}
-              />
-              <FormControl fullWidth>
-                <InputLabel>Category</InputLabel>
-                <Select
-                  value={assetForm.category}
-                  label="Category"
-                  onChange={(e) => setAssetForm(prev => ({ ...prev, category: e.target.value as Asset['category'] }))}
-                  disabled={dialogMode === 'view'}
-                  required
-                >
-                  <MenuItem value="computer">Computer</MenuItem>
-                  <MenuItem value="mobile">Mobile</MenuItem>
-                  <MenuItem value="printer">Printer</MenuItem>
-                  <MenuItem value="furniture">Furniture</MenuItem>
-                  <MenuItem value="vehicle">Vehicle</MenuItem>
-                  <MenuItem value="other">Other</MenuItem>
-                </Select>
-              </FormControl>
-              <TextField
-                fullWidth
-                label="Serial Number"
-                value={assetForm.serialNumber}
-                onChange={(e) => setAssetForm(prev => ({ ...prev, serialNumber: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-                InputProps={{
-                  startAdornment: <AssignmentIcon sx={{ color: 'action.active', mr: 1 }} />
-                }}
-              />
-              <TextField
-                fullWidth
-                label="Model"
-                value={assetForm.model}
-                onChange={(e) => setAssetForm(prev => ({ ...prev, model: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-              />
-              <TextField
-                fullWidth
-                label="Manufacturer"
-                value={assetForm.manufacturer}
-                onChange={(e) => setAssetForm(prev => ({ ...prev, manufacturer: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-              />
-              <TextField
-                fullWidth
-                label="Purchase Price"
-                type="number"
-                value={assetForm.purchasePrice}
-                onChange={(e) => setAssetForm(prev => ({ ...prev, purchasePrice: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-              />
-              <TextField
-                fullWidth
-                label="Purchase Date"
-                type="date"
-                value={assetForm.purchaseDate}
-                onChange={(e) => setAssetForm(prev => ({ ...prev, purchaseDate: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-                InputLabelProps={{ shrink: true }}
-              />
-              <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={assetForm.status}
-                  label="Status"
-                  onChange={(e) => setAssetForm(prev => ({ ...prev, status: e.target.value as Asset['status'] }))}
-                  disabled={dialogMode === 'view'}
-                  required
-                >
-                  <MenuItem value="available">Available</MenuItem>
-                  <MenuItem value="assigned">Assigned</MenuItem>
-                  <MenuItem value="maintenance">Maintenance</MenuItem>
-                  <MenuItem value="retired">Retired</MenuItem>
-                  <MenuItem value="lost">Lost</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>Assigned To</InputLabel>
-                <Select
-                  value={assetForm.assignedTo}
-                  label="Assigned To"
-                  onChange={(e) => setAssetForm(prev => ({ ...prev, assignedTo: e.target.value }))}
-                  disabled={dialogMode === 'view'}
-                >
-                  <MenuItem value="">Unassigned</MenuItem>
-                  {users.map(user => (
-                    <MenuItem key={user.id} value={user.id}>
-                      {user.name} - {user.department}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                fullWidth
-                label="Location"
-                value={assetForm.location}
-                onChange={(e) => setAssetForm(prev => ({ ...prev, location: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-                InputProps={{
-                  startAdornment: <LocationIcon sx={{ color: 'action.active', mr: 1 }} />
-                }}
-              />
-              <FormControl fullWidth>
-                <InputLabel>Condition</InputLabel>
-                <Select
-                  value={assetForm.condition}
-                  label="Condition"
-                  onChange={(e) => setAssetForm(prev => ({ ...prev, condition: e.target.value as Asset['condition'] }))}
-                  disabled={dialogMode === 'view'}
-                  required
-                >
-                  <MenuItem value="excellent">Excellent</MenuItem>
-                  <MenuItem value="good">Good</MenuItem>
-                  <MenuItem value="fair">Fair</MenuItem>
-                  <MenuItem value="poor">Poor</MenuItem>
-                </Select>
-              </FormControl>
-              <TextField
-                fullWidth
-                label="Warranty Expiry"
-                type="date"
-                value={assetForm.warrantyExpiry}
-                onChange={(e) => setAssetForm(prev => ({ ...prev, warrantyExpiry: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                InputLabelProps={{ shrink: true }}
-              />
-                             <TextField
-                 fullWidth
-                 label="Description"
-                 multiline
-                 rows={3}
-                 value={assetForm.description}
-                 onChange={(e) => setAssetForm(prev => ({ ...prev, description: e.target.value }))}
-                 disabled={dialogMode === 'view'}
-               />
-               <TextField
-                 fullWidth
-                 label="Supplier"
-                 value={assetForm.supplier}
-                 onChange={(e) => setAssetForm(prev => ({ ...prev, supplier: e.target.value }))}
-                 disabled={dialogMode === 'view'}
-               />
-               <TextField
-                 fullWidth
-                 label="Supplier Contact"
-                 value={assetForm.supplierContact}
-                 onChange={(e) => setAssetForm(prev => ({ ...prev, supplierContact: e.target.value }))}
-                 disabled={dialogMode === 'view'}
-               />
-               <TextField
-                 fullWidth
-                 label="Tags (comma separated)"
-                 value={assetForm.tags}
-                 onChange={(e) => setAssetForm(prev => ({ ...prev, tags: e.target.value }))}
-                 disabled={dialogMode === 'view'}
-                 placeholder="computer, office, business"
-               />
-               <TextField
-                 fullWidth
-                 label="Notes"
-                 value={assetForm.notes}
-                 onChange={(e) => setAssetForm(prev => ({ ...prev, notes: e.target.value }))}
-                 disabled={dialogMode === 'view'}
-                 multiline
-                 rows={3}
-               />
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button 
-            onClick={handleCloseDialog}
-            variant={dialogMode === 'view' ? 'contained' : 'outlined'}
-            startIcon={dialogMode === 'view' ? <CheckCircleIcon /> : undefined}
-          >
-            {dialogMode === 'view' ? 'Close' : 'Cancel'}
-          </Button>
-          {dialogMode !== 'view' && (
-            <Button
-              onClick={handleSaveAsset}
-              variant="contained"
-              disabled={loading}
-              startIcon={loading ? <CircularProgress size={20} /> : <CheckCircleIcon />}
-            >
-              {loading ? 'Saving...' : 'Save'}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteConfirm.open}
-        onClose={() => setDeleteConfirm(prev => ({ ...prev, open: false }))}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ pb: 1, borderBottom: (t) => `1px solid ${t.palette.divider}` }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <DeleteIcon color="error" />
-            <Typography variant="h6">Confirm Delete</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <Typography variant="body1" sx={{ mb: 1 }}>
-            Are you sure you want to delete the asset <strong>"{deleteConfirm.assetName}"</strong>?
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            This action cannot be undone. All asset data will be permanently removed.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button 
-            onClick={() => setDeleteConfirm(prev => ({ ...prev, open: false }))}
-            variant="outlined"
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={() => {
-              if (deleteConfirm.assetId) {
-                handleDeleteAsset(deleteConfirm.assetId);
-                setDeleteConfirm(prev => ({ ...prev, open: false }));
-              }
-            }}
-            variant="contained" 
-            color="error"
-            startIcon={<DeleteIcon />}
-          >
-            Delete Asset
-          </Button>
-                 </DialogActions>
-       </Dialog>
-
-       {/* Maintenance Dialog */}
-       <Dialog open={showMaintenanceDialog} onClose={() => setShowMaintenanceDialog(false)} maxWidth="md" fullWidth>
-         <DialogTitle>
-           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-             <BuildIcon />
-             <Typography variant="h6">Add Maintenance Record</Typography>
-           </Box>
-         </DialogTitle>
-         <DialogContent dividers>
-           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3, mt: 2 }}>
-             <FormControl fullWidth>
-               <InputLabel>Maintenance Type</InputLabel>
-               <Select
-                 value={maintenanceForm.type}
-                 label="Maintenance Type"
-                 onChange={(e) => setMaintenanceForm(prev => ({ ...prev, type: e.target.value as MaintenanceRecord['type'] }))}
-               >
-                 <MenuItem value="preventive">Preventive</MenuItem>
-                 <MenuItem value="repair">Repair</MenuItem>
-                 <MenuItem value="upgrade">Upgrade</MenuItem>
-                 <MenuItem value="inspection">Inspection</MenuItem>
-               </Select>
-             </FormControl>
-             <TextField
-               fullWidth
-               label="Cost"
-               type="number"
-               value={maintenanceForm.cost}
-               onChange={(e) => setMaintenanceForm(prev => ({ ...prev, cost: e.target.value }))}
-               InputProps={{
-                 startAdornment: <Typography variant="body2" sx={{ mr: 1 }}>₹</Typography>
-               }}
-             />
-             <TextField
-               fullWidth
-               label="Performed By"
-               value={maintenanceForm.performedBy}
-               onChange={(e) => setMaintenanceForm(prev => ({ ...prev, performedBy: e.target.value }))}
-               placeholder="Technician name or company"
-             />
-             <TextField
-               fullWidth
-               label="Next Maintenance Date"
-               type="date"
-               value={maintenanceForm.nextMaintenanceDate}
-               onChange={(e) => setMaintenanceForm(prev => ({ ...prev, nextMaintenanceDate: e.target.value }))}
-               InputLabelProps={{ shrink: true }}
-             />
-             <TextField
-               fullWidth
-               label="Description"
-               multiline
-               rows={3}
-               value={maintenanceForm.description}
-               onChange={(e) => setMaintenanceForm(prev => ({ ...prev, description: e.target.value }))}
-               placeholder="Describe the maintenance work performed"
-               sx={{ gridColumn: 'span 2' }}
-             />
-           </Box>
-         </DialogContent>
-         <DialogActions sx={{ p: 2, gap: 1 }}>
-           <Button onClick={() => setShowMaintenanceDialog(false)} variant="outlined">
-             Cancel
-           </Button>
-           <Button onClick={handleAddMaintenance} variant="contained" startIcon={<BuildIcon />}>
-             Add Maintenance
-           </Button>
-         </DialogActions>
-       </Dialog>
-     </Box>
-   );
- };
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default AssetManagement;

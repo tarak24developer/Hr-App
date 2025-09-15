@@ -1,60 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Card,
-  CardContent,
-  Alert,
-  Snackbar,
-  Pagination,
-  FormControlLabel,
-  Switch,
-  Tooltip,
-  Avatar,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar
-} from '@mui/material';
-import {
-  Visibility as ViewIcon,
-  Search as SearchIcon,
-  FilterList as FilterIcon,
-  LocationOn as LocationIcon,
-  AccessTime as TimeIcon,
-  Person as PersonIcon,
-  Computer as ComputerIcon,
-  Smartphone as MobileIcon,
-  Tablet as TabletIcon,
-  Map as MapIcon,
-  Settings as SettingsIcon,
-  Refresh as RefreshIcon,
-  Wifi as WifiIcon,
-  WifiOff as WifiOffIcon
-} from '@mui/icons-material';
-import realtimeTrackingService from '../services/realtimeTracking';
-import locationTrackingService from '../services/locationTracking';
-import trackingDataService from '../services/trackingDataService';
-import authService from '../services/authService';
+  Eye,
+  MapPin,
+  Clock,
+  User,
+  Monitor,
+  Smartphone,
+  Tablet,
+  Map,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  Users,
+  UserCheck,
+  Activity,
+  AlertCircle,
+  Download,
+  Search,
+  Filter,
+  X
+} from 'lucide-react';
+import { cn } from '../utils/cn';
+import { showNotification } from '../utils/notification';
+import DashboardCard from '../components/DashboardCard';
 
 interface UserTrackingData {
   id?: string;
@@ -96,794 +64,827 @@ interface DeviceInfo {
   language: string;
   timezone: string;
   browser: string;
-  browserVersion: string;
-  os: string;
-  osVersion: string;
-  deviceType: string;
+  deviceType: 'desktop' | 'mobile' | 'tablet';
   screenResolution: string;
-  deviceId: string;
+  operatingSystem: string;
 }
-
-interface UserTrackingFilters {
-  search: string;
-  department: string;
-  status: string;
-  deviceType: string;
-  location: string;
-}
-
-const initialFilters: UserTrackingFilters = {
-  search: '',
-  department: '',
-  status: '',
-  deviceType: '',
-  location: ''
-};
-
-const statusColors = {
-  online: '#4caf50',
-  offline: '#f44336',
-  idle: '#ff9800'
-};
-
-const deviceTypeColors = {
-  desktop: '#2196f3',
-  mobile: '#ff9800',
-  tablet: '#9c27b0',
-  unknown: '#9e9e9e'
-};
 
 const UserTracking: React.FC = () => {
   const [trackingData, setTrackingData] = useState<UserTrackingData[]>([]);
-  const [filteredData, setFilteredData] = useState<UserTrackingData[]>([]);
-  const [filters, setFilters] = useState<UserTrackingFilters>(initialFilters);
-  const [selectedUser, setSelectedUser] = useState<UserTrackingData | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-
+  const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'info' | 'warning';
-  }>({
-    open: false,
-    message: '',
-    severity: 'info'
+  const [rowsPerPage] = useState(10);
+  const [selectedUser, setSelectedUser] = useState<UserTrackingData | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [filters, setFilters] = useState({
+    search: '',
+    status: '',
+    department: '',
+    deviceType: ''
   });
+  const [showFilters, setShowFilters] = useState(false);
+  const [isTracking, setIsTracking] = useState(false);
 
-  // Firebase integration - no mock data
-
-  // Initialize tracking data from Firebase
-  useEffect(() => {
-    const initializeTracking = async () => {
-      try {
-        // Load initial tracking data
-        const data = await realtimeTrackingService.getAllUserTrackingData();
-        setTrackingData(data);
-
-        // Set up real-time listener
-        const unsubscribe = realtimeTrackingService.onAllTrackingUpdates((data: UserTrackingData[]) => {
-          setTrackingData(data);
-        });
-
-        // Store unsubscribe function for cleanup
-        return unsubscribe;
-      } catch (error) {
-        console.error('Error loading tracking data:', error);
-        setSnackbar({
-          open: true,
-          message: 'Failed to load tracking data',
-          severity: 'error'
-        });
-        return null;
-      }
-    };
-
-    let unsubscribe: (() => void) | null = null;
-    
-    initializeTracking().then((unsub) => {
-      unsubscribe = unsub;
-    });
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
+  // Load tracking data
+  const loadTrackingData = useCallback(async () => {
+    try {
+      setLoading(true);
+      // Mock data for now - replace with actual service call
+      const mockData: UserTrackingData[] = [
+        {
+          id: '1',
+          userId: 'user1',
+          userName: 'John Doe',
+          userEmail: 'john@example.com',
+          userRole: 'Employee',
+          userDepartment: 'IT',
+          isOnline: true,
+          lastSeen: new Date(),
+          currentLocation: {
+            latitude: 40.7128,
+            longitude: -74.0060,
+            accuracy: 10,
+            timestamp: Date.now(),
+            address: '123 Main St, New York, NY',
+            city: 'New York',
+            state: 'NY',
+            country: 'USA'
+          },
+          deviceInfo: {
+            userAgent: 'Mozilla/5.0...',
+            platform: 'Win32',
+            language: 'en-US',
+            timezone: 'America/New_York',
+            browser: 'Chrome',
+            deviceType: 'desktop',
+            screenResolution: '1920x1080',
+            operatingSystem: 'Windows 10'
+          },
+          status: 'online',
+          totalDistance: 5.2,
+          lastActivity: new Date(),
+          sessionId: 'session1',
+          trackingEnabled: true,
+          consentGiven: true
+        }
+      ];
+      setTrackingData(mockData);
+    } catch (error) {
+      console.error('Error loading tracking data:', error);
+      showNotification('Failed to load tracking data', 'error');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    applyFilters();
-  }, [trackingData, filters]);
+    loadTrackingData();
+  }, [loadTrackingData]);
 
-  const applyFilters = useCallback(() => {
-    let filtered = [...trackingData];
-
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(user =>
-        user.userName.toLowerCase().includes(searchLower) ||
-        user.userEmail.toLowerCase().includes(searchLower) ||
-        user.userRole.toLowerCase().includes(searchLower) ||
-        user.userDepartment.toLowerCase().includes(searchLower)
-      );
-    }
-
-    if (filters.department) {
-      filtered = filtered.filter(user => user.userDepartment === filters.department);
-    }
-
-    if (filters.status) {
-      if (filters.status === 'online') {
-        filtered = filtered.filter(user => user.isOnline);
-      } else if (filters.status === 'offline') {
-        filtered = filtered.filter(user => !user.isOnline);
-      } else if (filters.status === 'idle') {
-        filtered = filtered.filter(user => user.status === 'idle');
-      } else if (filters.status === 'away') {
-        filtered = filtered.filter(user => user.status === 'away');
-      }
-    }
-
-    if (filters.deviceType) {
-      filtered = filtered.filter(user => user.deviceInfo.deviceType === filters.deviceType);
-    }
-
-    if (filters.location) {
-      filtered = filtered.filter(user => 
-        user.currentLocation.address?.toLowerCase().includes(filters.location.toLowerCase()) ||
-        user.currentLocation.city?.toLowerCase().includes(filters.location.toLowerCase()) ||
-        user.currentLocation.country?.toLowerCase().includes(filters.location.toLowerCase())
-      );
-    }
-
-    setFilteredData(filtered);
-    setCurrentPage(1);
-  }, [trackingData, filters]);
-
-  const handleFilterChange = (field: keyof UserTrackingFilters, value: string) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleViewUser = (user: UserTrackingData) => {
-    setSelectedUser(user);
-    setIsDialogOpen(true);
-  };
-
-  const handleToggleTracking = async (userId: string) => {
+  // Start/stop tracking
+  const handleTrackingToggle = async () => {
     try {
-      // Find the user to toggle
-      const user = trackingData.find(u => u.userId === userId);
-      if (!user) return;
-
-      // Update tracking status in Firebase
-      const updatedUser = {
-        ...user,
-        trackingEnabled: !user.trackingEnabled,
-        updatedAt: new Date()
-      };
-
-      // Save to Firebase
-      await trackingDataService.saveUserTrackingRecord(updatedUser);
-      
-      setSnackbar({
-        open: true,
-        message: 'Tracking status updated successfully',
-        severity: 'success'
-      });
-    } catch (error) {
-      console.error('Error updating tracking status:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to update tracking status',
-        severity: 'error'
-      });
-    }
-  };
-
-  const handleRefreshLocation = async (userId: string) => {
-    try {
-      // Find the user to refresh
-      const user = trackingData.find(u => u.userId === userId);
-      if (!user) return;
-
-      // Force location update for this user
-      if (user.userId === (await authService.getCurrentUser())?.id) {
-        // If it's the current user, force a location update
-        await locationTrackingService.forceLocationUpdate();
+      if (isTracking) {
+        // await realtimeTrackingService.stopTracking('user');
+        setIsTracking(false);
+        showNotification('Tracking stopped', 'success');
       } else {
-        // For other users, we can't force their location update
-        setSnackbar({
-          open: true,
-          message: 'Cannot refresh location for other users',
-          severity: 'warning'
-        });
-        return;
+        // await realtimeTrackingService.startTracking('user', {});
+        setIsTracking(true);
+        showNotification('Tracking started', 'success');
       }
-      
-      setSnackbar({
-        open: true,
-        message: 'Location refreshed successfully',
-        severity: 'success'
-      });
     } catch (error) {
-      console.error('Error refreshing location:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to refresh location',
-        severity: 'error'
-      });
+      console.error('Error toggling tracking:', error);
+      showNotification('Failed to toggle tracking', 'error');
     }
   };
 
-  const getStatusColor = (isOnline: boolean) => {
-    return isOnline ? statusColors.online : statusColors.offline;
+  // Filter data
+  const filteredData = trackingData.filter(user => {
+    const matchesSearch = user.userName.toLowerCase().includes(filters.search.toLowerCase()) ||
+                         user.userEmail.toLowerCase().includes(filters.search.toLowerCase());
+    const matchesStatus = !filters.status || user.status === filters.status;
+    const matchesDepartment = !filters.department || user.userDepartment === filters.department;
+    const matchesDeviceType = !filters.deviceType || user.deviceInfo.deviceType === filters.deviceType;
+    
+    return matchesSearch && matchesStatus && matchesDepartment && matchesDeviceType;
+  });
+
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
+
+  // Statistics
+  const getTotalUsers = () => trackingData.length;
+  const getOnlineUsers = () => trackingData.filter(user => user.isOnline).length;
+  const getOfflineUsers = () => trackingData.filter(user => !user.isOnline).length;
+  const getActiveUsers = () => trackingData.filter(user => user.status === 'online').length;
+  const getAwayUsers = () => trackingData.filter(user => user.status === 'away').length;
+
+  const formatDate = (date: Date) => {
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
   };
 
-  const getDeviceTypeColor = (deviceType: string) => {
-    return deviceTypeColors[deviceType as keyof typeof deviceTypeColors] || deviceTypeColors.unknown;
+  const formatDistance = (distance: number) => {
+    return `${distance.toFixed(2)} km`;
   };
 
   const getDeviceIcon = (deviceType: string) => {
     switch (deviceType) {
       case 'desktop':
-        return <ComputerIcon />;
+        return <Monitor className="w-4 h-4" />;
       case 'mobile':
-        return <MobileIcon />;
+        return <Smartphone className="w-4 h-4" />;
       case 'tablet':
-        return <TabletIcon />;
+        return <Tablet className="w-4 h-4" />;
       default:
-        return <ComputerIcon />;
+        return <Monitor className="w-4 h-4" />;
     }
   };
 
-  const formatTimeAgo = (date: Date) => {
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
-    if (diffInSeconds < 60) return 'Just now';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'online':
+        return 'bg-green-100 text-green-800';
+      case 'offline':
+        return 'bg-gray-100 text-gray-800';
+      case 'idle':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'away':
+        return 'bg-orange-100 text-orange-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
   };
 
-  const getOnlineUsersCount = () => {
-    return trackingData.filter(user => user.isOnline).length;
+  const handleFilterChange = (field: string, value: string) => {
+    setFilters(prev => ({ ...prev, [field]: value }));
+    setCurrentPage(1);
   };
 
-  const getTotalUsersCount = () => {
-    return trackingData.length;
+  const handleViewDetails = (user: UserTrackingData) => {
+    setSelectedUser(user);
+    setShowDetailsModal(true);
   };
 
-  const getActiveDepartments = () => {
-    return [...new Set(trackingData.map(user => user.userDepartment))];
+  const handleViewMap = (user: UserTrackingData) => {
+    setSelectedUser(user);
+    setShowMapModal(true);
   };
 
-
-
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading tracking data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          User Tracking & Monitoring
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={() => window.location.reload()}
+    <div className="space-y-6 p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">User Tracking & Monitoring</h1>
+          <p className="text-gray-600">Monitor user activity, location, and device information in real-time</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button 
+            onClick={handleTrackingToggle}
+            className={cn(
+              "px-4 py-2 rounded-lg transition-colors flex items-center justify-center space-x-2",
+              isTracking 
+                ? "bg-red-600 text-white hover:bg-red-700" 
+                : "bg-green-600 text-white hover:bg-green-700"
+            )}
           >
-            Refresh All
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<MapIcon />}
-            sx={{ bgcolor: 'primary.main' }}
+            {isTracking ? <WifiOff className="w-4 h-4" /> : <Wifi className="w-4 h-4" />}
+            <span>{isTracking ? 'Stop Tracking' : 'Start Tracking'}</span>
+          </button>
+          <button 
+            onClick={loadTrackingData}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
           >
-            View Map
-          </Button>
-        </Box>
-      </Box>
+            <RefreshCw className="w-4 h-4" />
+            <span>Refresh</span>
+          </button>
+          <button 
+            onClick={() => {/* Export functionality */}}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export Report</span>
+          </button>
+        </div>
+      </div>
 
-      {/* Statistics Cards */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, 
-        gap: 3, 
-        mb: 3 
-      }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Users
-            </Typography>
-            <Typography variant="h4" component="div">
-              {getTotalUsersCount()}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Online Users
-            </Typography>
-            <Typography variant="h4" component="div" color="success.main">
-              {getOnlineUsersCount()}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Active Departments
-            </Typography>
-            <Typography variant="h4" component="div" color="primary.main">
-              {getActiveDepartments().length}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Tracking Enabled
-            </Typography>
-            <Typography variant="h4" component="div" color="info.main">
-              {trackingData.filter(user => user.trackingEnabled !== false).length}
-            </Typography>
-          </CardContent>
-        </Card>
-      </Box>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <DashboardCard
+          name="Total Users"
+          value={getTotalUsers()}
+          icon={Users}
+          color="blue"
+        />
+        <DashboardCard
+          name="Online"
+          value={getOnlineUsers()}
+          icon={UserCheck}
+          color="green"
+        />
+        <DashboardCard
+          name="Offline"
+          value={getOfflineUsers()}
+          icon={User}
+          color="gray"
+        />
+        <DashboardCard
+          name="Active"
+          value={getActiveUsers()}
+          icon={Activity}
+          color="yellow"
+        />
+        <DashboardCard
+          name="Away"
+          value={getAwayUsers()}
+          icon={Clock}
+          color="indigo"
+        />
+      </div>
 
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterIcon sx={{ mr: 1 }} />
-          <Typography variant="h6">Filters</Typography>
-        </Box>
-        <Box sx={{ 
-          display: 'grid', 
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, 
-          gap: 2 
-        }}>
-          <TextField
-            fullWidth
-            label="Search Users"
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-              )
-            }}
-          />
-          <FormControl fullWidth>
-            <InputLabel>Department</InputLabel>
-            <Select
-              value={filters.department}
-              label="Department"
-              onChange={(e) => handleFilterChange('department', e.target.value)}
-            >
-              <MenuItem value="">All Departments</MenuItem>
-              {getActiveDepartments().map(dept => (
-                <MenuItem key={dept} value={dept}>
-                  {dept}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={filters.status}
-              label="Status"
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-            >
-              <MenuItem value="">All Statuses</MenuItem>
-              <MenuItem value="online">Online</MenuItem>
-              <MenuItem value="offline">Offline</MenuItem>
-              <MenuItem value="idle">Idle</MenuItem>
-              <MenuItem value="away">Away</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Device Type</InputLabel>
-            <Select
-              value={filters.deviceType}
-              label="Device Type"
-              onChange={(e) => handleFilterChange('deviceType', e.target.value)}
-            >
-              <MenuItem value="">All Devices</MenuItem>
-              <MenuItem value="desktop">Desktop</MenuItem>
-              <MenuItem value="mobile">Mobile</MenuItem>
-              <MenuItem value="tablet">Tablet</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
-      </Paper>
-
-      {/* User Tracking Table */}
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-        <TableContainer>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell>User</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Device</TableCell>
-                <TableCell>Location</TableCell>
-                <TableCell>Last Activity</TableCell>
-                <TableCell>Tracking</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} sx={{ textAlign: 'center', py: 6 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <PersonIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-                      <Typography variant="h6" color="text.secondary" gutterBottom>
-                        No Tracking Data
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 400 }}>
-                        {trackingData.length === 0 
-                          ? "No users are currently being tracked. Start location tracking to see data here."
-                          : "No users match the current filter criteria."
-                        }
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedData.map((user) => (
-                <TableRow key={user.id} hover>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar sx={{ width: 40, height: 40, bgcolor: 'primary.main' }}>
-                        {user.userName.split(' ').map(n => n[0]).join('')}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight="bold">
-                          {user.userName}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          {user.userRole} • {user.userDepartment}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {user.isOnline ? (
-                        <WifiIcon color="success" />
-                      ) : (
-                        <WifiOffIcon color="error" />
-                      )}
-                      <Chip
-                        label={user.isOnline ? 'Online' : 'Offline'}
-                        size="small"
-                        sx={{
-                          bgcolor: getStatusColor(user.isOnline),
-                          color: 'white',
-                          fontWeight: 'bold'
-                        }}
-                      />
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Box sx={{ color: getDeviceTypeColor(user.deviceInfo.deviceType) }}>
-                        {getDeviceIcon(user.deviceInfo.deviceType)}
-                      </Box>
-                      <Box>
-                        <Typography variant="body2" fontWeight="medium">
-                          {user.deviceInfo.deviceType.charAt(0).toUpperCase() + user.deviceInfo.deviceType.slice(1)}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          {user.deviceInfo.os} {user.deviceInfo.osVersion}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <LocationIcon fontSize="small" color="action" />
-                      <Box>
-                        <Typography variant="body2">
-                          {user.currentLocation.address || `${user.currentLocation.latitude.toFixed(4)}, ${user.currentLocation.longitude.toFixed(4)}`}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          {user.currentLocation.accuracy}m accuracy
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <TimeIcon fontSize="small" color="action" />
-                      <Typography variant="body2">
-                        {formatTimeAgo(user.lastSeen)}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={user.trackingEnabled !== false}
-                            onChange={() => handleToggleTracking(user.userId)}
-                            color="primary"
-                          />
-                        }
-                        label=""
-                      />
-                      <Chip
-                        label={user.trackingEnabled !== false ? 'Enabled' : 'Disabled'}
-                        size="small"
-                        color={user.trackingEnabled !== false ? 'success' : 'default'}
-                        variant="outlined"
-                      />
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
-                      <Tooltip title="View Details">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleViewUser(user)}
-                          color="primary"
-                        >
-                          <ViewIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Refresh Location">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleRefreshLocation(user.userId)}
-                          color="info"
-                        >
-                          <RefreshIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Settings">
-                        <IconButton
-                          size="small"
-                          color="default"
-                        >
-                          <SettingsIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-                ))
+      {/* Search and Filters */}
+      {trackingData.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  value={filters.search}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+              >
+                <Filter className="w-4 h-4" />
+                <span>Filters</span>
+              </button>
+              
+              {(filters.status || filters.department || filters.deviceType) && (
+                <button
+                  onClick={() => setFilters({ search: '', status: '', department: '', deviceType: '' })}
+                  className="px-4 py-2 text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition-colors"
+                >
+                  Clear Filters
+                </button>
               )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+            </div>
+          </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(_, page) => setCurrentPage(page)}
-            color="primary"
-            showFirstButton
-            showLastButton
-          />
-        </Box>
+          {/* Filter Options */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={filters.status}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="online">Online</option>
+                    <option value="offline">Offline</option>
+                    <option value="idle">Idle</option>
+                    <option value="away">Away</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <select
+                    value={filters.department}
+                    onChange={(e) => handleFilterChange('department', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Departments</option>
+                    {Array.from(new Set(trackingData.map(user => user.userDepartment))).map(dept => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Device Type</label>
+                  <select
+                    value={filters.deviceType}
+                    onChange={(e) => handleFilterChange('deviceType', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Devices</option>
+                    <option value="desktop">Desktop</option>
+                    <option value="mobile">Mobile</option>
+                    <option value="tablet">Tablet</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* User Details Dialog */}
-      <Dialog
-        open={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <PersonIcon />
-            <Typography variant="h6">
-              User Tracking Details: {selectedUser?.userName}
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {selectedUser && (
-            <Box sx={{ mt: 2 }}>
-              <Box sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, 
-                gap: 3, 
-                mb: 3 
-              }}>
-                <Box>
-                  <Typography variant="h6" gutterBottom>User Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'primary.main' }}>
-                          <PersonIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Full Name"
-                        secondary={selectedUser.userName}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                          <PersonIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Email"
-                        secondary={selectedUser.userEmail}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <PersonIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Role"
-                        secondary={selectedUser.userRole}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'warning.main' }}>
-                          <PersonIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Department"
-                        secondary={selectedUser.userDepartment}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-                <Box>
-                  <Typography variant="h6" gutterBottom>Device Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'primary.main' }}>
-                          {getDeviceIcon(selectedUser.deviceInfo.deviceType)}
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Device Type"
-                        secondary={selectedUser.deviceInfo.deviceType.charAt(0).toUpperCase() + selectedUser.deviceInfo.deviceType.slice(1)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                          <ComputerIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Operating System"
-                        secondary={`${selectedUser.deviceInfo.os} ${selectedUser.deviceInfo.osVersion}`}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'info.main' }}>
-                          <ComputerIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Browser"
-                        secondary={`${selectedUser.deviceInfo.browser} ${selectedUser.deviceInfo.browserVersion}`}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemAvatar>
-                        <Avatar sx={{ bgcolor: 'warning.main' }}>
-                          <ComputerIcon />
-                        </Avatar>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary="Screen Resolution"
-                        secondary={selectedUser.deviceInfo.screenResolution}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-              </Box>
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" gutterBottom>Current Location</Typography>
-                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box sx={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, 
-                    gap: 2 
-                  }}>
-                    <Typography variant="body2">
-                      <strong>Coordinates:</strong> {selectedUser.currentLocation.latitude.toFixed(4)}, {selectedUser.currentLocation.longitude.toFixed(4)}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Accuracy:</strong> {selectedUser.currentLocation.accuracy}m
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Address:</strong> {selectedUser.currentLocation.address || 'Not available'}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>City/Country:</strong> {selectedUser.currentLocation.city || 'Unknown'}, {selectedUser.currentLocation.country || 'Unknown'}
-                    </Typography>
-                    <Typography variant="body2" sx={{ gridColumn: { xs: '1', sm: '1 / -1' } }}>
-                      <strong>Last Updated:</strong> {new Date(selectedUser.currentLocation.timestamp).toLocaleString()}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Box>
-              <Box>
-                <Typography variant="h6" gutterBottom>Session Information</Typography>
-                <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                  <Box sx={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, 
-                    gap: 2 
-                  }}>
-                    <Typography variant="body2">
-                      <strong>Session ID:</strong> {selectedUser.sessionId}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Login Time:</strong> {selectedUser.loginTime ? selectedUser.loginTime.toLocaleString() : 'Not available'}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Last Activity:</strong> {selectedUser.lastActivity ? selectedUser.lastActivity.toLocaleString() : 'Not available'}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Total Distance:</strong> {selectedUser.totalDistance ? `${selectedUser.totalDistance.toFixed(2)} km` : 'Not tracked'}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
+      {/* Tracking Data Table */}
+      {trackingData.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Seen</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {paginatedData.map((user) => (
+                  <tr key={user.userId} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10">
+                          <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
+                            <User className="w-5 h-5 text-gray-600" />
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{user.userName}</div>
+                          <div className="text-sm text-gray-500">{user.userEmail}</div>
+                          <div className="text-sm text-gray-500">{user.userDepartment}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <span className={cn(
+                          "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                          getStatusColor(user.status)
+                        )}>
+                          {user.status}
+                        </span>
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          user.isOnline ? "bg-green-500" : "bg-gray-400"
+                        )}></div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        {getDeviceIcon(user.deviceInfo.deviceType)}
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">
+                            {user.deviceInfo.deviceType}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {user.deviceInfo.operatingSystem}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="text-sm text-gray-900">
+                            {user.currentLocation.city || 'Unknown'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {user.currentLocation.address || 'Location not available'}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {formatDate(user.lastSeen)}
+                      </div>
+                      {user.totalDistance && (
+                        <div className="text-sm text-gray-500">
+                          {formatDistance(user.totalDistance)} traveled
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleViewDetails(user)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleViewMap(user)}
+                          className="text-green-600 hover:text-green-900"
+                        >
+                          <Map className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-      >
-        <Alert
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+      {/* No Results */}
+      {filteredData.length === 0 && trackingData.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
+          <p className="text-gray-500">Try adjusting your search or filter parameters</p>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {trackingData.length === 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-medium text-gray-900 mb-2">No Tracking Data</h3>
+          <p className="text-gray-500 mb-6">Start tracking to monitor user activity and location</p>
+          <button
+            onClick={handleTrackingToggle}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 mx-auto"
+          >
+            <Wifi className="w-4 h-4" />
+            <span>Start Tracking</span>
+          </button>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {filteredData.length > rowsPerPage && (
+        <div className="flex justify-center">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {Array.from({ length: Math.ceil(filteredData.length / rowsPerPage) }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  "px-3 py-2 text-sm font-medium rounded-lg",
+                  page === currentPage
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 bg-white border border-gray-300 hover:bg-gray-50"
+                )}
+              >
+                {page}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setCurrentPage(Math.min(Math.ceil(filteredData.length / rowsPerPage), currentPage + 1))}
+              disabled={currentPage === Math.ceil(filteredData.length / rowsPerPage)}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* User Details Modal */}
+      {showDetailsModal && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowDetailsModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between mb-4 p-4">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-1.5 bg-primary-100 rounded-lg">
+                  <Eye className="w-5 h-5 text-primary-600" />
+                </div>
+                <h3 className="text-base font-semibold text-gray-900">User Tracking Details</h3>
+              </div>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* User Details Content */}
+            <div className="p-4 space-y-6">
+              {/* User Header */}
+              <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+                  <span className="text-primary-600 font-semibold text-xl">
+                    {selectedUser.userName.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-xl font-semibold text-gray-900">{selectedUser.userName}</h4>
+                  <p className="text-gray-600">{selectedUser.userEmail}</p>
+                  <div className="flex items-center space-x-4 mt-2">
+                    <span className={cn(
+                      "px-2 py-1 text-xs font-medium rounded-full",
+                      getStatusColor(selectedUser.status)
+                    )}>
+                      {selectedUser.status}
+                    </span>
+                    <span className={cn(
+                      "px-2 py-1 text-xs font-medium rounded-full",
+                      selectedUser.isOnline ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                    )}>
+                      {selectedUser.isOnline ? 'Online' : 'Offline'}
+                    </span>
+                    <span className="text-sm text-gray-500">{selectedUser.userDepartment}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Details Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* User Information */}
+                <div className="space-y-4">
+                  <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">User Information</h5>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <User className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Name</p>
+                        <p className="text-sm text-gray-600">{selectedUser.userName}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <User className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Email</p>
+                        <p className="text-sm text-gray-600">{selectedUser.userEmail}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                        <User className="w-4 h-4 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Role</p>
+                        <p className="text-sm text-gray-600">{selectedUser.userRole}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                        <User className="w-4 h-4 text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Department</p>
+                        <p className="text-sm text-gray-600">{selectedUser.userDepartment}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status & Activity */}
+                <div className="space-y-4">
+                  <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Status & Activity</h5>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <UserCheck className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Status</p>
+                        <span className={cn(
+                          "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                          getStatusColor(selectedUser.status)
+                        )}>
+                          {selectedUser.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Wifi className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Online Status</p>
+                        <span className={cn(
+                          "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                          selectedUser.isOnline ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                        )}>
+                          {selectedUser.isOnline ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <Clock className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Last Seen</p>
+                        <p className="text-sm text-gray-600">{formatDate(selectedUser.lastSeen)}</p>
+                      </div>
+                    </div>
+                    {selectedUser.lastActivity && (
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                          <Activity className="w-4 h-4 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Last Activity</p>
+                          <p className="text-sm text-gray-600">{formatDate(selectedUser.lastActivity)}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Device Information */}
+              <div className="space-y-4">
+                <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Device Information</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        {getDeviceIcon(selectedUser.deviceInfo.deviceType)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Device Type</p>
+                        <p className="text-sm text-gray-600">{selectedUser.deviceInfo.deviceType}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <Monitor className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Operating System</p>
+                        <p className="text-sm text-gray-600">{selectedUser.deviceInfo.operatingSystem}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                        <Monitor className="w-4 h-4 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Browser</p>
+                        <p className="text-sm text-gray-600">{selectedUser.deviceInfo.browser}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Monitor className="w-4 h-4 text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Screen Resolution</p>
+                        <p className="text-sm text-gray-600">{selectedUser.deviceInfo.screenResolution}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Location Information */}
+              <div className="space-y-4">
+                <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Location Information</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm font-medium text-gray-500">City</span>
+                      <span className="text-sm text-gray-900">{selectedUser.currentLocation.city || '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm font-medium text-gray-500">State</span>
+                      <span className="text-sm text-gray-900">{selectedUser.currentLocation.state || '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm font-medium text-gray-500">Country</span>
+                      <span className="text-sm text-gray-900">{selectedUser.currentLocation.country || '—'}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm font-medium text-gray-500">Address</span>
+                      <span className="text-sm text-gray-900">{selectedUser.currentLocation.address || '—'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm font-medium text-gray-500">Coordinates</span>
+                      <span className="text-sm text-gray-900">
+                        {selectedUser.currentLocation.latitude && selectedUser.currentLocation.longitude 
+                          ? `${selectedUser.currentLocation.latitude}, ${selectedUser.currentLocation.longitude}`
+                          : '—'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="mt-6 flex justify-end border-t border-gray-200 pt-4 p-4">
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors mr-3"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => handleViewMap(selectedUser)}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+              >
+                <Map className="w-4 h-4" />
+                <span>View Map</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Map Modal */}
+      {showMapModal && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowMapModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                <Map className="w-5 h-5" />
+                <span>Location Map - {selectedUser.userName}</span>
+              </h3>
+              <button
+                onClick={() => setShowMapModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
+                <div className="text-center">
+                  <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Map View</h3>
+                  <p className="text-gray-500 mb-4">
+                    Location: {selectedUser.currentLocation.latitude}, {selectedUser.currentLocation.longitude}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {selectedUser.currentLocation.address || 'Address not available'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowMapModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

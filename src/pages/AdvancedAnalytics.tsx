@@ -16,7 +16,6 @@ import {
   MenuItem,
   Button,
   Stack,
-  Grid,
   Chip,
   LinearProgress,
   Table,
@@ -30,10 +29,7 @@ import {
   TrendingUp as TrendingUpIcon,
   People as PeopleIcon,
   AttachMoney as MoneyIcon,
-  Assessment as AssessmentIcon,
-  Business as BusinessIcon,
   Schedule as ScheduleIcon,
-  AccountBalance as AccountBalanceIcon,
   Refresh as RefreshIcon,
   Work as WorkIcon
 } from '@mui/icons-material';
@@ -109,16 +105,16 @@ interface Attendance {
   overtimeHours: number;
 }
 
-interface Payroll {
-  id: string;
-  employeeId: string;
-  month: string;
-  year: string;
-  basicSalary: number;
-  allowances: number;
-  deductions: number;
-  netSalary: number;
-}
+// interface Payroll {
+//   id: string;
+//   employeeId: string;
+//   month: string;
+//   year: string;
+//   basicSalary: number;
+//   allowances: number;
+//   deductions: number;
+//   netSalary: number;
+// }
 
 interface Expense {
   id: string;
@@ -157,7 +153,7 @@ const AdvancedAnalytics: React.FC = () => {
 
       const users = usersResult.data as User[] || [];
       const attendance = attendanceResult.data as Attendance[] || [];
-      const payroll = payrollResult.data as Payroll[] || [];
+      // const _payroll = payrollResult.data as Payroll[] || [];
       const expenses = expensesResult.data as Expense[] || [];
 
       // For main metrics, use overall data (not period-filtered) to ensure data is visible
@@ -530,7 +526,7 @@ const AdvancedAnalytics: React.FC = () => {
                 Department Overview
               </Typography>
               <Box>
-                {analyticsData.departmentStats.map((dept, index) => (
+                {analyticsData.departmentStats.map((dept, _index) => (
                   <Box key={dept.department} mb={2}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                       <Typography variant="body2" fontWeight="medium">

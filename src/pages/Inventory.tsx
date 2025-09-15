@@ -1,57 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Card,
-  CardContent,
-  CircularProgress,
-  Tooltip,
-  Pagination,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Visibility as ViewIcon,
-  Search as SearchIcon,
-  FilterList as FilterIcon,
-  Inventory as InventoryIcon,
-  Category as CategoryIcon,
-  Person as PersonIcon,
-  LocationOn as LocationIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  Refresh as RefreshIcon,
-  Download as DownloadIcon,
-  Assignment as AssignmentIcon,
-  Build as BuildIcon,
-  Schedule as ScheduleIcon
-} from '@mui/icons-material';
+  Plus,
+  Edit,
+  Eye,
+  Trash2,
+  Package,
+  Tag,
+  User,
+  MapPin,
+  AlertTriangle,
+  CheckCircle,
+  Download,
+  DollarSign,
+  AlertCircle,
+  Search,
+  Filter,
+  X,
+  FileText
+} from 'lucide-react';
+import { cn } from '../utils/cn';
 import firebaseService from '../services/firebaseService';
 import { showNotification } from '../utils/notification';
+import DashboardCard from '../components/DashboardCard';
 
 interface User {
   id: string;
@@ -76,12 +46,12 @@ interface InventoryItem {
   location: string;
   status: 'active' | 'inactive' | 'discontinued' | 'out_of_stock';
   condition: 'new' | 'good' | 'fair' | 'poor';
-  dateAdded: any; // Can be Date, Firebase Timestamp, or string
-  lastUpdated: any; // Can be Date, Firebase Timestamp, or string
-  lastAudit?: any; // Can be Date, Firebase Timestamp, or string
+  dateAdded: any;
+  lastUpdated: any;
+  lastAudit?: any;
   supplier: string;
   supplierContact: string;
-  warrantyExpiry?: any | null; // Can be Date, Firebase Timestamp, string, or null
+  warrantyExpiry?: any | null;
   tags: string[];
   notes: string;
 }
@@ -102,9 +72,9 @@ const Inventory: React.FC = () => {
     category: '',
     status: '',
     condition: '',
-    assignedTo: '',
     location: ''
   });
+  const [showFilters, setShowFilters] = useState(false);
 
   const [inventoryForm, setInventoryForm] = useState({
     name: '',
@@ -114,7 +84,7 @@ const Inventory: React.FC = () => {
     quantity: '',
     minQuantity: '',
     maxQuantity: '',
-    unit: 'pieces',
+    unit: '',
     unitPrice: '',
     assignedTo: '',
     location: '',
@@ -125,14 +95,6 @@ const Inventory: React.FC = () => {
     warrantyExpiry: '',
     tags: '',
     notes: ''
-  });
-
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    open: boolean;
-    itemId?: string;
-    itemName?: string;
-  }>({
-    open: false
   });
 
   // Firebase integration functions
@@ -175,7 +137,6 @@ const Inventory: React.FC = () => {
   };
 
   useEffect(() => {
-    // Load data from Firebase
     fetchInventory();
     fetchUsers();
   }, []);
@@ -188,15 +149,13 @@ const Inventory: React.FC = () => {
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(filters.search.toLowerCase()) ||
                          item.sku.toLowerCase().includes(filters.search.toLowerCase()) ||
-                         item.description.toLowerCase().includes(filters.search.toLowerCase()) ||
-                         item.category.toLowerCase().includes(filters.search.toLowerCase());
+                         item.description.toLowerCase().includes(filters.search.toLowerCase());
     const matchesCategory = !filters.category || item.category === filters.category;
     const matchesStatus = !filters.status || item.status === filters.status;
     const matchesCondition = !filters.condition || item.condition === filters.condition;
-    const matchesAssignedTo = !filters.assignedTo || item.assignedTo === filters.assignedTo;
     const matchesLocation = !filters.location || item.location === filters.location;
     
-    return matchesSearch && matchesCategory && matchesStatus && matchesCondition && matchesAssignedTo && matchesLocation;
+    return matchesSearch && matchesCategory && matchesStatus && matchesCondition && matchesLocation;
   });
 
   const paginatedInventory = filteredInventory.slice(
@@ -204,8 +163,8 @@ const Inventory: React.FC = () => {
     currentPage * rowsPerPage
   );
 
-  const getTotalValue = () => {
-    return inventory.reduce((total, item) => total + item.totalValue, 0);
+  const getTotalItems = () => {
+    return inventory.length;
   };
 
   const getActiveItems = () => {
@@ -220,6 +179,10 @@ const Inventory: React.FC = () => {
     return inventory.filter(item => item.status === 'out_of_stock');
   };
 
+  const getTotalValue = () => {
+    return inventory.reduce((total, item) => total + item.totalValue, 0);
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -227,64 +190,14 @@ const Inventory: React.FC = () => {
     }).format(amount);
   };
 
-  const getStatusColor = (status: InventoryItem['status']) => {
-    switch (status) {
-      case 'active': return 'success';
-      case 'inactive': return 'default';
-      case 'discontinued': return 'error';
-      case 'out_of_stock': return 'warning';
-      default: return 'default';
+  const formatDate = (date: any) => {
+    if (!date) return 'N/A';
+    try {
+      const dateObj = date.toDate ? date.toDate() : new Date(date);
+      return dateObj.toLocaleDateString();
+    } catch {
+      return 'Invalid Date';
     }
-  };
-
-  const getConditionColor = (condition: InventoryItem['condition']) => {
-    switch (condition) {
-      case 'new': return 'success';
-      case 'good': return 'primary';
-      case 'fair': return 'warning';
-      case 'poor': return 'error';
-      default: return 'default';
-    }
-  };
-
-  // Helper function to safely convert any date type to a display string
-  const convertToDisplayDate = (dateField: any): string => {
-    if (!dateField) return 'Not specified';
-    if (dateField instanceof Date) {
-      return dateField.toLocaleDateString();
-    }
-    if (typeof dateField === 'string') {
-      try {
-        return new Date(dateField).toLocaleDateString();
-      } catch {
-        return dateField;
-      }
-    }
-    // Handle Firebase Timestamp objects
-    if (dateField && typeof dateField.toDate === 'function') {
-      return dateField.toDate().toLocaleDateString();
-    }
-    return 'Invalid date';
-  };
-
-  // Helper function to safely convert Firebase date fields to ISO date strings
-  const convertToDateString = (dateField: any): string => {
-    if (!dateField) return '';
-    if (dateField instanceof Date) {
-      return dateField.toISOString().split('T')[0];
-    }
-    if (typeof dateField === 'string') {
-      try {
-        return new Date(dateField).toISOString().split('T')[0];
-      } catch {
-        return dateField;
-      }
-    }
-    // Handle Firebase Timestamp objects
-    if (dateField && typeof dateField.toDate === 'function') {
-      return dateField.toDate().toISOString().split('T')[0];
-    }
-    return '';
   };
 
   const handleOpenDialog = (mode: 'add' | 'edit' | 'view', item?: InventoryItem) => {
@@ -302,14 +215,14 @@ const Inventory: React.FC = () => {
         unit: item.unit,
         unitPrice: item.unitPrice.toString(),
         assignedTo: item.assignedTo || '',
-        location: item.location || '',
+        location: item.location,
         status: item.status,
         condition: item.condition,
-        supplier: item.supplier || '',
-        supplierContact: item.supplierContact || '',
-        warrantyExpiry: convertToDateString(item.warrantyExpiry),
+        supplier: item.supplier,
+        supplierContact: item.supplierContact,
+        warrantyExpiry: formatDate(item.warrantyExpiry),
         tags: item.tags.join(', '),
-        notes: item.notes || ''
+        notes: item.notes
       });
     } else {
       setSelectedItem(null);
@@ -321,7 +234,7 @@ const Inventory: React.FC = () => {
         quantity: '',
         minQuantity: '',
         maxQuantity: '',
-        unit: 'pieces',
+        unit: '',
         unitPrice: '',
         assignedTo: '',
         location: '',
@@ -348,7 +261,7 @@ const Inventory: React.FC = () => {
       quantity: '',
       minQuantity: '',
       maxQuantity: '',
-      unit: 'pieces',
+      unit: '',
       unitPrice: '',
       assignedTo: '',
       location: '',
@@ -363,36 +276,28 @@ const Inventory: React.FC = () => {
   };
 
   const handleSaveItem = async () => {
-    if (!inventoryForm.name || !inventoryForm.sku || !inventoryForm.category || !inventoryForm.quantity || !inventoryForm.unitPrice) {
+    if (!inventoryForm.name || !inventoryForm.sku || !inventoryForm.category || !inventoryForm.quantity) {
       showNotification('Please fill in all required fields', 'error');
       return;
     }
 
     try {
       setLoading(true);
+      const quantity = parseFloat(inventoryForm.quantity);
+      const unitPrice = parseFloat(inventoryForm.unitPrice);
+      const totalValue = quantity * unitPrice;
+      
       const itemData = {
-        name: inventoryForm.name,
-        category: inventoryForm.category,
-        sku: inventoryForm.sku,
-        description: inventoryForm.description,
-        quantity: parseInt(inventoryForm.quantity),
-        minQuantity: parseInt(inventoryForm.minQuantity),
-        maxQuantity: parseInt(inventoryForm.maxQuantity),
-        unit: inventoryForm.unit,
-        unitPrice: parseFloat(inventoryForm.unitPrice),
-        totalValue: parseInt(inventoryForm.quantity) * parseFloat(inventoryForm.unitPrice),
-        assignedTo: inventoryForm.assignedTo || '',
-        location: inventoryForm.location,
-        status: inventoryForm.status,
-        condition: inventoryForm.condition,
-        supplier: inventoryForm.supplier || '',
-        supplierContact: inventoryForm.supplierContact || '',
-        tags: inventoryForm.tags ? inventoryForm.tags.split(',').map(tag => tag.trim()) : [],
-        notes: inventoryForm.notes || '',
-        warrantyExpiry: inventoryForm.warrantyExpiry ? new Date(inventoryForm.warrantyExpiry) : null,
+        ...inventoryForm,
+        quantity: quantity,
+        minQuantity: parseFloat(inventoryForm.minQuantity),
+        maxQuantity: parseFloat(inventoryForm.maxQuantity),
+        unitPrice: unitPrice,
+        totalValue: totalValue,
         dateAdded: new Date(),
         lastUpdated: new Date(),
-        lastAudit: new Date()
+        warrantyExpiry: inventoryForm.warrantyExpiry ? new Date(inventoryForm.warrantyExpiry) : null,
+        tags: inventoryForm.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
       };
 
       if (dialogMode === 'add') {
@@ -423,17 +328,19 @@ const Inventory: React.FC = () => {
   };
 
   const handleDeleteItem = async (itemId: string) => {
-    try {
-      const result = await firebaseService.deleteDocument('inventory', itemId);
-      if (result.success) {
-        showNotification('Inventory item deleted successfully!', 'success');
-        fetchInventory();
-      } else {
-        showNotification('Failed to delete inventory item', 'error');
+    if (window.confirm('Are you sure you want to delete this inventory item?')) {
+      try {
+        const result = await firebaseService.deleteDocument('inventory', itemId);
+        if (result.success) {
+          showNotification('Inventory item deleted successfully!', 'success');
+          fetchInventory();
+        } else {
+          showNotification('Failed to delete inventory item', 'error');
+        }
+      } catch (error) {
+        console.error('Error deleting inventory item:', error);
+        showNotification('Error deleting inventory item', 'error');
       }
-    } catch (error) {
-      console.error('Error deleting inventory item:', error);
-      showNotification('Error deleting inventory item', 'error');
     }
   };
 
@@ -457,884 +364,826 @@ const Inventory: React.FC = () => {
     }
   };
 
-  // CSV Export functions
-  const generateCSV = () => {
-    const headers = [
-      'Name', 'SKU', 'Category', 'Description', 'Quantity', 'Unit', 'Unit Price', 
-      'Total Value', 'Status', 'Condition', 'Location', 'Assigned To', 
-      'Supplier', 'Supplier Contact', 'Warranty Expiry', 'Tags', 'Notes', 
-      'Date Added', 'Last Updated'
-    ];
-    
-    const csvRows = [headers.join(',')];
-    
-    inventory.forEach(item => {
-      const row = [
-        `"${item.name}"`,
-        `"${item.sku}"`,
-        `"${item.category}"`,
-        `"${item.description}"`,
-        item.quantity,
-        `"${item.unit}"`,
-        item.unitPrice,
-        item.totalValue,
-        `"${item.status}"`,
-        `"${item.condition}"`,
-        `"${item.location}"`,
-        `"${item.assignedTo ? users.find(u => u.id === item.assignedTo)?.name || 'Unknown' : 'Unassigned'}"`,
-        `"${item.supplier}"`,
-        `"${item.supplierContact}"`,
-        `"${item.warrantyExpiry ? convertToDisplayDate(item.warrantyExpiry) : 'Not specified'}"`,
-        `"${item.tags.join(', ')}"`,
-        `"${item.notes}"`,
-        `"${convertToDisplayDate(item.dateAdded)}"`,
-        `"${convertToDisplayDate(item.lastUpdated)}"`
-      ];
-      csvRows.push(row.join(','));
-    });
-    
-    return csvRows.join('\n');
-  };
-
-  const downloadCSV = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
+  // Loading state
   if (inventoryLoading || usersLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress />
-      </Box>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading inventory data...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Inventory Management
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
+    <div className="space-y-6 p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
+          <p className="text-gray-600">Track and manage company inventory items</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button 
             onClick={() => handleOpenDialog('add')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
           >
-            Add Item
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={() => {
-              fetchInventory();
-              fetchUsers();
-            }}
+            <Plus className="w-4 h-4" />
+            <span>Add Item</span>
+          </button>
+          <button 
+            onClick={() => {/* Export functionality */}}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
           >
-            Refresh
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={() => {
-              // Export inventory data to CSV
-              const csvContent = generateCSV();
-              downloadCSV(csvContent, 'inventory-export.csv');
-            }}
-          >
-            Export
-          </Button>
-        </Box>
-      </Box>
+            <Download className="w-4 h-4" />
+            <span>Export Report</span>
+          </button>
+        </div>
+      </div>
 
-      {/* Statistics Cards */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-        gap: 3, 
-        mb: 3 
-      }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Items
-            </Typography>
-            <Typography variant="h4" component="div">
-              {inventory.length}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              {formatCurrency(getTotalValue())} total value
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Active Items
-            </Typography>
-            <Typography variant="h4" component="div" color="success.main">
-              {getActiveItems().length}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Currently available
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Low Stock
-            </Typography>
-            <Typography variant="h4" component="div" color="warning.main">
-              {getLowStockItems().length}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Below minimum quantity
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Out of Stock
-            </Typography>
-            <Typography variant="h4" component="div" color="error.main">
-              {getOutOfStockItems().length}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Need restocking
-            </Typography>
-          </CardContent>
-        </Card>
-      </Box>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <DashboardCard
+          name="Total Items"
+          value={getTotalItems()}
+          icon={Package}
+          color="blue"
+        />
+        <DashboardCard
+          name="Active Items"
+          value={getActiveItems().length}
+          icon={CheckCircle}
+          color="green"
+        />
+        <DashboardCard
+          name="Low Stock"
+          value={getLowStockItems().length}
+          icon={AlertTriangle}
+          color="yellow"
+        />
+        <DashboardCard
+          name="Out of Stock"
+          value={getOutOfStockItems().length}
+          icon={AlertCircle}
+          color="red"
+        />
+        <DashboardCard
+          name="Total Value"
+          value={formatCurrency(getTotalValue())}
+          icon={DollarSign}
+          color="purple"
+        />
+      </div>
 
-      {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <FilterIcon sx={{ mr: 1 }} />
-          <Typography variant="h6">Filters</Typography>
-        </Box>
-        <Box sx={{ 
-          display: 'grid', 
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)', lg: 'repeat(6, 1fr)' },
-          gap: 2 
-        }}>
-          <TextField
-            fullWidth
-            label="Search"
-            value={filters.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
-            }}
-          />
-          <TextField
-            fullWidth
-            label="Category"
-            value={filters.category}
-            onChange={(e) => handleFilterChange('category', e.target.value)}
-          />
-          <FormControl fullWidth>
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={filters.status}
-              label="Status"
-              onChange={(e) => handleFilterChange('status', e.target.value)}
-            >
-              <MenuItem value="">All Statuses</MenuItem>
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-              <MenuItem value="discontinued">Discontinued</MenuItem>
-              <MenuItem value="out_of_stock">Out of Stock</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Condition</InputLabel>
-            <Select
-              value={filters.condition}
-              label="Condition"
-              onChange={(e) => handleFilterChange('condition', e.target.value)}
-            >
-              <MenuItem value="">All Conditions</MenuItem>
-              <MenuItem value="new">New</MenuItem>
-              <MenuItem value="good">Good</MenuItem>
-              <MenuItem value="fair">Fair</MenuItem>
-              <MenuItem value="poor">Poor</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>Assigned To</InputLabel>
-            <Select
-              value={filters.assignedTo}
-              label="Assigned To"
-              onChange={(e) => handleFilterChange('assignedTo', e.target.value)}
-            >
-              <MenuItem value="">All Assignments</MenuItem>
-              {users.map(user => (
-                <MenuItem key={user.id} value={user.id}>
-                  {user.name} - {user.department}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            fullWidth
-            label="Location"
-            value={filters.location}
-            onChange={(e) => handleFilterChange('location', e.target.value)}
-          />
-        </Box>
-      </Paper>
+      {/* Search and Filters */}
+      {inventory.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search inventory..."
+                  value={filters.search}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+              >
+                <Filter className="w-4 h-4" />
+                <span>Filters</span>
+              </button>
+              
+              {(filters.category || filters.status || filters.condition || filters.location) && (
+                <button
+                  onClick={() => setFilters({ search: '', category: '', status: '', condition: '', location: '' })}
+                  className="px-4 py-2 text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition-colors"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Filter Options */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <select
+                    value={filters.category}
+                    onChange={(e) => handleFilterChange('category', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Categories</option>
+                    {Array.from(new Set(inventory.map(item => item.category))).map(category => (
+                      <option key={category} value={category}>
+                        {category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={filters.status}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="discontinued">Discontinued</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Condition</label>
+                  <select
+                    value={filters.condition}
+                    onChange={(e) => handleFilterChange('condition', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Conditions</option>
+                    <option value="new">New</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                  <select
+                    value={filters.location}
+                    onChange={(e) => handleFilterChange('location', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">All Locations</option>
+                    {Array.from(new Set(inventory.map(item => item.location))).map(location => (
+                      <option key={location} value={location}>
+                        {location}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Inventory Table */}
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-        <TableContainer>
-          <Table stickyHeader>
-            <TableHead>
-              <TableRow>
-                <TableCell>Item</TableCell>
-                <TableCell>SKU</TableCell>
-                <TableCell>Quantity</TableCell>
-                <TableCell>Value</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Condition</TableCell>
-                <TableCell>Assigned To</TableCell>
-                <TableCell>Location</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+      {inventory.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
               {paginatedInventory.map((item) => {
-                const assignedUser = users.find(u => u.id === item.assignedTo);
-                return (
-                  <TableRow key={item.id} hover>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <InventoryIcon color="primary" />
-                        <Box>
-                          <Typography variant="subtitle2" fontWeight="bold">
-                            {item.name}
-                          </Typography>
-                          <Typography variant="body2" color="textSecondary">
-                            {item.category}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontFamily="monospace">
-                        {item.sku}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight="bold">
-                          {item.quantity} {item.unit}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          Min: {item.minQuantity} | Max: {item.maxQuantity}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="subtitle2" fontWeight="bold">
-                        {formatCurrency(item.totalValue)}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        {formatCurrency(item.unitPrice)} per {item.unit}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={item.status.replace('_', ' ')}
-                        size="small"
-                        color={getStatusColor(item.status)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={item.condition}
-                        size="small"
-                        color={getConditionColor(item.condition)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {assignedUser ? (
-                        <Box>
-                          <Typography variant="body2">
-                            {assignedUser.name}
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            {assignedUser.department}
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" color="textSecondary">
-                          Unassigned
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {item.location}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Tooltip title="View Details">
-                          <IconButton
-                            size="small"
+                  const isLowStock = item.quantity <= item.minQuantity;
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                              <Package className="w-4 h-4" />
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                            <div className="text-sm text-gray-500 max-w-xs truncate">{item.description}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{item.sku}</div>
+                        <div className="text-sm text-gray-500">{item.unit}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                          {item.category}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{item.quantity}</div>
+                        {isLowStock && (
+                          <div className="text-sm text-yellow-600 flex items-center">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            Low Stock
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={cn(
+                          "inline-flex px-2 py-1 text-xs font-semibold rounded-full",
+                          item.status === 'active' ? 'bg-green-100 text-green-800' :
+                          item.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
+                          item.status === 'discontinued' ? 'bg-red-100 text-red-800' :
+                          'bg-red-100 text-red-800'
+                        )}>
+                          {item.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <MapPin className="w-4 h-4 text-gray-400 mr-2" />
+                          <div className="text-sm text-gray-900">{item.location}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatCurrency(item.totalValue)}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatCurrency(item.unitPrice)} per {item.unit}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-2">
+                          <button
                             onClick={() => handleOpenDialog('view', item)}
-                            color="info"
+                            className="text-blue-600 hover:text-blue-900"
                           >
-                            <ViewIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit Item">
-                          <IconButton
-                            size="small"
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleOpenDialog('edit', item)}
-                            color="primary"
+                            className="text-green-600 hover:text-green-900"
                           >
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <FormControl size="small" sx={{ minWidth: 120 }}>
-                          <Select
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <select
                             value={item.status}
                             onChange={(e) => handleStatusChange(item.id, e.target.value)}
-                            size="small"
+                            className="text-xs border border-gray-300 rounded px-2 py-1"
                           >
-                            <MenuItem value="active">Active</MenuItem>
-                            <MenuItem value="inactive">Inactive</MenuItem>
-                            <MenuItem value="discontinued">Discontinued</MenuItem>
-                            <MenuItem value="out_of_stock">Out of Stock</MenuItem>
-                          </Select>
-                        </FormControl>
-                        <Tooltip title="Delete Item">
-                          <IconButton
-                            size="small"
-                            onClick={() => setDeleteConfirm({
-                              open: true,
-                              itemId: item.id,
-                              itemName: item.name
-                            })}
-                            color="error"
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="discontinued">Discontinued</option>
+                            <option value="out_of_stock">Out of Stock</option>
+                          </select>
+                          <button
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="text-red-600 hover:text-red-900"
                           >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        
-        {filteredInventory.length === 0 && (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Typography color="textSecondary">
-              No inventory items found matching your criteria
-            </Typography>
-          </Box>
-        )}
-      </Paper>
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* No Results */}
+      {filteredInventory.length === 0 && inventory.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No inventory items found</h3>
+          <p className="text-gray-500">Try adjusting your search or filter parameters</p>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {inventory.length === 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+          <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-medium text-gray-900 mb-2">No Inventory Items Yet</h3>
+          <p className="text-gray-500 mb-6">Start by adding your first inventory item to get started with inventory management</p>
+          <button
+            onClick={() => handleOpenDialog('add')}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 mx-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add First Item</span>
+          </button>
+        </div>
+      )}
 
       {/* Pagination */}
       {filteredInventory.length > rowsPerPage && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-          <Pagination
-            count={Math.ceil(filteredInventory.length / rowsPerPage)}
-            page={currentPage}
-            onChange={(_, page) => setCurrentPage(page)}
-            color="primary"
-          />
-        </Box>
+        <div className="flex justify-center">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {Array.from({ length: Math.ceil(filteredInventory.length / rowsPerPage) }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  "px-3 py-2 text-sm font-medium rounded-lg",
+                  page === currentPage
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-500 bg-white border border-gray-300 hover:bg-gray-50"
+                )}
+              >
+                {page}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setCurrentPage(Math.min(Math.ceil(filteredInventory.length / rowsPerPage), currentPage + 1))}
+              disabled={currentPage === Math.ceil(filteredInventory.length / rowsPerPage)}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* Add/Edit/View Dialog */}
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ pb: 1, borderBottom: (t) => `1px solid ${t.palette.divider}` }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {dialogMode === 'add' ? <AddIcon color="primary" /> : 
-             dialogMode === 'edit' ? <EditIcon color="primary" /> : <ViewIcon color="primary" />}
-            <Typography variant="h6" component="span">
-              {dialogMode === 'add' ? 'Add New Item' :
-               dialogMode === 'edit' ? 'Edit Item' : 'View Item Details'}
-            </Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {dialogMode === 'view'
-              ? 'Viewing item details'
-              : `Fill the details below to ${dialogMode === 'edit' ? 'update the' : 'create a new'} inventory item. Fields marked with * are required.`}
-          </Typography>
-        </DialogTitle>
-        <DialogContent dividers>
-          {dialogMode === 'view' && selectedItem ? (
-            // View Mode - Display item details in structured format
-            <Box sx={{ mt: 2 }}>
-              <Box sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
-                gap: 3 
-              }}>
-                <Box>
-                  <Typography variant="h6" gutterBottom>Item Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemIcon>
-                        <InventoryIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Item Name"
-                        secondary={selectedItem.name}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <AssignmentIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="SKU"
-                        secondary={selectedItem.sku}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <CategoryIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Category"
-                        secondary={selectedItem.category}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <BuildIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Description"
-                        secondary={selectedItem.description}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <ScheduleIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Date Added"
-                        secondary={convertToDisplayDate(selectedItem.dateAdded)}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-                <Box>
-                  <Typography variant="h6" gutterBottom>Item Details</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemIcon>
-                        <CheckCircleIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Status"
-                        secondary={selectedItem.status.replace('_', ' ')}
-                      />
-                      <Chip
-                        label={selectedItem.status.replace('_', ' ')}
-                        size="small"
-                        color={getStatusColor(selectedItem.status)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <WarningIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Condition"
-                        secondary={selectedItem.condition}
-                      />
-                      <Chip
-                        label={selectedItem.condition}
-                        size="small"
-                        color={getConditionColor(selectedItem.condition)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <LocationIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Location"
-                        secondary={selectedItem.location}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <PersonIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Assigned To"
-                        secondary={
-                          selectedItem.assignedTo ? 
-                          users.find(u => u.id === selectedItem.assignedTo)?.name || 'Unknown User' :
-                          'Unassigned'
-                        }
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <CheckCircleIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Quantity"
-                        secondary={`${selectedItem.quantity} ${selectedItem.unit}`}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemIcon>
-                        <CheckCircleIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Total Value"
-                        secondary={formatCurrency(selectedItem.totalValue)}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-              </Box>
-              
-              {selectedItem.supplier && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="h6" gutterBottom>Supplier Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemIcon>
-                        <PersonIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Supplier"
-                        secondary={selectedItem.supplier}
-                      />
-                    </ListItem>
-                    {selectedItem.supplierContact && (
-                      <ListItem>
-                        <ListItemIcon>
-                          <PersonIcon />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary="Contact"
-                          secondary={selectedItem.supplierContact}
-                        />
-                      </ListItem>
-                    )}
-                  </List>
-                </Box>
-              )}
-              
-              {selectedItem.warrantyExpiry && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="h6" gutterBottom>Warranty Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemIcon>
-                        <ScheduleIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary="Warranty Expiry"
-                        secondary={convertToDisplayDate(selectedItem.warrantyExpiry)}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-              )}
-              
-              {selectedItem.tags && selectedItem.tags.length > 0 && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="h6" gutterBottom>Tags</Typography>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {selectedItem.tags.map((tag, index) => (
-                      <Chip key={index} label={tag} size="small" variant="outlined" />
-                    ))}
-                  </Box>
-                </Box>
-              )}
-              
-              {selectedItem.notes && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="h6" gutterBottom>Notes</Typography>
-                  <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
-                    <Typography variant="body2">
-                      {selectedItem.notes}
-                    </Typography>
-                  </Paper>
-                </Box>
-              )}
-            </Box>
-          ) : (
-            // Edit/Add Mode - Show form fields
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3, mt: 2 }}>
-              <TextField
-                fullWidth
-                label="Item Name"
+      {/* Add/Edit/View Modal */}
+      {openDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={handleCloseDialog}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            {dialogMode === 'view' ? (
+              // View Mode - grouped sections, read-only
+              <div className="p-4">
+                {/* Modal Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="p-1.5 bg-primary-100 rounded-lg">
+                      <Eye className="w-5 h-5 text-primary-600" />
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900">Item Details</h3>
+                  </div>
+                  <button
+                    onClick={handleCloseDialog}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                {/* Item Details Content */}
+                <div className="space-y-6">
+                  {/* Item Header */}
+                  <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+                      <span className="text-primary-600 font-semibold text-xl">
+                        {inventoryForm.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-xl font-semibold text-gray-900">{inventoryForm.name}</h4>
+                      <p className="text-gray-600">{inventoryForm.sku}</p>
+                      <div className="flex items-center space-x-4 mt-2">
+                        <span className={cn(
+                          "px-2 py-1 text-xs font-medium rounded-full",
+                          parseFloat(inventoryForm.quantity) <= parseFloat(inventoryForm.minQuantity) ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
+                        )}>
+                          {parseFloat(inventoryForm.quantity) <= parseFloat(inventoryForm.minQuantity) ? 'Low Stock' : 'In Stock'}
+                        </span>
+                        <span className="text-sm text-gray-500">{inventoryForm.category}</span>
+                        <span className="text-sm text-gray-500">Qty: {inventoryForm.quantity}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Basic Information */}
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Basic Information</h5>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Package className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Item Name</p>
+                            <p className="text-sm text-gray-600">{inventoryForm.name}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <FileText className="w-4 h-4 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">SKU</p>
+                            <p className="text-sm text-gray-600">{inventoryForm.sku}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                            <Tag className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Category</p>
+                            <p className="text-sm text-gray-600">{inventoryForm.category}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                            <Package className="w-4 h-4 text-orange-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">Unit</p>
+                            <p className="text-sm text-gray-600">{inventoryForm.unit}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quantity Information */}
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Quantity Information</h5>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Current Quantity</span>
+                          <span className="text-sm text-gray-900">{inventoryForm.quantity}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Min Quantity</span>
+                          <span className="text-sm text-gray-900">{inventoryForm.minQuantity}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Max Quantity</span>
+                          <span className="text-sm text-gray-900">{inventoryForm.maxQuantity}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Reorder Level</span>
+                          <span className="text-sm text-gray-900">{inventoryForm.minQuantity}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Status</span>
+                          <span className={cn(
+                            "px-2 py-1 text-xs font-medium rounded-full",
+                            parseFloat(inventoryForm.quantity) <= parseFloat(inventoryForm.minQuantity) ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
+                          )}>
+                            {parseFloat(inventoryForm.quantity) <= parseFloat(inventoryForm.minQuantity) ? 'Low Stock' : 'In Stock'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description Section */}
+                  {inventoryForm.description && (
+                    <div className="space-y-4">
+                      <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Description</h5>
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <p className="text-sm text-gray-900">{inventoryForm.description}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Additional Information */}
+                  <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Additional Information</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Location</span>
+                          <span className="text-sm text-gray-900">{inventoryForm.location || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Supplier</span>
+                          <span className="text-sm text-gray-900">{inventoryForm.supplier || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Unit Price</span>
+                          <span className="text-sm text-gray-900">₹{inventoryForm.unitPrice || '0'}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Total Value</span>
+                          <span className="text-sm text-gray-900">₹{(parseFloat(inventoryForm.quantity) * parseFloat(inventoryForm.unitPrice)).toFixed(2) || '0'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Warranty Expiry</span>
+                          <span className="text-sm text-gray-900">{inventoryForm.warrantyExpiry || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Assigned To</span>
+                          <span className="text-sm text-gray-900">
+                            {inventoryForm.assignedTo ? 
+                              users.find(u => u.id === inventoryForm.assignedTo)?.name || '—' : 
+                              '—'
+                            }
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Condition</span>
+                          <span className="text-sm text-gray-900 capitalize">{inventoryForm.condition || '—'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Tags</span>
+                          <span className="text-sm text-gray-900">
+                            {inventoryForm.tags ? 
+                              inventoryForm.tags.split(',').map(tag => tag.trim()).filter(tag => tag).join(', ') || '—' : 
+                              '—'
+                            }
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-sm font-medium text-gray-500">Notes</span>
+                          <span className="text-sm text-gray-900">{inventoryForm.notes || '—'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Modal Footer */}
+                <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+                  <button
+                    onClick={handleCloseDialog}
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Add/Edit Mode - Original Design
+              <>
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                {dialogMode === 'add' && <Plus className="w-5 h-5" />}
+                {dialogMode === 'edit' && <Edit className="w-5 h-5" />}
+                <span>
+                  {dialogMode === 'add' ? 'Add New Item' : 'Edit Item'}
+                </span>
+              </h3>
+              <button
+                onClick={handleCloseDialog}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                  <input
+                    type="text"
                 value={inventoryForm.name}
                 onChange={(e) => setInventoryForm(prev => ({ ...prev, name: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-                InputProps={{
-                  startAdornment: <InventoryIcon sx={{ color: 'action.active', mr: 1 }} />
-                }}
-              />
-              <TextField
-                fullWidth
-                label="SKU"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
+                  <input
+                    type="text"
                 value={inventoryForm.sku}
                 onChange={(e) => setInventoryForm(prev => ({ ...prev, sku: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-                InputProps={{
-                  startAdornment: <AssignmentIcon sx={{ color: 'action.active', mr: 1 }} />
-                }}
-              />
-              <TextField
-                fullWidth
-                label="Category"
-                value={inventoryForm.category}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, category: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-                InputProps={{
-                  startAdornment: <CategoryIcon sx={{ color: 'action.active', mr: 1 }} />
-                }}
-              />
-              <TextField
-                fullWidth
-                label="Description"
-                value={inventoryForm.description}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, description: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-                multiline
-                rows={2}
-              />
-              <TextField
-                fullWidth
-                label="Quantity"
-                type="number"
-                value={inventoryForm.quantity}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, quantity: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-              />
-              <TextField
-                fullWidth
-                label="Unit"
-                value={inventoryForm.unit}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, unit: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-              />
-              <TextField
-                fullWidth
-                label="Minimum Quantity"
-                type="number"
-                value={inventoryForm.minQuantity}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, minQuantity: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-              />
-              <TextField
-                fullWidth
-                label="Maximum Quantity"
-                type="number"
-                value={inventoryForm.maxQuantity}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, maxQuantity: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-              />
-              <TextField
-                fullWidth
-                label="Unit Price"
-                type="number"
-                value={inventoryForm.unitPrice}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, unitPrice: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-              />
-              <FormControl fullWidth>
-                <InputLabel>Status</InputLabel>
-                <Select
-                  value={inventoryForm.status}
-                  label="Status"
-                  onChange={(e) => setInventoryForm(prev => ({ ...prev, status: e.target.value as InventoryItem['status'] }))}
-                  disabled={dialogMode === 'view'}
-                  required
-                >
-                  <MenuItem value="active">Active</MenuItem>
-                  <MenuItem value="inactive">Inactive</MenuItem>
-                  <MenuItem value="discontinued">Discontinued</MenuItem>
-                  <MenuItem value="out_of_stock">Out of Stock</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>Condition</InputLabel>
-                <Select
-                  value={inventoryForm.condition}
-                  label="Condition"
-                  onChange={(e) => setInventoryForm(prev => ({ ...prev, condition: e.target.value as InventoryItem['condition'] }))}
-                  disabled={dialogMode === 'view'}
-                  required
-                >
-                  <MenuItem value="new">New</MenuItem>
-                  <MenuItem value="good">Good</MenuItem>
-                  <MenuItem value="fair">Fair</MenuItem>
-                  <MenuItem value="poor">Poor</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>Assigned To</InputLabel>
-                <Select
-                  value={inventoryForm.assignedTo}
-                  label="Assigned To"
-                  onChange={(e) => setInventoryForm(prev => ({ ...prev, assignedTo: e.target.value }))}
-                  disabled={dialogMode === 'view'}
-                >
-                  <MenuItem value="">Unassigned</MenuItem>
-                  {users.map(user => (
-                    <MenuItem key={user.id} value={user.id}>
-                      {user.name} - {user.department}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                fullWidth
-                label="Location"
-                value={inventoryForm.location}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, location: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                required
-                InputProps={{
-                  startAdornment: <LocationIcon sx={{ color: 'action.active', mr: 1 }} />
-                }}
-              />
-              <TextField
-                fullWidth
-                label="Supplier"
-                value={inventoryForm.supplier}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, supplier: e.target.value }))}
-                disabled={dialogMode === 'view'}
-              />
-              <TextField
-                fullWidth
-                label="Supplier Contact"
-                value={inventoryForm.supplierContact}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, supplierContact: e.target.value }))}
-                disabled={dialogMode === 'view'}
-              />
-              <TextField
-                fullWidth
-                label="Warranty Expiry"
-                type="date"
-                value={inventoryForm.warrantyExpiry}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, warrantyExpiry: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                InputLabelProps={{ shrink: true }}
-              />
-              <TextField
-                fullWidth
-                label="Tags (comma separated)"
-                value={inventoryForm.tags}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, tags: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                placeholder="laptop, premium, business"
-              />
-              <TextField
-                fullWidth
-                label="Notes"
-                value={inventoryForm.notes}
-                onChange={(e) => setInventoryForm(prev => ({ ...prev, notes: e.target.value }))}
-                disabled={dialogMode === 'view'}
-                multiline
-                rows={3}
-              />
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button 
-            onClick={handleCloseDialog}
-            variant={dialogMode === 'view' ? 'contained' : 'outlined'}
-            startIcon={dialogMode === 'view' ? <CheckCircleIcon /> : undefined}
-          >
-            {dialogMode === 'view' ? 'Close' : 'Cancel'}
-          </Button>
-          {dialogMode !== 'view' && (
-            <Button
-              onClick={handleSaveItem}
-              variant="contained"
-              disabled={loading}
-              startIcon={loading ? <CircularProgress size={20} /> : <CheckCircleIcon />}
-            >
-              {loading ? 'Saving...' : 'Save'}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteConfirm.open}
-        onClose={() => setDeleteConfirm(prev => ({ ...prev, open: false }))}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ pb: 1, borderBottom: (t) => `1px solid ${t.palette.divider}` }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <DeleteIcon color="error" />
-            <Typography variant="h6">Confirm Delete</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 2 }}>
-          <Typography variant="body1" sx={{ mb: 1 }}>
-            Are you sure you want to delete the inventory item <strong>"{deleteConfirm.itemName}"</strong>?
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            This action cannot be undone. All item data will be permanently removed.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, gap: 1 }}>
-          <Button 
-            onClick={() => setDeleteConfirm(prev => ({ ...prev, open: false }))}
-            variant="outlined"
-          >
-            Cancel
-          </Button>
-          <Button 
-            onClick={() => {
-              if (deleteConfirm.itemId) {
-                handleDeleteItem(deleteConfirm.itemId);
-                setDeleteConfirm(prev => ({ ...prev, open: false }));
-              }
-            }}
-            variant="contained" 
-            color="error"
-            startIcon={<DeleteIcon />}
-          >
-            Delete Item
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <input
+                    type="text"
+                    value={inventoryForm.category}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                  <input
+                    type="text"
+                    value={inventoryForm.unit}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, unit: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    value={inventoryForm.quantity}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, quantity: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Min Quantity</label>
+                  <input
+                    type="number"
+                    value={inventoryForm.minQuantity}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, minQuantity: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Max Quantity</label>
+                  <input
+                    type="number"
+                    value={inventoryForm.maxQuantity}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, maxQuantity: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit Price</label>
+                  <input
+                    type="number"
+                    value={inventoryForm.unitPrice}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, unitPrice: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={inventoryForm.status}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, status: e.target.value as InventoryItem['status'] }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="discontinued">Discontinued</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Condition</label>
+                  <select
+                    value={inventoryForm.condition}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, condition: e.target.value as InventoryItem['condition'] }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="new">New</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                  <select
+                    value={inventoryForm.assignedTo}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, assignedTo: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Unassigned</option>
+                    {users.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} - {user.department}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                  <input
+                    type="text"
+                    value={inventoryForm.location}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, location: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                  <input
+                    type="text"
+                    value={inventoryForm.supplier}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, supplier: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Contact</label>
+                  <input
+                    type="text"
+                    value={inventoryForm.supplierContact}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, supplierContact: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Warranty Expiry</label>
+                  <input
+                    type="date"
+                    value={inventoryForm.warrantyExpiry}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, warrantyExpiry: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tags (comma separated)</label>
+                  <input
+                    type="text"
+                    value={inventoryForm.tags}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, tags: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="tag1, tag2, tag3"
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={inventoryForm.description}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={inventoryForm.notes}
+                    onChange={(e) => setInventoryForm(prev => ({ ...prev, notes: e.target.value }))}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={handleCloseDialog}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveItem}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {loading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>}
+                <span>Save</span>
+              </button>
+            </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
-export default Inventory; 
+export default Inventory;

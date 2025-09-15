@@ -1,7 +1,14 @@
 import React from 'react';
 import { Box } from '@mui/material';
 
-function TabPanel({ children, value, index, ...other }) {
+interface TabPanelProps {
+  children?: React.ReactNode;
+  value: number;
+  index: number;
+  [key: string]: any;
+}
+
+function TabPanel({ children, value, index, ...other }: TabPanelProps) {
   return (
     <div
       role="tabpanel"

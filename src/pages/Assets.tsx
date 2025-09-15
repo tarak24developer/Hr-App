@@ -3,7 +3,6 @@ import {
   Package, 
   Search, 
   Plus, 
-  Filter, 
   Download, 
   Edit, 
   Trash2, 
@@ -13,9 +12,9 @@ import {
   User,
   AlertTriangle,
   CheckCircle,
-  Clock
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import DashboardCard from '../components/DashboardCard';
 
 interface Asset {
   id: string;
@@ -222,59 +221,30 @@ const Assets: React.FC = () => {
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Package className="w-5 h-5 text-blue-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Total Assets</p>
-              <p className="text-2xl font-bold text-gray-900">{assets.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Available</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {assets.filter(a => a.status === 'available').length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <User className="w-5 h-5 text-blue-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Assigned</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {assets.filter(a => a.status === 'assigned').length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <AlertTriangle className="w-5 h-5 text-yellow-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Maintenance</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {assets.filter(a => a.status === 'maintenance').length}
-              </p>
-            </div>
-          </div>
-        </div>
+        <DashboardCard
+          name="Total Assets"
+          value={assets.length}
+          icon={Package}
+          color="blue"
+        />
+        <DashboardCard
+          name="Available"
+          value={assets.filter(a => a.status === 'available').length}
+          icon={CheckCircle}
+          color="green"
+        />
+        <DashboardCard
+          name="Assigned"
+          value={assets.filter(a => a.status === 'assigned').length}
+          icon={User}
+          color="indigo"
+        />
+        <DashboardCard
+          name="Maintenance"
+          value={assets.filter(a => a.status === 'maintenance').length}
+          icon={AlertTriangle}
+          color="yellow"
+        />
       </div>
 
       {/* Assets Grid/List */}

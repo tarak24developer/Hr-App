@@ -15,13 +15,18 @@ import {
   UserCheck,
   Settings,
   UserPlus,
-  Trash2
+  Trash2,
+  User as UserIcon,
+  Badge,
+  Calendar as CalendarIcon,
+  Clock as ClockIcon
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import firebaseService from '@/services/firebaseService';
 import { useUser } from '@/stores/authStore';
 import { showNotification } from '@/utils/notification';
 import { showCustomConfirmDialog } from '@/utils/customConfirmDialog';
+import DashboardCard from '../components/DashboardCard';
 
 interface LeaveRequest {
   id: string;
@@ -1128,64 +1133,35 @@ const Leaves: React.FC = () => {
             <div className="space-y-6">
               {/* Summary Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Users className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Total Employees</p>
-                      <p className="text-2xl font-bold text-gray-900">{leaveBalances.length}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Calendar className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Avg Annual Days</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {leaveBalances.length > 0 
-                          ? Math.round(leaveBalances.reduce((sum, b) => sum + b.annual, 0) / leaveBalances.length)
-                          : 0}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-yellow-100 rounded-lg">
-                      <Clock className="w-5 h-5 text-yellow-600" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Avg Sick Days</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {leaveBalances.length > 0 
-                          ? Math.round(leaveBalances.reduce((sum, b) => sum + b.sick, 0) / leaveBalances.length)
-                          : 0}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <FileText className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Total Leave Days</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {leaveBalances.reduce((sum, b) => 
-                          sum + b.annual + b.sick + b.personal + b.maternity + b.paternity + b.bereavement, 0)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <DashboardCard
+                  name="Total Employees"
+                  value={leaveBalances.length}
+                  icon={Users}
+                  color="blue"
+                />
+                <DashboardCard
+                  name="Avg Annual Days"
+                  value={leaveBalances.length > 0 
+                    ? Math.round(leaveBalances.reduce((sum, b) => sum + b.annual, 0) / leaveBalances.length)
+                    : 0}
+                  icon={Calendar}
+                  color="green"
+                />
+                <DashboardCard
+                  name="Avg Sick Days"
+                  value={leaveBalances.length > 0 
+                    ? Math.round(leaveBalances.reduce((sum, b) => sum + b.sick, 0) / leaveBalances.length)
+                    : 0}
+                  icon={Clock}
+                  color="yellow"
+                />
+                <DashboardCard
+                  name="Total Leave Days"
+                  value={leaveBalances.reduce((sum, b) => 
+                    sum + b.annual + b.sick + b.personal + b.maternity + b.paternity + b.bereavement, 0)}
+                  icon={FileText}
+                  color="purple"
+                />
               </div>
 
               {/* Admin Management Header */}
@@ -2280,35 +2256,136 @@ const Leaves: React.FC = () => {
 
       {/* View Balance Modal */}
       {showViewBalanceModal && viewingBalance && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-lg mx-4 shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-medium text-gray-900">View Leave Balance</h3>
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[200] p-3">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto z-[210]">
+            <div className="p-4">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-1.5 bg-primary-100 rounded-lg">
+                    <Eye className="w-5 h-5 text-primary-600" />
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900">Leave Balance Details</h3>
+                </div>
               <button
                 onClick={() => setShowViewBalanceModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-                aria-label="Close view balance modal"
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
               >
-                <X className="w-6 h-6" />
+                  <X className="w-4 h-4" />
               </button>
             </div>
             
+              {/* Employee Details Content */}
             <div className="space-y-6">
-              <div className="text-center">
-                <h4 className="text-lg font-medium text-gray-900 mb-2">Leave Balance Details</h4>
-                <p className="text-gray-600">
-                  {viewingBalance.employeeName}'s current leave balance.
-                </p>
+                {/* Employee Header */}
+                <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+                    <span className="text-primary-600 font-semibold text-xl">
+                      {viewingBalance.employeeName.split(' ').map(n => n[0]).join('')}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-xl font-semibold text-gray-900">{viewingBalance.employeeName}</h4>
+                    <p className="text-gray-600">{viewingBalance.employeeId}</p>
+                    <div className="flex items-center space-x-4 mt-2">
+                      <span className="text-sm text-gray-500">Leave Balance Summary</span>
+                    </div>
+                  </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                <div><span className="font-medium">Annual:</span> {viewingBalance.annual} days</div>
-                <div><span className="font-medium">Sick:</span> {viewingBalance.sick} days</div>
-                <div><span className="font-medium">Personal:</span> {viewingBalance.personal} days</div>
-                <div><span className="font-medium">Maternity:</span> {viewingBalance.maternity} days</div>
-                <div><span className="font-medium">Paternity:</span> {viewingBalance.paternity} days</div>
-                <div><span className="font-medium">Bereavement:</span> {viewingBalance.bereavement} days</div>
-                <div><span className="font-medium">Unpaid:</span> {viewingBalance.unpaid} days</div>
+                {/* Leave Balance Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Annual & Sick Leave */}
+                  <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Annual & Sick Leave</h5>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <CalendarIcon className="w-4 h-4 text-blue-600" />
+              </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Annual Leave</p>
+                          <p className="text-sm text-gray-600">{viewingBalance.annual} days</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                          <ClockIcon className="w-4 h-4 text-red-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Sick Leave</p>
+                          <p className="text-sm text-gray-600">{viewingBalance.sick} days</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <UserIcon className="w-4 h-4 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Personal Leave</p>
+                          <p className="text-sm text-gray-600">{viewingBalance.personal} days</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Family & Special Leave */}
+                  <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Family & Special Leave</h5>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center">
+                          <UserCheck className="w-4 h-4 text-pink-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Maternity Leave</p>
+                          <p className="text-sm text-gray-600">{viewingBalance.maternity} days</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <Badge className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Paternity Leave</p>
+                          <p className="text-sm text-gray-600">{viewingBalance.paternity} days</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Bereavement Leave</p>
+                          <p className="text-sm text-gray-600">{viewingBalance.bereavement} days</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Leave Types */}
+                <div className="space-y-4">
+                  <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Additional Leave Types</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Unpaid Leave</span>
+                        <span className="text-sm text-gray-900">{viewingBalance.unpaid} days</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+                <button
+                  onClick={() => setShowViewBalanceModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

@@ -1,54 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Card,
-  CardContent,
-  Alert,
-  Snackbar,
-  Container,
-  Stack,
-  Avatar,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  IconButton,
-  CircularProgress
-} from '@mui/material';
-import {
   Settings as SettingsIcon,
   Shield,
   Save,
-  CheckCircle as CheckCircleIcon,
-  Error as AlertCircleIcon,
-  Lock as LockIcon,
-  Security as SecurityIcon,
-  History as HistoryIcon,
-  Close as CloseIcon,
-  Visibility as VisibilityIcon,
-  VisibilityOff as VisibilityOffIcon,
-  Refresh as RotateCcwIcon,
+  Lock,
+  Key,
+  History,
+  X,
+  Eye,
+  EyeOff,
+  RotateCcw,
   Palette,
-  Notifications as BellIcon,
-  Person as UserIcon,
-  Language as GlobeIcon,
-  TextFields as TypeIcon,
-  WbSunny as SunIcon,
-  Nightlight as MoonIcon,
-  Computer as MonitorIcon
-} from '@mui/icons-material';
+  Bell,
+  User as UserIcon,
+  Globe,
+  Type,
+  Sun,
+  Moon,
+  Monitor,
+  CheckCircle,
+  AlertCircle
+} from 'lucide-react';
+import { cn } from '../utils/cn';
+import { showNotification } from '../utils/notification';
 import { useThemeActions } from '@/stores/themeStore';
 import { useFontSizeStore, type FontSize } from '@/stores/fontSizeStore';
 import { settingsService } from '../services/settingsService';
@@ -97,12 +72,6 @@ const Settings: React.FC = () => {
     confirm: false
   });
   
-  // Snackbar state
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'success' as 'success' | 'error' | 'warning' | 'info'
-  });
 
   const fontSizes: { value: FontSize; label: string; preview: string }[] = [
     { value: 'xs', label: 'Extra Small', preview: 'Aa' },
@@ -115,10 +84,10 @@ const Settings: React.FC = () => {
 
   const tabs = [
     { id: 'appearance', label: 'Appearance', icon: Palette },
-    { id: 'notifications', label: 'Notifications', icon: BellIcon },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'account', label: 'Account', icon: UserIcon },
-    { id: 'language', label: 'Language', icon: GlobeIcon },
+    { id: 'language', label: 'Language', icon: Globe },
   ];
 
   const getFontSizeClass = (size: FontSize) => {
@@ -170,11 +139,7 @@ const Settings: React.FC = () => {
   };
 
   const showMessage = (type: 'success' | 'error' | 'warning' | 'info', text: string) => {
-    setSnackbar({ open: true, message: text, severity: type });
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
+    showNotification(text, type === 'warning' ? 'error' : type);
   };
 
   const handleSaveSettings = async () => {
@@ -416,67 +381,58 @@ const Settings: React.FC = () => {
 
   if (loading || !userSettings) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-        <CircularProgress size={60} />
-      </Box>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading settings...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
+    <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Box display="flex" alignItems="center" gap={2}>
-          <Avatar sx={{ bgcolor: 'primary.main' }}>
-            <SettingsIcon />
-          </Avatar>
-          <Box>
-            <Typography variant="h4" component="h1" fontWeight="bold">
-              Settings
-            </Typography>
-            <Typography color="textSecondary">
-              Configure system settings and preferences
-            </Typography>
-          </Box>
-        </Box>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+            <SettingsIcon className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+            <p className="text-gray-600">Configure system settings and preferences</p>
+          </div>
+        </div>
         
         {/* Action Buttons */}
-        <Stack direction="row" spacing={2}>
-          <Button
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button
             onClick={handleResetToDefault}
             disabled={saving}
-            startIcon={<RotateCcwIcon />}
-            variant="outlined"
+            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
           >
-            Reset to Default
-          </Button>
-          <Button
+            <RotateCcw className="w-4 h-4" />
+            <span>Reset to Default</span>
+          </button>
+          <button
             onClick={handleSaveSettings}
             disabled={saving}
-            startIcon={<Save />}
-            variant="contained"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
           >
-            {saving ? 'Saving...' : 'Save All Settings'}
-          </Button>
-        </Stack>
-      </Box>
-
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+            {saving ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            <span>{saving ? 'Saving...' : 'Save All Settings'}</span>
+          </button>
+        </div>
+      </div>
 
       {/* Settings Container */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         {/* Tab Navigation */}
-        <div className="border-b border-gray-200 dark:border-gray-700">
+        <div className="border-b border-gray-200">
           <nav className="flex space-x-8 px-6">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -484,11 +440,12 @@ const Settings: React.FC = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  className={cn(
+                    "flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors",
                     activeTab === tab.id
-                      ? 'border-primary-500 text-primary-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  )}
                 >
                   <Icon className="w-4 h-4" />
                   <span>{tab.label}</span>
@@ -505,8 +462,8 @@ const Settings: React.FC = () => {
             <div className="space-y-8">
               {/* Font Size Settings */}
               <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                  <TypeIcon className="w-5 h-5 mr-2 text-primary-600" />
+                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                  <Type className="w-5 h-5 mr-2 text-blue-600" />
                   Font Size
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -514,16 +471,17 @@ const Settings: React.FC = () => {
                     <button
                       key={fontSizeOption.value}
                       onClick={() => setFontSize(fontSizeOption.value)}
-                      className={`p-4 rounded-lg border-2 transition-all ${
+                      className={cn(
+                        "p-4 rounded-lg border-2 transition-all",
                         fontSize === fontSizeOption.value
-                          ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                      }`}
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-200 hover:border-gray-300"
+                      )}
                     >
                       <div className={`${getFontSizeClass(fontSizeOption.value)} font-bold text-center mb-2`}>
                         {fontSizeOption.preview}
                       </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400 text-center">
+                      <div className="text-sm text-gray-600 text-center">
                         {fontSizeOption.label}
                       </div>
                     </button>
@@ -532,12 +490,12 @@ const Settings: React.FC = () => {
                 <div className="mt-4 flex items-center space-x-4">
                   <button
                     onClick={resetFontSize}
-                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                    className="flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
                   >
-                    <RotateCcwIcon className="w-4 h-4" />
+                    <RotateCcw className="w-4 h-4" />
                     <span>Reset to Default</span>
                   </button>
-                  <span className="text-sm text-gray-500 dark:text-gray-500">
+                  <span className="text-sm text-gray-500">
                     Current: {fontSizes.find(f => f.value === fontSize)?.label}
                   </span>
                 </div>
@@ -545,53 +503,56 @@ const Settings: React.FC = () => {
 
               {/* Theme Settings */}
               <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                  <Palette className="w-5 h-5 mr-2 text-primary-600" />
+                <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                  <Palette className="w-5 h-5 mr-2 text-blue-600" />
                   Theme
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <button
                     onClick={() => handleThemeChange('light')}
-                    className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-colors ${
+                    className={cn(
+                      "flex items-center space-x-3 p-4 rounded-lg border-2 transition-colors",
                       userSettings?.theme?.mode === 'light'
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                    }`}
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    )}
                   >
-                    <SunIcon className="w-6 h-6 text-yellow-500" />
+                    <Sun className="w-6 h-6 text-yellow-500" />
                     <div className="text-left">
-                      <div className="font-medium text-gray-900 dark:text-white">Light</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">Clean, bright interface</div>
+                      <div className="font-medium text-gray-900">Light</div>
+                      <div className="text-sm text-gray-500">Clean, bright interface</div>
                     </div>
                   </button>
                   
                   <button
                     onClick={() => handleThemeChange('dark')}
-                    className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-colors ${
+                    className={cn(
+                      "flex items-center space-x-3 p-4 rounded-lg border-2 transition-colors",
                       userSettings?.theme?.mode === 'dark'
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                    }`}
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    )}
                   >
-                    <MoonIcon className="w-6 h-6 text-blue-500" />
+                    <Moon className="w-6 h-6 text-blue-500" />
                     <div className="text-left">
-                      <div className="font-medium text-gray-900 dark:text-white">Dark</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">Easy on the eyes</div>
+                      <div className="font-medium text-gray-900">Dark</div>
+                      <div className="text-sm text-gray-500">Easy on the eyes</div>
                     </div>
                   </button>
                   
                   <button
                     onClick={() => handleThemeChange('auto')}
-                    className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-colors ${
+                    className={cn(
+                      "flex items-center space-x-3 p-4 rounded-lg border-2 transition-colors",
                       userSettings?.theme?.mode === 'auto'
-                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
-                    }`}
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    )}
                   >
-                    <MonitorIcon className="w-6 h-6 text-gray-500" />
+                    <Monitor className="w-6 h-6 text-gray-500" />
                     <div className="text-left">
-                      <div className="font-medium text-gray-900 dark:text-white">Auto</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">Follows system</div>
+                      <div className="font-medium text-gray-900">Auto</div>
+                      <div className="text-sm text-gray-500">Follows system</div>
                     </div>
                   </button>
                 </div>
@@ -602,15 +563,15 @@ const Settings: React.FC = () => {
           {/* Notifications Tab */}
           {activeTab === 'notifications' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                <BellIcon className="w-5 h-5 mr-2 text-primary-600" />
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <Bell className="w-5 h-5 mr-2 text-blue-600" />
                 Notification Preferences
               </h3>
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
-                    <div className="font-medium text-gray-900 dark:text-white">Email Notifications</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Receive notifications via email</div>
+                    <div className="font-medium text-gray-900">Email Notifications</div>
+                    <div className="text-sm text-gray-500">Receive notifications via email</div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input 
@@ -620,14 +581,14 @@ const Settings: React.FC = () => {
                       onChange={(e) => handleNotificationToggle('email', e.target.checked)}
                       aria-label="Enable email notifications" 
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                   </label>
                 </div>
                 
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
-                    <div className="font-medium text-gray-900 dark:text-white">Push Notifications</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Receive push notifications</div>
+                    <div className="font-medium text-gray-900">Push Notifications</div>
+                    <div className="text-sm text-gray-500">Receive push notifications</div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input 
@@ -637,14 +598,14 @@ const Settings: React.FC = () => {
                       onChange={(e) => handleNotificationToggle('push', e.target.checked)}
                       aria-label="Enable push notifications" 
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                   </label>
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
-                    <div className="font-medium text-gray-900 dark:text-white">SMS Notifications</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Receive notifications via SMS</div>
+                    <div className="font-medium text-gray-900">SMS Notifications</div>
+                    <div className="text-sm text-gray-500">Receive notifications via SMS</div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input 
@@ -654,7 +615,7 @@ const Settings: React.FC = () => {
                       onChange={(e) => handleNotificationToggle('sms', e.target.checked)}
                       aria-label="Enable SMS notifications" 
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                   </label>
                 </div>
               </div>
@@ -663,103 +624,91 @@ const Settings: React.FC = () => {
 
           {/* Security Tab */}
           {activeTab === 'security' && (
-            <Box>
-              <Typography variant="h6" gutterBottom display="flex" alignItems="center" gap={1} mb={3}>
-                <Shield color="primary" />
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <Shield className="w-5 h-5 mr-2 text-blue-600" />
                 Security Settings
-              </Typography>
+              </h3>
               
-              <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(300px, 1fr))" gap={3}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Change Password Card */}
-                <Card>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" justifyContent="space-between">
-                      <Box>
-                        <Typography variant="h6" gutterBottom>
-                          Change Password
-                        </Typography>
-                        <Typography color="textSecondary" variant="body2">
-                          Update your account password
-                        </Typography>
-                      </Box>
-                      <Avatar sx={{ bgcolor: 'primary.main' }}>
-                        <LockIcon />
-                      </Avatar>
-                    </Box>
-                    <Button
-                      variant="contained"
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900">Change Password</h4>
+                      <p className="text-sm text-gray-500">Update your account password</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <Lock className="w-5 h-5 text-blue-600" />
+                    </div>
+                  </div>
+                  <button
                       onClick={() => setChangePasswordOpen(true)}
-                      sx={{ mt: 2 }}
-                      fullWidth
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       Change Password
-                    </Button>
-                  </CardContent>
-                </Card>
+                  </button>
+                </div>
 
                 {/* Two-Factor Authentication Card */}
-                <Card>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" justifyContent="space-between">
-                      <Box>
-                        <Typography variant="h6" gutterBottom>
-                          Two-Factor Authentication
-                        </Typography>
-                        <Typography color="textSecondary" variant="body2">
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900">Two-Factor Authentication</h4>
+                      <p className="text-sm text-gray-500">
                           {twoFactorEnabled ? 'Enabled' : 'Disabled'} - Extra security for your account
-                        </Typography>
-                      </Box>
-                      <Avatar sx={{ bgcolor: twoFactorEnabled ? 'success.main' : 'grey.400' }}>
-                        <SecurityIcon />
-                      </Avatar>
-                    </Box>
-                    <Button
-                      variant={twoFactorEnabled ? 'outlined' : 'contained'}
-                      color={twoFactorEnabled ? 'error' : 'primary'}
+                      </p>
+                    </div>
+                    <div className={cn(
+                      "w-10 h-10 rounded-full flex items-center justify-center",
+                      twoFactorEnabled ? "bg-green-100" : "bg-gray-100"
+                    )}>
+                      <Key className={cn(
+                        "w-5 h-5",
+                        twoFactorEnabled ? "text-green-600" : "text-gray-600"
+                      )} />
+                    </div>
+                  </div>
+                  <button
                       onClick={() => setTwoFactorOpen(true)}
-                      sx={{ mt: 2 }}
-                      fullWidth
+                    className={cn(
+                      "w-full px-4 py-2 rounded-lg transition-colors",
+                      twoFactorEnabled
+                        ? "bg-red-600 text-white hover:bg-red-700"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    )}
                     >
                       {twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
-                    </Button>
-                  </CardContent>
-                </Card>
+                  </button>
+                </div>
 
                 {/* Login History Card */}
-                <Card>
-                  <CardContent>
-                    <Box display="flex" alignItems="center" justifyContent="space-between">
-                      <Box>
-                        <Typography variant="h6" gutterBottom>
-                          Login History
-                        </Typography>
-                        <Typography color="textSecondary" variant="body2">
-                          View recent login activity
-                        </Typography>
-                      </Box>
-                      <Avatar sx={{ bgcolor: 'info.main' }}>
-                        <HistoryIcon />
-                      </Avatar>
-                    </Box>
-                    <Button
-                      variant="contained"
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="text-lg font-semibold text-gray-900">Login History</h4>
+                      <p className="text-sm text-gray-500">View recent login activity</p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                      <History className="w-5 h-5 text-purple-600" />
+                    </div>
+                  </div>
+                  <button
                       onClick={handleViewLoginHistory}
-                      sx={{ mt: 2 }}
-                      fullWidth
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       View Login History
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Box>
-            </Box>
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Account Tab */}
           {activeTab === 'account' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                <UserIcon className="w-5 h-5 mr-2 text-primary-600" />
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <UserIcon className="w-5 h-5 mr-2 text-blue-600" />
                 Account Settings
               </h3>
               <div className="space-y-4">
@@ -774,24 +723,24 @@ const Settings: React.FC = () => {
                       console.error('Navigation failed:', error);
                     }
                   }}
-                  className="w-full text-left p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                  className="w-full text-left p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                 >
-                  <div className="font-medium text-gray-900 dark:text-white">Edit Profile</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Update your personal information</div>
+                  <div className="font-medium text-gray-900">Edit Profile</div>
+                  <div className="text-sm text-gray-500">Update your personal information</div>
                 </button>
                 
                 <div className="space-y-4">
-                  <h4 className="text-md font-medium text-gray-900 dark:text-white">Privacy Settings</h4>
+                  <h4 className="text-md font-medium text-gray-900">Privacy Settings</h4>
                   
-                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
-                      <div className="font-medium text-gray-900 dark:text-white">Profile Visibility</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">Control who can see your profile</div>
+                      <div className="font-medium text-gray-900">Profile Visibility</div>
+                      <div className="text-sm text-gray-500">Control who can see your profile</div>
                     </div>
                     <select
                       value={privacySettings?.profileVisibility || 'team-only'}
                       onChange={(e) => handlePrivacyToggle('profileVisibility', e.target.value)}
-                      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       aria-label="Select profile visibility"
                     >
                       <option value="public">Public</option>
@@ -800,10 +749,10 @@ const Settings: React.FC = () => {
                     </select>
                   </div>
 
-                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
-                      <div className="font-medium text-gray-900 dark:text-white">Location Sharing</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">Allow location tracking</div>
+                      <div className="font-medium text-gray-900">Location Sharing</div>
+                      <div className="text-sm text-gray-500">Allow location tracking</div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
@@ -813,14 +762,14 @@ const Settings: React.FC = () => {
                         onChange={(e) => handlePrivacyToggle('locationSharing', e.target.checked)}
                         aria-label="Enable location sharing" 
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
 
-                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div>
-                      <div className="font-medium text-gray-900 dark:text-white">Activity Tracking</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">Track user activity for analytics</div>
+                      <div className="font-medium text-gray-900">Activity Tracking</div>
+                      <div className="text-sm text-gray-500">Track user activity for analytics</div>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input 
@@ -830,14 +779,14 @@ const Settings: React.FC = () => {
                         onChange={(e) => handlePrivacyToggle('activityTracking', e.target.checked)}
                         aria-label="Enable activity tracking" 
                       />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                   </div>
                 </div>
                 
-                <button className="w-full text-left p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
-                  <div className="font-medium text-gray-900 dark:text-white">Export Data</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">Download your account data</div>
+                <button className="w-full text-left p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="font-medium text-gray-900">Export Data</div>
+                  <div className="text-sm text-gray-500">Download your account data</div>
                 </button>
               </div>
             </div>
@@ -846,19 +795,19 @@ const Settings: React.FC = () => {
           {/* Language Tab */}
           {activeTab === 'language' && (
             <div className="space-y-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center">
-                <GlobeIcon className="w-5 h-5 mr-2 text-primary-600" />
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <Globe className="w-5 h-5 mr-2 text-blue-600" />
                 Language & Region
               </h3>
               <div className="space-y-4">
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Language
                   </label>
                   <select 
                     value={language || 'en'}
                     onChange={(e) => setLanguage(e.target.value)}
-                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+                    className="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
                     aria-label="Select language"
                   >
                     <option value="en">English</option>
@@ -870,14 +819,14 @@ const Settings: React.FC = () => {
                   </select>
                 </div>
                 
-                <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Time Zone
                   </label>
                   <select 
                     value={timezone || 'UTC'}
                     onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent" 
+                    className="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
                     aria-label="Select time zone"
                   >
                     <option value="UTC">UTC</option>
@@ -895,7 +844,7 @@ const Settings: React.FC = () => {
                 <div className="flex justify-end">
                   <button
                     onClick={handleLanguageTimezoneChange}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     Save Language & Timezone
                   </button>
@@ -907,187 +856,267 @@ const Settings: React.FC = () => {
       </div>
 
       {/* Change Password Dialog */}
-      <Dialog open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Change Password</DialogTitle>
-        <DialogContent>
-          <Box display="flex" flexDirection="column" gap={3} pt={1}>
-            <TextField
-              label="Current Password"
+      {changePasswordOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setChangePasswordOpen(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Change Password</h3>
+              <button
+                onClick={() => setChangePasswordOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                <div className="relative">
+                  <input
               type={showPasswords.current ? 'text' : 'password'}
               value={passwordData.currentPassword}
               onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-              fullWidth
-              InputProps={{
-                endAdornment: (
-                  <IconButton
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                  />
+                  <button
+                    type="button"
                     onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
-                    edge="end"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showPasswords.current ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                  </IconButton>
-                )
-              }}
-            />
-            <TextField
-              label="New Password"
+                    {showPasswords.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <div className="relative">
+                  <input
               type={showPasswords.new ? 'text' : 'password'}
               value={passwordData.newPassword}
               onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-              fullWidth
-              InputProps={{
-                endAdornment: (
-                  <IconButton
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                  />
+                  <button
+                    type="button"
                     onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
-                    edge="end"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showPasswords.new ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                  </IconButton>
-                )
-              }}
-            />
-            <TextField
-              label="Confirm New Password"
+                    {showPasswords.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                <div className="relative">
+                  <input
               type={showPasswords.confirm ? 'text' : 'password'}
               value={passwordData.confirmPassword}
               onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-              fullWidth
-              InputProps={{
-                endAdornment: (
-                  <IconButton
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                  />
+                  <button
+                    type="button"
                     onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
-                    edge="end"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {showPasswords.confirm ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                  </IconButton>
-                )
-              }}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setChangePasswordOpen(false)}>
+                    {showPasswords.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setChangePasswordOpen(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
             Cancel
-          </Button>
-          <Button
+              </button>
+              <button
             onClick={handleChangePassword}
             disabled={saving}
-            variant="contained"
-          >
-            {saving ? 'Changing...' : 'Change Password'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {saving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : null}
+                <span>{saving ? 'Changing...' : 'Change Password'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Two-Factor Authentication Dialog */}
-      <Dialog open={twoFactorOpen} onClose={() => setTwoFactorOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
+      {twoFactorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setTwoFactorOpen(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">
           {twoFactorEnabled ? 'Disable' : 'Enable'} Two-Factor Authentication
-        </DialogTitle>
-        <DialogContent>
-          <Box>
-            <Typography variant="body2" color="textSecondary" paragraph>
+              </h3>
+              <button
+                onClick={() => setTwoFactorOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
               {twoFactorEnabled 
                 ? 'Are you sure you want to disable two-factor authentication? This will make your account less secure.'
                 : 'Two-factor authentication adds an extra layer of security to your account by requiring a second form of verification when signing in.'
               }
-            </Typography>
+              </p>
+              
             {!twoFactorEnabled && (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                <Typography variant="subtitle2" gutterBottom>
-                  How it works:
-                </Typography>
-                <Typography variant="body2" component="div">
-                  <Box component="ul" sx={{ margin: 0, paddingLeft: '1.2rem' }}>
-                    <Box component="li">Download an authenticator app (Google Authenticator, Authy, etc.)</Box>
-                    <Box component="li">Scan the QR code or enter the setup key</Box>
-                    <Box component="li">Enter the 6-digit code from your app when signing in</Box>
-                  </Box>
-                </Typography>
-              </Alert>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setTwoFactorOpen(false)}>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <h4 className="text-sm font-semibold text-blue-900 mb-2">How it works:</h4>
+                  <ul className="text-sm text-blue-800 space-y-1">
+                    <li>• Download an authenticator app (Google Authenticator, Authy, etc.)</li>
+                    <li>• Scan the QR code or enter the setup key</li>
+                    <li>• Enter the 6-digit code from your app when signing in</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setTwoFactorOpen(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
             Cancel
-          </Button>
-          <Button
+              </button>
+              <button
             onClick={handleToggleTwoFactor}
             disabled={saving}
-            variant={twoFactorEnabled ? 'outlined' : 'contained'}
-            color={twoFactorEnabled ? 'error' : 'primary'}
-          >
-            {saving ? 'Processing...' : (twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+                className={cn(
+                  "px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2",
+                  twoFactorEnabled
+                    ? "bg-red-600 text-white hover:bg-red-700"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                )}
+              >
+                {saving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : null}
+                <span>{saving ? 'Processing...' : (twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Login History Dialog */}
-      <Dialog open={loginHistoryOpen} onClose={() => setLoginHistoryOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Box display="flex" justifyContent="space-between" alignItems="center">
-            <Typography variant="h6">Login History</Typography>
-            <IconButton onClick={() => setLoginHistoryOpen(false)} size="small">
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <TableContainer component={Paper} variant="outlined">
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Date & Time</TableCell>
-                  <TableCell>Device</TableCell>
-                  <TableCell>Location</TableCell>
-                  <TableCell>IP Address</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {loginHistory.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell>
-                      <Chip
-                        label={entry.status}
-                        color={entry.status === 'success' ? 'success' : 'error'}
-                        size="small"
-                        icon={entry.status === 'success' ? <CheckCircleIcon /> : <AlertCircleIcon />}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {new Date(entry.timestamp).toLocaleString()}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {entry.device}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {entry.location}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontFamily="monospace">
-                        {entry.ipAddress}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setLoginHistoryOpen(false)} variant="contained">
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+      {loginHistoryOpen && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[200] p-3">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <History className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Login History</h3>
+                  <p className="text-sm text-gray-500">Recent login activity and security events</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setLoginHistoryOpen(false)}
+                className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-auto max-h-[calc(90vh-140px)]">
+              <div className="space-y-4">
+                {/* Login History Table */}
+                <div className="bg-gray-50 rounded-xl p-5">
+                  <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <History className="w-5 h-5 text-gray-600 mr-2" />
+                    Login Activity
+                  </h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Date & Time</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Device</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Location</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">IP Address</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {loginHistory.map((entry) => (
+                          <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center space-x-2">
+                                <div className={cn(
+                                  "w-6 h-6 rounded-lg flex items-center justify-center",
+                                  entry.status === 'success' ? "bg-green-100" : "bg-red-100"
+                                )}>
+                                  {entry.status === 'success' ? (
+                                    <CheckCircle className="w-4 h-4 text-green-600" />
+                                  ) : (
+                                    <AlertCircle className="w-4 h-4 text-red-600" />
+                                  )}
+                                </div>
+                                <span className={cn(
+                                  "px-2 py-1 rounded-full text-xs font-medium",
+                                  entry.status === 'success'
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                                )}>
+                                  {entry.status}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-sm text-gray-900">
+                              {new Date(entry.timestamp).toLocaleString()}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-gray-900">
+                              {entry.device}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-gray-900">
+                              {entry.location}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-gray-900 font-mono">
+                              {entry.ipAddress}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setLoginHistoryOpen(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

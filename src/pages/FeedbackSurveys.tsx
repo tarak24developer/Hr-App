@@ -1,71 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Card,
-  CardContent,
-  Alert,
-  Snackbar,
-  Pagination,
-  Tooltip,
-  Avatar,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  ListItemAvatar,
-  LinearProgress,
-  Rating,
-  InputAdornment,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  CircularProgress,
-  Switch,
-  FormControlLabel
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Visibility as ViewIcon,
-  Search as SearchIcon,
-  FilterList as FilterIcon,
-  Assessment as AssessmentIcon,
-  QuestionAnswer as QuestionAnswerIcon,
-  Person as PersonIcon,
-  Archive as ArchiveIcon,
-  Info as InfoIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  CheckCircle as CheckCircleIcon,
-
-  ExpandMore as ExpandMoreIcon,
-  Send as SendIcon,
-  BarChart as ChartIcon,
-  Download as DownloadIcon
-} from '@mui/icons-material';
-import firebaseService from '@/services/firebaseService';
-import { showNotification } from '@/utils/notification';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Search, 
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
+  AlertCircle,
+  CheckCircle,
+  X,
+  FileText,
+  Users,
+  Download,
+  User as UserIcon,
+  Badge,
+  Clock as ClockIcon
+} from 'lucide-react';
+import { cn } from '../utils/cn';
+import firebaseService from '../services/firebaseService';
+import DashboardCard from '../components/DashboardCard';
 
 interface Survey {
   id: string;
@@ -131,1730 +83,971 @@ interface SurveySettings {
   notificationEmails: string[];
 }
 
-interface SurveyFilters {
-  search: string;
-  type: string;
-  status: string;
-  category: string;
-  author: string;
-  dateRange: {
-    start: string | null;
-    end: string | null;
-  };
-}
-
-const initialFilters: SurveyFilters = {
-  search: '',
-  type: '',
-  status: '',
-  category: '',
-  author: '',
-  dateRange: {
-    start: null,
-    end: null
-  }
-};
-
-const statusColors = {
-  draft: '#9e9e9e',
-  active: '#4caf50',
-  paused: '#ff9800',
-  closed: '#f44336',
-  archived: '#607d8b'
-};
-
-const priorityColors = {
-  low: '#4caf50',
-  medium: '#ff9800',
-  high: '#f44336',
-  urgent: '#9c27b0'
-};
-
-const typeColors = {
-  feedback: '#2196f3',
-  satisfaction: '#4caf50',
-  performance: '#ff9800',
-  culture: '#9c27b0',
-  training: '#607d8b',
-  general: '#795548'
-};
-
 const FeedbackSurveys: React.FC = () => {
   const [surveys, setSurveys] = useState<Survey[]>([]);
-  const [filteredSurveys, setFilteredSurveys] = useState<Survey[]>([]);
-  const [filters, setFilters] = useState<SurveyFilters>(initialFilters);
-  const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isViewMode, setIsViewMode] = useState(false);
-  const [isCreateMode, setIsCreateMode] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [snackbar, setSnackbar] = useState<{
-    open: boolean;
-    message: string;
-    severity: 'success' | 'error' | 'info' | 'warning';
-  }>({
-    open: false,
-    message: '',
-    severity: 'info'
-  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [successMessage, setSuccessMessage] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
-  // Form state for creating/editing surveys
-  const [surveyForm, setSurveyForm] = useState({
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
+
+  // Form data
+  const [formData, setFormData] = useState<Partial<Survey>>({
     title: '',
     description: '',
     category: '',
-    type: 'general' as 'feedback' | 'satisfaction' | 'performance' | 'culture' | 'training' | 'general',
-    priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
-    targetAudience: [] as string[],
+    type: 'feedback',
+    status: 'draft',
+    priority: 'medium',
+    authorName: '',
+    targetAudience: [],
     isAnonymous: false,
     allowMultipleResponses: false,
     startDate: '',
     endDate: '',
-    questions: [] as SurveyQuestion[],
+    questions: [],
+    responses: [],
     settings: {
-      allowPartialCompletion: false,
+      allowPartialCompletion: true,
       showProgressBar: true,
       randomizeQuestions: false,
       requireAuthentication: true,
-      notificationEmails: [] as string[]
+      notificationEmails: []
     }
   });
 
-  // Question form state
-  const [questionForm, setQuestionForm] = useState({
-    text: '',
-    type: 'text' as 'text' | 'multiple_choice' | 'checkbox' | 'rating' | 'scale' | 'date' | 'file',
-    required: false,
-    options: [] as string[],
-    minRating: 1,
-    maxRating: 5,
-    scaleLabels: [] as string[]
-  });
+  // Load data
+  useEffect(() => {
+    loadSurveys();
+  }, []);
 
-  // Question editing state
-  const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null);
-  const [showQuestionForm, setShowQuestionForm] = useState(false);
-
-  // Fetch surveys from Firebase
-  const fetchSurveys = async () => {
+  const loadSurveys = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-      
-      const result = await firebaseService.getCollection('surveys');
-      
-      if (result.success && result.data) {
-        const surveysData = result.data.map((survey: any) => ({
-          id: survey.id,
-          title: survey.title || '',
-          description: survey.description || '',
-          category: survey.category || '',
-          type: survey.type || 'general',
-          status: survey.status || 'draft',
-          priority: survey.priority || 'medium',
-          authorId: survey.authorId || '',
-          authorName: survey.authorName || '',
-          targetAudience: survey.targetAudience || [],
-          isAnonymous: survey.isAnonymous || false,
-          allowMultipleResponses: survey.allowMultipleResponses || false,
-          startDate: survey.startDate || '',
-          endDate: survey.endDate || '',
-          createdAt: survey.createdAt || '',
-          updatedAt: survey.updatedAt || '',
-          questions: survey.questions || [],
-          responses: survey.responses || [],
-          settings: survey.settings || {
-            allowPartialCompletion: false,
+      const response = await firebaseService.getCollection('surveys');
+      if (response.success && response.data) {
+        const surveyList: Survey[] = response.data.map((doc: any) => ({
+          id: doc.id || doc['id'],
+          title: doc.title || '',
+          description: doc.description || '',
+          category: doc.category || '',
+          type: doc.type || 'feedback',
+          status: doc.status || 'draft',
+          priority: doc.priority || 'medium',
+          authorId: doc.authorId || '',
+          authorName: doc.authorName || '',
+          targetAudience: doc.targetAudience || [],
+          isAnonymous: doc.isAnonymous || false,
+          allowMultipleResponses: doc.allowMultipleResponses || false,
+          startDate: doc.startDate || '',
+          endDate: doc.endDate || '',
+          createdAt: doc.createdAt || new Date().toISOString(),
+          updatedAt: doc.updatedAt || new Date().toISOString(),
+          questions: doc.questions || [],
+          responses: doc.responses || [],
+          settings: doc.settings || {
+            allowPartialCompletion: true,
             showProgressBar: true,
             randomizeQuestions: false,
             requireAuthentication: true,
             notificationEmails: []
           }
         }));
-        setSurveys(surveysData);
+        setSurveys(surveyList);
       } else {
-        setError('Failed to load surveys');
-        showNotification('Error loading surveys', 'error');
+        setSurveys([]);
       }
-    } catch (err) {
-      console.error('Error fetching surveys:', err);
+    } catch (error) {
+      console.error('Error loading surveys:', error);
       setError('Failed to load surveys');
-      showNotification('Error loading surveys', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  // Survey form handlers
-  const handleSurveyFormChange = (field: string, value: any) => {
-    setSurveyForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  // Filtered surveys
+  const filteredSurveys = useMemo(() => {
+    let filtered = [...surveys];
 
-  const handleSettingsChange = (field: string, value: any) => {
-    setSurveyForm(prev => ({
-      ...prev,
-      settings: {
-        ...prev.settings,
-        [field]: value
-      }
-    }));
-  };
-
-  const handleSaveSurvey = async () => {
-    try {
-      if (!surveyForm.title || !surveyForm.description || !surveyForm.category) {
-        showNotification('Please fill in all required fields', 'error');
-        return;
-      }
-
-      if (surveyForm.questions.length === 0) {
-        showNotification('Please add at least one question', 'error');
-        return;
-      }
-
-      const surveyData = {
-        ...surveyForm,
-        authorId: 'current-user-id', // TODO: Get from auth context
-        authorName: 'Current User', // TODO: Get from auth context
-        status: 'draft' as const,
-        createdAt: isCreateMode ? new Date().toISOString() : selectedSurvey?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      if (isCreateMode) {
-        const result = await firebaseService.addDocument('surveys', surveyData);
-        if (result.success) {
-          showNotification('Survey created successfully!', 'success');
-          setIsDialogOpen(false);
-          resetSurveyForm();
-          fetchSurveys();
-        } else {
-          showNotification('Failed to create survey', 'error');
-        }
-      } else if (selectedSurvey) {
-        const result = await firebaseService.updateDocument('surveys', selectedSurvey.id, surveyData);
-        if (result.success) {
-          showNotification('Survey updated successfully!', 'success');
-          setIsDialogOpen(false);
-          resetSurveyForm();
-          fetchSurveys();
-        } else {
-          showNotification('Failed to update survey', 'error');
-        }
-      }
-    } catch (err) {
-      console.error('Error saving survey:', err);
-      showNotification('Error saving survey', 'error');
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      filtered = filtered.filter(survey =>
+        survey.title.toLowerCase().includes(searchLower) ||
+        survey.description.toLowerCase().includes(searchLower) ||
+        survey.category.toLowerCase().includes(searchLower) ||
+        survey.authorName.toLowerCase().includes(searchLower)
+      );
     }
-  };
 
-  const resetSurveyForm = () => {
-    setSurveyForm({
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(survey => survey.type === typeFilter);
+    }
+
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(survey => survey.status === statusFilter);
+    }
+
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter(survey => survey.category === categoryFilter);
+    }
+
+    return filtered;
+  }, [surveys, searchQuery, typeFilter, statusFilter, categoryFilter]);
+
+  // Statistics
+  const stats = useMemo(() => {
+    const total = surveys.length;
+    const active = surveys.filter(s => s.status === 'active').length;
+    const draft = surveys.filter(s => s.status === 'draft').length;
+    const closed = surveys.filter(s => s.status === 'closed').length;
+    const responses = surveys.reduce((acc, s) => acc + s.responses.length, 0);
+
+    return { total, active, draft, closed, responses };
+  }, [surveys]);
+
+
+  // Form validation
+  const isFormValid = useMemo(() => {
+    return Boolean(
+      (formData.title || '').trim() &&
+      (formData.description || '').trim() &&
+      (formData.category || '').trim()
+    );
+  }, [formData.title, formData.description, formData.category]);
+
+  // Action handlers
+  const handleCreateSurvey = () => {
+    setFormData({
       title: '',
       description: '',
       category: '',
-      type: 'general' as 'feedback' | 'satisfaction' | 'performance' | 'culture' | 'training' | 'general',
-      priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
-      targetAudience: [] as string[],
+      type: 'feedback',
+      status: 'draft',
+      priority: 'medium',
+      authorName: '',
+      targetAudience: [],
       isAnonymous: false,
       allowMultipleResponses: false,
       startDate: '',
       endDate: '',
-      questions: [] as SurveyQuestion[],
+      questions: [],
+      responses: [],
       settings: {
-        allowPartialCompletion: false,
+        allowPartialCompletion: true,
         showProgressBar: true,
         randomizeQuestions: false,
         requireAuthentication: true,
-        notificationEmails: [] as string[]
+        notificationEmails: []
       }
     });
-    setQuestionForm({
-      text: '',
-      type: 'text' as 'text' | 'multiple_choice' | 'checkbox' | 'rating' | 'scale' | 'date' | 'file',
-      required: false,
-      options: [] as string[],
-      minRating: 1,
-      maxRating: 5,
-      scaleLabels: [] as string[]
-    });
-    setEditingQuestionIndex(null);
-    setShowQuestionForm(false);
-  };
-
-  // Question management functions
-  const handleQuestionFormChange = (field: string, value: any) => {
-    setQuestionForm(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleAddQuestion = () => {
-    if (!questionForm.text) {
-      showNotification('Please enter question text', 'error');
-      return;
-    }
-
-    const newQuestion: SurveyQuestion = {
-      id: Date.now().toString(),
-      text: questionForm.text,
-      type: questionForm.type,
-      required: questionForm.required,
-      options: questionForm.type === 'multiple_choice' || questionForm.type === 'checkbox' ? questionForm.options : [],
-      minRating: questionForm.type === 'rating' ? questionForm.minRating : 1,
-      maxRating: questionForm.type === 'rating' ? questionForm.maxRating : 5,
-      scaleLabels: questionForm.type === 'scale' ? questionForm.scaleLabels : [],
-      order: surveyForm.questions.length
-    };
-
-    setSurveyForm(prev => ({
-      ...prev,
-      questions: [...prev.questions, newQuestion]
-    }));
-
-    // Reset question form
-    setQuestionForm({
-      text: '',
-      type: 'text',
-      required: false,
-      options: [],
-      minRating: 1,
-      maxRating: 5,
-      scaleLabels: []
-    });
-    setShowQuestionForm(false);
-  };
-
-  const handleEditQuestion = (index: number) => {
-    const question = surveyForm.questions[index];
-    if (!question) return;
-    
-    setQuestionForm({
-      text: question.text,
-      type: question.type,
-      required: question.required,
-      options: question.options || [],
-      minRating: question.minRating || 1,
-      maxRating: question.maxRating || 5,
-      scaleLabels: question.scaleLabels || []
-    });
-    setEditingQuestionIndex(index);
-    setShowQuestionForm(true);
-  };
-
-  const handleUpdateQuestion = () => {
-    if (!questionForm.text || editingQuestionIndex === null) return;
-
-    const currentQuestion = surveyForm.questions[editingQuestionIndex];
-    if (!currentQuestion) return;
-
-    const updatedQuestion: SurveyQuestion = {
-      id: currentQuestion.id,
-      text: questionForm.text,
-      type: questionForm.type,
-      required: questionForm.required,
-      options: questionForm.type === 'multiple_choice' || questionForm.type === 'checkbox' ? questionForm.options : [],
-      minRating: questionForm.type === 'rating' ? questionForm.minRating : 1,
-      maxRating: questionForm.type === 'rating' ? questionForm.maxRating : 5,
-      scaleLabels: questionForm.type === 'scale' ? questionForm.scaleLabels : [],
-      order: currentQuestion.order
-    };
-
-    setSurveyForm(prev => ({
-      ...prev,
-      questions: prev.questions.map((q, i) => i === editingQuestionIndex ? updatedQuestion : q)
-    }));
-
-    setEditingQuestionIndex(null);
-    setShowQuestionForm(false);
-    setQuestionForm({
-      text: '',
-      type: 'text',
-      required: false,
-      options: [],
-      minRating: 1,
-      maxRating: 5,
-      scaleLabels: []
-    });
-  };
-
-  const handleDeleteQuestion = (index: number) => {
-    setSurveyForm(prev => ({
-      ...prev,
-      questions: prev.questions.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleAddOption = () => {
-    const newOption = `Option ${questionForm.options.length + 1}`;
-    setQuestionForm(prev => ({
-      ...prev,
-      options: [...prev.options, newOption]
-    }));
-  };
-
-  const handleRemoveOption = (index: number) => {
-    setQuestionForm(prev => ({
-      ...prev,
-      options: prev.options.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleOptionChange = (index: number, value: string) => {
-    setQuestionForm(prev => ({
-      ...prev,
-      options: prev.options.map((opt, i) => i === index ? value : opt)
-    }));
-  };
-
-  useEffect(() => {
-    fetchSurveys();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [surveys, filters]);
-
-  const applyFilters = useCallback(() => {
-    let filtered = [...surveys];
-
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      filtered = filtered.filter(survey =>
-        survey.title.toLowerCase().includes(searchLower) ||
-        survey.description.toLowerCase().includes(searchLower) ||
-        survey.authorName.toLowerCase().includes(searchLower) ||
-        survey.category.toLowerCase().includes(searchLower)
-      );
-    }
-
-    if (filters.type) {
-      filtered = filtered.filter(survey => survey.type === filters.type);
-    }
-
-    if (filters.status) {
-      filtered = filtered.filter(survey => survey.status === filters.status);
-    }
-
-    if (filters.category) {
-      filtered = filtered.filter(survey => survey.category === filters.category);
-    }
-
-    if (filters.author) {
-      filtered = filtered.filter(survey => survey.authorName === filters.author);
-    }
-
-    if (filters.dateRange.start) {
-      filtered = filtered.filter(survey => survey.createdAt >= filters.dateRange.start!);
-    }
-
-    if (filters.dateRange.end) {
-      filtered = filtered.filter(survey => survey.createdAt <= filters.dateRange.end!);
-    }
-
-    setFilteredSurveys(filtered);
-    setCurrentPage(1);
-  }, [surveys, filters]);
-
-  const handleFilterChange = (field: keyof SurveyFilters, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleCreateSurvey = () => {
-    resetSurveyForm();
-    setSelectedSurvey(null);
-    setIsViewMode(false);
-    setIsCreateMode(true);
-    setIsDialogOpen(true);
-  };
-
-  const handleEditSurvey = (survey: Survey) => {
-    setSurveyForm({
-      title: survey.title,
-      description: survey.description,
-      category: survey.category,
-      type: survey.type,
-      priority: survey.priority,
-      targetAudience: survey.targetAudience,
-      isAnonymous: survey.isAnonymous,
-      allowMultipleResponses: survey.allowMultipleResponses,
-      startDate: survey.startDate,
-      endDate: survey.endDate || '',
-      questions: survey.questions,
-      settings: survey.settings
-    });
-    setSelectedSurvey(survey);
-    setIsViewMode(false);
-    setIsCreateMode(false);
-    setIsDialogOpen(true);
+    setShowCreateModal(true);
   };
 
   const handleViewSurvey = (survey: Survey) => {
     setSelectedSurvey(survey);
-    setIsViewMode(true);
-    setIsCreateMode(false);
-    setIsDialogOpen(true);
+    setShowViewModal(true);
   };
 
-  const handleDeleteSurvey = async (surveyId: string) => {
+  const handleEditSurvey = (survey: Survey) => {
+    setSelectedSurvey(survey);
+    setFormData(survey);
+    setShowEditModal(true);
+  };
+
+  const handleDeleteSurvey = (survey: Survey) => {
+    setSelectedSurvey(survey);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteSurvey = async () => {
+    if (!selectedSurvey) return;
+    
     try {
-      const result = await firebaseService.deleteDocument('surveys', surveyId);
-      
-      if (result.success) {
-        setSurveys(prev => prev.filter(survey => survey.id !== surveyId));
-        setSnackbar({
-          open: true,
-          message: 'Survey deleted successfully',
-          severity: 'success'
-        });
-        showNotification('Survey deleted successfully!', 'success');
-      } else {
-        setSnackbar({
-          open: true,
-          message: 'Failed to delete survey',
-          severity: 'error'
-        });
-        showNotification('Failed to delete survey', 'error');
-      }
-    } catch (err) {
-      console.error('Error deleting survey:', err);
-      setSnackbar({
-        open: true,
-        message: 'Error deleting survey',
-        severity: 'error'
-      });
-      showNotification('Error deleting survey', 'error');
+      await firebaseService.deleteDocument('surveys', selectedSurvey.id);
+      setSurveys(prev => prev.filter(s => s.id !== selectedSurvey.id));
+      setShowDeleteModal(false);
+      setSuccessMessage('Survey deleted successfully');
+    } catch (error) {
+      setError('Failed to delete survey');
     }
   };
 
-  const handleActivateSurvey = async (surveyId: string) => {
-    try {
-      const survey = surveys.find(s => s.id === surveyId);
-      if (!survey) return;
+  const handleSaveSurvey = async () => {
+    if (!isFormValid) {
+      setError('Please fill in all required fields');
+      return;
+    }
 
-      const updatedSurvey = {
-        ...survey,
-        status: 'active',
+    try {
+      const surveyData = {
+        ...formData,
+        createdAt: selectedSurvey ? selectedSurvey.createdAt : new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      const result = await firebaseService.updateDocument('surveys', surveyId, updatedSurvey);
-      
-      if (result.success) {
-        setSurveys(prev => prev.map(survey =>
-          survey.id === surveyId
-            ? { ...survey, status: 'active', updatedAt: new Date().toISOString() }
-            : survey
-        ));
-        setSnackbar({
-          open: true,
-          message: 'Survey activated successfully',
-          severity: 'success'
-        });
-        showNotification('Survey activated successfully!', 'success');
+      if (selectedSurvey) {
+        // Update existing survey
+        await firebaseService.updateDocument('surveys', selectedSurvey.id, surveyData);
+        setSurveys(prev => prev.map(s => s.id === selectedSurvey.id ? { ...s, ...surveyData } : s));
+        setShowEditModal(false);
+        setSuccessMessage('Survey updated successfully');
       } else {
-        setSnackbar({
-          open: true,
-          message: 'Failed to activate survey',
-          severity: 'error'
-        });
-        showNotification('Failed to activate survey', 'error');
-      }
-    } catch (err) {
-      console.error('Error activating survey:', err);
-      setSnackbar({
-        open: true,
-        message: 'Error activating survey',
-        severity: 'error'
-      });
-      showNotification('Error activating survey', 'error');
-    }
-  };
-
-  const handlePauseSurvey = async (surveyId: string) => {
-    try {
-      const survey = surveys.find(s => s.id === surveyId);
-      if (!survey) return;
-
-      const updatedSurvey = {
-        ...survey,
-        status: 'paused',
-        updatedAt: new Date().toISOString()
-      };
-
-      const result = await firebaseService.updateDocument('surveys', surveyId, updatedSurvey);
-      
-      if (result.success) {
-        setSurveys(prev => prev.map(survey =>
-          survey.id === surveyId
-            ? { ...survey, status: 'paused', updatedAt: new Date().toISOString() }
-            : survey
-        ));
-        setSnackbar({
-          open: true,
-          message: 'Survey paused successfully',
-          severity: 'warning'
-        });
-        showNotification('Survey paused successfully!', 'info');
-      } else {
-        setSnackbar({
-          open: true,
-          message: 'Failed to pause survey',
-          severity: 'error'
-        });
-        showNotification('Failed to pause survey', 'error');
-      }
-    } catch (err) {
-      console.error('Error pausing survey:', err);
-      setSnackbar({
-        open: true,
-        message: 'Error pausing survey',
-        severity: 'error'
-      });
-      showNotification('Error pausing survey', 'error');
-    }
-  };
-
-  const handleCloseSurvey = async (surveyId: string) => {
-    try {
-      const survey = surveys.find(s => s.id === surveyId);
-      if (!survey) return;
-
-      const updatedSurvey = {
-        ...survey,
-        status: 'closed',
-        updatedAt: new Date().toISOString()
-      };
-
-      const result = await firebaseService.updateDocument('surveys', surveyId, updatedSurvey);
-      
-      if (result.success) {
-        setSurveys(prev => prev.map(survey =>
-          survey.id === surveyId
-            ? { ...survey, status: 'closed', updatedAt: new Date().toISOString() }
-            : survey
-        ));
-        setSnackbar({
-          open: true,
-          message: 'Survey closed successfully',
-          severity: 'info'
-        });
-        showNotification('Survey closed successfully!', 'info');
-      } else {
-        setSnackbar({
-          open: true,
-          message: 'Failed to close survey',
-          severity: 'error'
-        });
-        showNotification('Failed to close survey', 'error');
-      }
-    } catch (err) {
-      console.error('Error closing survey:', err);
-      setSnackbar({
-        open: true,
-        message: 'Error closing survey',
-        severity: 'error'
-      });
-      showNotification('Error closing survey', 'error');
-    }
-  };
-
-  const handleArchiveSurvey = async (surveyId: string) => {
-    try {
-      const survey = surveys.find(s => s.id === surveyId);
-      if (!survey) return;
-
-      const updatedSurvey = {
-        ...survey,
-        status: 'archived',
-        updatedAt: new Date().toISOString()
-      };
-
-      const result = await firebaseService.updateDocument('surveys', surveyId, updatedSurvey);
-      
-      if (result.success) {
-        setSurveys(prev => prev.map(survey =>
-          survey.id === surveyId
-            ? { ...survey, status: 'archived', updatedAt: new Date().toISOString() }
-            : survey
-        ));
-        setSnackbar({
-          open: true,
-          message: 'Survey archived successfully',
-          severity: 'info'
-        });
-        showNotification('Survey archived successfully!', 'info');
-      } else {
-        setSnackbar({
-          open: true,
-          message: 'Failed to archive survey',
-          severity: 'error'
-        });
-        showNotification('Failed to archive survey', 'error');
-      }
-    } catch (err) {
-      console.error('Error archiving survey:', err);
-      setSnackbar({
-        open: true,
-        message: 'Error archiving survey',
-        severity: 'error'
-      });
-      showNotification('Error archiving survey', 'error');
-    }
-  };
-
-  
-
-  const getResponseRate = (survey: Survey) => {
-    if (!survey.targetAudience.length) return 0;
-    const targetCount = survey.targetAudience.length;
-    const responseCount = survey.responses.length;
-    return Math.round((responseCount / targetCount) * 100);
-  };
-
-  const getAverageRating = (survey: Survey) => {
-    const ratingQuestions = survey.questions.filter(q => q.type === 'rating');
-    if (ratingQuestions.length === 0) return 0;
-
-    let totalRating = 0;
-    let ratingCount = 0;
-
-    survey.responses.forEach(response => {
-      response.answers.forEach(answer => {
-        if (answer.ratingValue) {
-          totalRating += answer.ratingValue;
-          ratingCount++;
+        // Create new survey
+        const response = await firebaseService.addDocument('surveys', surveyData);
+        if (response.success && response.data) {
+          setSurveys(prev => [...prev, response.data as Survey]);
+          setShowCreateModal(false);
+          setSuccessMessage('Survey created successfully');
         }
-      });
-    });
-
-    return ratingCount > 0 ? Math.round((totalRating / ratingCount) * 10) / 10 : 0;
+      }
+    } catch (error) {
+      setError('Failed to save survey');
+    }
   };
 
-  const getStatusIcon = (status: string) => {
+
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'draft':
-        return <InfoIcon color="action" />;
-      case 'active':
-        return <CheckCircleIcon color="success" />;
-      case 'paused':
-        return <WarningIcon color="warning" />;
-      case 'closed':
-        return <ErrorIcon color="error" />;
-      case 'archived':
-        return <ArchiveIcon color="action" />;
-      default:
-        return <InfoIcon />;
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'draft': return 'bg-yellow-100 text-yellow-800';
+      case 'paused': return 'bg-orange-100 text-orange-800';
+      case 'closed': return 'bg-gray-100 text-gray-800';
+      case 'archived': return 'bg-purple-100 text-purple-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getPriorityIcon = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-      case 'high':
-        return <WarningIcon color="error" />;
-      case 'medium':
-        return <WarningIcon color="warning" />;
-      case 'low':
-        return <WarningIcon color="action" />;
-      default:
-        return <WarningIcon />;
-    }
-  };
 
-  const getSurveyTypeLabel = (type: string) => {
+  const getTypeColor = (type: string) => {
     switch (type) {
-      case 'feedback':
-        return 'Feedback';
-      case 'satisfaction':
-        return 'Satisfaction';
-      case 'performance':
-        return 'Performance';
-      case 'culture':
-        return 'Culture';
-      case 'training':
-        return 'Training';
-      case 'general':
-        return 'General';
-      default:
-        return 'Unknown';
+      case 'feedback': return 'bg-blue-100 text-blue-800';
+      case 'satisfaction': return 'bg-green-100 text-green-800';
+      case 'performance': return 'bg-purple-100 text-purple-800';
+      case 'culture': return 'bg-pink-100 text-pink-800';
+      case 'training': return 'bg-indigo-100 text-indigo-800';
+      case 'general': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    try {
-      return new Date(dateString).toLocaleDateString();
-    } catch {
-      return 'Invalid Date';
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 'bg-red-100 text-red-800';
+      case 'high': return 'bg-orange-100 text-orange-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      case 'low': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const paginatedSurveys = filteredSurveys.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const surveyTypes = ['feedback', 'satisfaction', 'performance', 'culture', 'training', 'general'];
+  const surveyStatuses = ['draft', 'active', 'paused', 'closed', 'archived'];
+  const surveyCategories = ['HR', 'Operations', 'IT', 'Finance', 'General'];
 
-  const totalPages = Math.ceil(filteredSurveys.length / itemsPerPage);
-
-  // Loading state
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-        <CircularProgress />
-      </Box>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading surveys...</p>
+        </div>
+      </div>
     );
   }
 
-  // Error state
   if (error) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-        <Button onClick={fetchSurveys} variant="contained">
-          Try Again
-        </Button>
-      </Box>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Feedback & Surveys
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<ChartIcon />}
-            onClick={() => {}}
+    <div className="space-y-6 p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Feedback Surveys</h1>
+          <p className="text-gray-600">Create and manage employee feedback surveys</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button 
+            onClick={() => {/* Export functionality */}}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center justify-center space-x-2"
           >
-            Analytics
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            onClick={() => {}}
-          >
-            Export
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
+            <Download className="w-4 h-4" />
+            <span>Export</span>
+          </button>
+          <button 
             onClick={handleCreateSurvey}
-            sx={{ bgcolor: 'primary.main' }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
           >
-            Create Survey
-          </Button>
-        </Box>
-      </Box>
+            <Plus className="w-4 h-4" />
+            <span>Create Survey</span>
+          </button>
+        </div>
+      </div>
 
-      {/* Statistics Cards */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-        gap: 3, 
-        mb: 3 
-      }}>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Surveys
-            </Typography>
-            <Typography variant="h4" component="div">
-              {surveys.length}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Active Surveys
-            </Typography>
-            <Typography variant="h4" component="div" color="success.main">
-              {surveys.filter(survey => survey.status === 'active').length}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Total Responses
-            </Typography>
-            <Typography variant="h4" component="div" color="primary.main">
-              {surveys.reduce((total, survey) => total + survey.responses.length, 0)}
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent>
-            <Typography color="textSecondary" gutterBottom>
-              Avg. Response Rate
-            </Typography>
-            <Typography variant="h4" component="div" color="info.main">
-              {surveys.length > 0 
-                ? Math.round(surveys.reduce((total, survey) => total + getResponseRate(survey), 0) / surveys.length)
-                : 0}%
-            </Typography>
-          </CardContent>
-        </Card>
-      </Box>
-
-      {/* No Data State */}
-      {surveys.length === 0 && (
-        <Box sx={{ textAlign: 'center', py: 8 }}>
-          <AssessmentIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            No surveys available
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Start by creating your first survey to collect feedback from your team.
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={handleCreateSurvey}
-          >
-            Create First Survey
-          </Button>
-        </Box>
+      {/* Success/Error Messages */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+            <p className="text-green-800">{successMessage}</p>
+          </div>
+        </div>
       )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+            <p className="text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <DashboardCard
+          name="Total Surveys"
+          value={stats.total}
+          icon={FileText}
+          color="blue"
+        />
+        <DashboardCard
+          name="Active"
+          value={stats.active}
+          icon={CheckCircle}
+          color="green"
+        />
+        <DashboardCard
+          name="Draft"
+          value={stats.draft}
+          icon={FileText}
+          color="yellow"
+        />
+        <DashboardCard
+          name="Closed"
+          value={stats.closed}
+          icon={FileText}
+          color="gray"
+        />
+        <DashboardCard
+          name="Responses"
+          value={stats.responses}
+          icon={Users}
+          color="purple"
+        />
+      </div>
 
       {/* Filters */}
-      {surveys.length > 0 && (
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <FilterIcon sx={{ mr: 1 }} />
-            <Typography variant="h6">Filters</Typography>
-          </Box>
-          <Box sx={{ 
-            display: 'grid', 
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-            gap: 2 
-          }}>
-            <TextField
-              fullWidth
-              label="Search Surveys"
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon />
-                  </InputAdornment>
-                )
-              }}
+      <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className="relative flex-1 min-w-[220px]">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search surveys by title, description, or author"
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
             />
-            <FormControl fullWidth>
-              <InputLabel>Survey Type</InputLabel>
-              <Select
-                value={filters.type}
-                label="Survey Type"
-                onChange={(e) => handleFilterChange('type', e.target.value)}
-              >
-                <MenuItem value="">All Types</MenuItem>
-                <MenuItem value="feedback">Feedback</MenuItem>
-                <MenuItem value="satisfaction">Satisfaction</MenuItem>
-                <MenuItem value="performance">Performance</MenuItem>
-                <MenuItem value="culture">Culture</MenuItem>
-                <MenuItem value="training">Training</MenuItem>
-                <MenuItem value="general">General</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl fullWidth>
-              <InputLabel>Status</InputLabel>
-              <Select
-                value={filters.status}
-                label="Status"
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-              >
-                <MenuItem value="">All Statuses</MenuItem>
-                <MenuItem value="draft">Draft</MenuItem>
-                <MenuItem value="active">Active</MenuItem>
-                <MenuItem value="paused">Paused</MenuItem>
-                <MenuItem value="closed">Closed</MenuItem>
-                <MenuItem value="archived">Archived</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl fullWidth>
-              <InputLabel>Category</InputLabel>
-              <Select
-                value={filters.category}
-                label="Category"
-                onChange={(e) => handleFilterChange('category', e.target.value)}
-              >
-                <MenuItem value="">All Categories</MenuItem>
-                <MenuItem value="HR">HR</MenuItem>
-                <MenuItem value="Training">Training</MenuItem>
-                <MenuItem value="Operations">Operations</MenuItem>
-                <MenuItem value="IT">IT</MenuItem>
-              </Select>
-            </FormControl>
-          </Box>
-        </Paper>
-      )}
+            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+            >
+              <option value="all">All Types</option>
+              {surveyTypes.map(type => (
+                <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
+              ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+            >
+              <option value="all">All Status</option>
+              {surveyStatuses.map(status => (
+                <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+              ))}
+            </select>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+            >
+              <option value="all">All Categories</option>
+              {surveyCategories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
 
       {/* Surveys Table */}
-      {surveys.length > 0 && (
-        <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-          <TableContainer>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Survey</TableCell>
-                  <TableCell>Type</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Priority</TableCell>
-                  <TableCell>Author</TableCell>
-                  <TableCell>Response Rate</TableCell>
-                  <TableCell>Avg. Rating</TableCell>
-                  <TableCell>Created</TableCell>
-                  <TableCell>Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {paginatedSurveys.map((survey) => (
-                  <TableRow key={survey.id} hover>
-                    <TableCell>
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight="bold">
-                          {survey.title}
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary" noWrap sx={{ maxWidth: 200 }}>
-                          {survey.description}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                          <Chip
-                            label={survey.category}
-                            size="small"
-                            variant="outlined"
-                          />
-                          <Chip
-                            label={`${survey.questions.length} questions`}
-                            size="small"
-                            variant="outlined"
-                            icon={<QuestionAnswerIcon />}
-                          />
-                        </Box>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={getSurveyTypeLabel(survey.type)}
-                        size="small"
-                        sx={{
-                          bgcolor: typeColors[survey.type],
-                          color: 'white',
-                          fontWeight: 'bold'
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {getStatusIcon(survey.status)}
-                        <Chip
-                          label={survey.status}
-                          size="small"
-                          sx={{
-                            bgcolor: statusColors[survey.status],
-                            color: 'white',
-                            fontWeight: 'bold',
-                            textTransform: 'capitalize'
-                          }}
-                        />
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {getPriorityIcon(survey.priority)}
-                        <Chip
-                          label={survey.priority}
-                          size="small"
-                          sx={{
-                            bgcolor: priorityColors[survey.priority],
-                            color: 'white',
-                            fontWeight: 'bold',
-                            textTransform: 'capitalize'
-                          }}
-                        />
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Avatar sx={{ width: 24, height: 24 }}>
-                          <PersonIcon />
-                        </Avatar>
-                        <Typography variant="body2">
-                          {survey.authorName}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ width: '100%', maxWidth: 100 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                          <Typography variant="caption" color="textSecondary">
-                            {getResponseRate(survey)}%
-                          </Typography>
-                          <Typography variant="caption" color="textSecondary">
-                            {survey.responses.length}/{survey.targetAudience.length}
-                          </Typography>
-                        </Box>
-                        <LinearProgress
-                          variant="determinate"
-                          value={getResponseRate(survey)}
-                          sx={{ height: 6, borderRadius: 1 }}
-                        />
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Rating
-                          value={getAverageRating(survey)}
-                          readOnly
-                          size="small"
-                          precision={0.1}
-                        />
-                        <Typography variant="body2">
-                          {getAverageRating(survey).toFixed(1)}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {formatDate(survey.createdAt)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Tooltip title="View Details">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleViewSurvey(survey)}
-                            color="primary"
-                          >
-                            <ViewIcon />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Edit Survey">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleEditSurvey(survey)}
-                            color="primary"
-                          >
-                            <EditIcon />
-                          </IconButton>
-                        </Tooltip>
-                        {survey.status === 'draft' && (
-                          <Tooltip title="Activate Survey">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleActivateSurvey(survey.id)}
-                              color="success"
-                            >
-                              <SendIcon />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        {survey.status === 'active' && (
-                          <>
-                            <Tooltip title="Pause Survey">
-                              <IconButton
-                                size="small"
-                                onClick={() => handlePauseSurvey(survey.id)}
-                                color="warning"
-                              >
-                                <WarningIcon />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Close Survey">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleCloseSurvey(survey.id)}
-                                color="error"
-                              >
-                                <ErrorIcon />
-                              </IconButton>
-                            </Tooltip>
-                          </>
-                        )}
-                        {survey.status === 'closed' && (
-                          <Tooltip title="Archive Survey">
-                            <IconButton
-                              size="small"
-                              onClick={() => handleArchiveSurvey(survey.id)}
-                              color="default"
-                            >
-                              <ArchiveIcon />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        <Tooltip title="Delete Survey">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleDeleteSurvey(survey.id)}
-                            color="error"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(_, page) => setCurrentPage(page)}
-            color="primary"
-            showFirstButton
-            showLastButton
-          />
-        </Box>
-      )}
-
-      {/* Survey Details Dialog */}
-      <Dialog
-        open={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AssessmentIcon />
-            <Typography variant="h6">
-              {isViewMode ? 'Survey Details' : isCreateMode ? 'Create New Survey' : 'Edit Survey'}
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {isViewMode && selectedSurvey ? (
-            <Box sx={{ mt: 2 }}>
-              <Box sx={{ 
-                display: 'grid', 
-                gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
-                gap: 3 
-              }}>
-                <Box>
-                  <Typography variant="h6" gutterBottom>Survey Information</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemText
-                        primary="Title"
-                        secondary={selectedSurvey.title}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Description"
-                        secondary={selectedSurvey.description}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Type"
-                        secondary={getSurveyTypeLabel(selectedSurvey.type)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Status"
-                        secondary={
-                          <Chip
-                            label={selectedSurvey.status}
-                            size="small"
-                            sx={{
-                              bgcolor: statusColors[selectedSurvey.status],
-                              color: 'white',
-                              textTransform: 'capitalize'
-                            }}
-                          />
-                        }
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Priority"
-                        secondary={
-                          <Chip
-                            label={selectedSurvey.priority}
-                            size="small"
-                            sx={{
-                              bgcolor: priorityColors[selectedSurvey.priority],
-                              color: 'white',
-                              textTransform: 'capitalize'
-                            }}
-                          />
-                        }
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-                <Box>
-                  <Typography variant="h6" gutterBottom>Survey Statistics</Typography>
-                  <List dense>
-                    <ListItem>
-                      <ListItemText
-                        primary="Questions"
-                        secondary={selectedSurvey.questions.length}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Responses"
-                        secondary={selectedSurvey.responses.length}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Response Rate"
-                        secondary={`${getResponseRate(selectedSurvey)}%`}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText
-                        primary="Average Rating"
-                        secondary={getAverageRating(selectedSurvey).toFixed(1)}
-                      />
-                    </ListItem>
-                  </List>
-                </Box>
-              </Box>
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="h6" gutterBottom>Questions</Typography>
-                <Accordion>
-                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="subtitle1">Survey Questions ({selectedSurvey.questions.length})</Typography>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <List>
-                      {selectedSurvey.questions.map((question, index) => (
-                        <ListItem key={question.id} divider>
-                          <ListItemIcon>
-                            <QuestionAnswerIcon />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={`${index + 1}. ${question.text}`}
-                            secondary={
-                              <Box>
-                                <Typography variant="caption" display="block">
-                                  Type: {question.type}
-                                </Typography>
-                                <Typography variant="caption" display="block">
-                                  Required: {question.required ? 'Yes' : 'No'}
-                                </Typography>
-                                {question.options && question.options.length > 0 && (
-                                  <Typography variant="caption" display="block">
-                                    Options: {question.options.join(', ')}
-                                  </Typography>
-                                )}
-                              </Box>
-                            }
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  </AccordionDetails>
-                </Accordion>
-              </Box>
-              {selectedSurvey.responses.length > 0 && (
-                <Box sx={{ mt: 3 }}>
-                  <Typography variant="h6" gutterBottom>Recent Responses</Typography>
-                  <List>
-                    {selectedSurvey.responses.slice(0, 3).map((response) => (
-                      <ListItem key={response.id} divider>
-                        <ListItemAvatar>
-                          <Avatar>
-                            <PersonIcon />
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={response.respondentName || 'Anonymous'}
-                          secondary={
-                            <Box>
-                              <Typography variant="body2">
-                                Submitted: {formatDate(response.submittedAt)}
-                              </Typography>
-                              <Typography variant="caption" color="textSecondary">
-                                Completion Time: {response.completionTime}s
-                              </Typography>
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Box>
-              )}
-            </Box>
-          ) : (
-            <Box sx={{ mt: 2 }}>
-              {/* Survey Form */}
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3, mb: 3 }}>
-                <TextField
-                  fullWidth
-                  label="Survey Title"
-                  value={surveyForm.title}
-                  onChange={(e) => handleSurveyFormChange('title', e.target.value)}
-                  required
-                />
-                <TextField
-                  fullWidth
-                  label="Category"
-                  value={surveyForm.category}
-                  onChange={(e) => handleSurveyFormChange('category', e.target.value)}
-                  required
-                />
-                <FormControl fullWidth>
-                  <InputLabel>Survey Type</InputLabel>
-                  <Select
-                    value={surveyForm.type}
-                    label="Survey Type"
-                    onChange={(e) => handleSurveyFormChange('type', e.target.value)}
-                  >
-                    <MenuItem value="feedback">Feedback</MenuItem>
-                    <MenuItem value="satisfaction">Satisfaction</MenuItem>
-                    <MenuItem value="performance">Performance</MenuItem>
-                    <MenuItem value="culture">Culture</MenuItem>
-                    <MenuItem value="training">Training</MenuItem>
-                    <MenuItem value="general">General</MenuItem>
-                  </Select>
-                </FormControl>
-                <FormControl fullWidth>
-                  <InputLabel>Priority</InputLabel>
-                  <Select
-                    value={surveyForm.priority}
-                    label="Priority"
-                    onChange={(e) => handleSurveyFormChange('priority', e.target.value)}
-                  >
-                    <MenuItem value="low">Low</MenuItem>
-                    <MenuItem value="medium">Medium</MenuItem>
-                    <MenuItem value="high">High</MenuItem>
-                    <MenuItem value="urgent">Urgent</MenuItem>
-                  </Select>
-                </FormControl>
-                <TextField
-                  fullWidth
-                  label="Start Date"
-                  type="date"
-                  value={surveyForm.startDate}
-                  onChange={(e) => handleSurveyFormChange('startDate', e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-                <TextField
-                  fullWidth
-                  label="End Date (Optional)"
-                  type="date"
-                  value={surveyForm.endDate}
-                  onChange={(e) => handleSurveyFormChange('endDate', e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Box>
-              
-              <TextField
-                fullWidth
-                label="Description"
-                value={surveyForm.description}
-                onChange={(e) => handleSurveyFormChange('description', e.target.value)}
-                multiline
-                rows={3}
-                required
-                sx={{ mb: 3 }}
-              />
-
-              {/* Settings */}
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="h6" gutterBottom>Settings</Typography>
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={surveyForm.isAnonymous}
-                        onChange={(e) => handleSurveyFormChange('isAnonymous', e.target.checked)}
-                      />
-                    }
-                    label="Anonymous Responses"
-                  />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={surveyForm.allowMultipleResponses}
-                        onChange={(e) => handleSurveyFormChange('allowMultipleResponses', e.target.checked)}
-                      />
-                    }
-                    label="Allow Multiple Responses"
-                  />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={surveyForm.settings.showProgressBar}
-                        onChange={(e) => handleSettingsChange('showProgressBar', e.target.checked)}
-                      />
-                    }
-                    label="Show Progress Bar"
-                  />
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={surveyForm.settings.requireAuthentication}
-                        onChange={(e) => handleSettingsChange('requireAuthentication', e.target.checked)}
-                      />
-                    }
-                    label="Require Authentication"
-                  />
-                </Box>
-              </Box>
-
-              {/* Questions Section */}
-              <Box sx={{ mb: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography variant="h6">Questions ({surveyForm.questions.length})</Typography>
-                  <Button
-                    variant="outlined"
-                    startIcon={<AddIcon />}
-                    onClick={() => setShowQuestionForm(true)}
-                  >
-                    Add Question
-                  </Button>
-                </Box>
-
-                {/* Questions List */}
-                {surveyForm.questions.map((question, index) => (
-                  <Card key={question.id} sx={{ mb: 2, p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="subtitle1" gutterBottom>
-                          {index + 1}. {question.text}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                          <Chip label={question.type} size="small" />
-                          <Chip label={question.required ? 'Required' : 'Optional'} size="small" />
-                          {question.options && question.options.length > 0 && (
-                            <Chip label={`${question.options.length} options`} size="small" />
-                          )}
-                        </Box>
-                      </Box>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEditQuestion(index)}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteQuestion(index)}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                  </Card>
-                ))}
-
-                {surveyForm.questions.length === 0 && (
-                  <Box sx={{ textAlign: 'center', py: 4, border: '2px dashed #ccc', borderRadius: 2 }}>
-                    <QuestionAnswerIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-                    <Typography variant="h6" color="text.secondary" gutterBottom>
-                      No questions added yet
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Add questions to your survey to start collecting responses.
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={() => setShowQuestionForm(true)}
-                    >
-                      Add First Question
-                    </Button>
-                  </Box>
-                )}
-              </Box>
-
-              {/* Question Form Modal */}
-              {showQuestionForm && (
-                <Box sx={{ border: '1px solid #ccc', borderRadius: 2, p: 3, mb: 3 }}>
-                  <Typography variant="h6" gutterBottom>
-                    {editingQuestionIndex !== null ? 'Edit Question' : 'Add New Question'}
-                  </Typography>
-                  
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2, mb: 2 }}>
-                    <TextField
-                      fullWidth
-                      label="Question Text"
-                      value={questionForm.text}
-                      onChange={(e) => handleQuestionFormChange('text', e.target.value)}
-                      required
-                    />
-                    <FormControl fullWidth>
-                      <InputLabel>Question Type</InputLabel>
-                      <Select
-                        value={questionForm.type}
-                        label="Question Type"
-                        onChange={(e) => handleQuestionFormChange('type', e.target.value)}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Survey Title</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Author</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responses</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredSurveys.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-6 py-12 text-center">
+                    <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No surveys found</h3>
+                    <p className="text-gray-600 mb-4">
+                      {surveys.length === 0 
+                        ? 'No surveys have been created yet. Click "Create Survey" to get started.'
+                        : 'No surveys match the current filters. Try adjusting your search criteria.'
+                      }
+                    </p>
+                    {surveys.length === 0 && (
+                      <button
+                        onClick={handleCreateSurvey}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 mx-auto"
                       >
-                        <MenuItem value="text">Text</MenuItem>
-                        <MenuItem value="multiple_choice">Multiple Choice</MenuItem>
-                        <MenuItem value="checkbox">Checkbox</MenuItem>
-                        <MenuItem value="rating">Rating</MenuItem>
-                        <MenuItem value="scale">Scale</MenuItem>
-                        <MenuItem value="date">Date</MenuItem>
-                      </Select>
-                    </FormControl>
-                  </Box>
-
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={questionForm.required}
-                        onChange={(e) => handleQuestionFormChange('required', e.target.checked)}
-                      />
-                    }
-                    label="Required Question"
-                    sx={{ mb: 2 }}
-                  />
-
-                  {/* Options for multiple choice and checkbox */}
-                  {(questionForm.type === 'multiple_choice' || questionForm.type === 'checkbox') && (
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle2" gutterBottom>Options</Typography>
-                      {questionForm.options.map((option, index) => (
-                        <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
-                          <TextField
-                            size="small"
-                            value={option}
-                            onChange={(e) => handleOptionChange(index, e.target.value)}
-                            placeholder={`Option ${index + 1}`}
-                            sx={{ flex: 1 }}
-                          />
-                          <IconButton
-                            size="small"
-                            onClick={() => handleRemoveOption(index)}
-                            color="error"
-                          >
-                            <DeleteIcon />
-                          </IconButton>
-                        </Box>
-                      ))}
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={handleAddOption}
-                        startIcon={<AddIcon />}
-                      >
-                        Add Option
-                      </Button>
-                    </Box>
-                  )}
-
-                  {/* Rating range for rating questions */}
-                  {questionForm.type === 'rating' && (
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2, mb: 2 }}>
-                      <TextField
-                        label="Min Rating"
-                        type="number"
-                        value={questionForm.minRating}
-                        onChange={(e) => handleQuestionFormChange('minRating', parseInt(e.target.value))}
-                        inputProps={{ min: 1, max: 10 }}
-                      />
-                      <TextField
-                        label="Max Rating"
-                        type="number"
-                        value={questionForm.maxRating}
-                        onChange={(e) => handleQuestionFormChange('maxRating', parseInt(e.target.value))}
-                        inputProps={{ min: 1, max: 10 }}
-                      />
-                    </Box>
-                  )}
-
-                  <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-                    <Button
-                      variant="outlined"
-                      onClick={() => {
-                        setShowQuestionForm(false);
-                        setEditingQuestionIndex(null);
-                        setQuestionForm({
-                          text: '',
-                          type: 'text',
-                          required: false,
-                          options: [],
-                          minRating: 1,
-                          maxRating: 5,
-                          scaleLabels: []
-                        });
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      variant="contained"
-                      onClick={editingQuestionIndex !== null ? handleUpdateQuestion : handleAddQuestion}
-                    >
-                      {editingQuestionIndex !== null ? 'Update Question' : 'Add Question'}
-                    </Button>
-                  </Box>
-                </Box>
+                        <Plus className="w-4 h-4" />
+                        <span>Create Survey</span>
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ) : (
+                filteredSurveys.map((survey, index) => (
+                  <tr key={survey.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {index + 1}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-8 w-8">
+                          <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
+                            <FileText className="h-4 w-4 text-primary-600" />
+                          </div>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{survey.title}</div>
+                          <div className="text-sm text-gray-500 truncate max-w-xs">{survey.description}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={cn(
+                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                        getTypeColor(survey.type)
+                      )}>
+                        {survey.type.charAt(0).toUpperCase() + survey.type.slice(1)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{survey.category}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={cn(
+                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                        getStatusColor(survey.status)
+                      )}>
+                        {survey.status.charAt(0).toUpperCase() + survey.status.slice(1)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{survey.authorName}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{survey.responses.length}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleViewSurvey(survey)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEditSurvey(survey)}
+                          className="text-green-600 hover:text-green-900"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSurvey(survey)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          {isViewMode ? (
-            <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
-          ) : (
-            <>
-              <Button onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-              <Button 
-                variant="contained" 
-                onClick={handleSaveSurvey}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Create Survey Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreateModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-3xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Create New Survey</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="text-gray-400 hover:text-gray-600"
               >
-                {isCreateMode ? 'Create Survey' : 'Update Survey'}
-              </Button>
-            </>
-          )}
-        </DialogActions>
-      </Dialog>
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Survey Title *</label>
+                  <input
+                    type="text"
+                    value={formData.title || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Enter survey title"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                  <textarea
+                    value={formData.description || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    rows={3}
+                    placeholder="Enter survey description"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                  <select
+                    value={formData.category || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select category</option>
+                    {surveyCategories.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select
+                      value={formData.type || 'feedback'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      {surveyTypes.map(type => (
+                        <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={formData.status || 'draft'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      {surveyStatuses.map(status => (
+                        <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Author Name</label>
+                  <input
+                    type="text"
+                    value={formData.authorName || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, authorName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Enter author name"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveSurvey}
+                disabled={!isFormValid}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Create Survey
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-      >
-        <Alert
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+      {/* View Survey Modal */}
+      {showViewModal && selectedSurvey && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-[200] p-3">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[85vh] overflow-y-auto z-[210]">
+            <div className="p-4">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-1.5 bg-primary-100 rounded-lg">
+                    <Eye className="w-5 h-5 text-primary-600" />
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900">Survey Details</h3>
+                </div>
+              <button
+                onClick={() => setShowViewModal(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                  <X className="w-4 h-4" />
+              </button>
+            </div>
+
+              {/* Survey Details Content */}
+              <div className="space-y-6">
+                {/* Survey Header */}
+                <div className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                  <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center">
+                    <FileText className="w-8 h-8 text-primary-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-xl font-semibold text-gray-900">{selectedSurvey.title}</h4>
+                    <p className="text-gray-600">{selectedSurvey.category}</p>
+                    <div className="flex items-center space-x-4 mt-2">
+                      <span className={cn(
+                        "px-2 py-1 text-xs font-medium rounded-full",
+                        getTypeColor(selectedSurvey.type)
+                      )}>
+                        {selectedSurvey.type.charAt(0).toUpperCase() + selectedSurvey.type.slice(1)}
+                      </span>
+                      <span className={cn(
+                        "px-2 py-1 text-xs font-medium rounded-full",
+                        getStatusColor(selectedSurvey.status)
+                      )}>
+                        {selectedSurvey.status.charAt(0).toUpperCase() + selectedSurvey.status.slice(1)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Basic Information */}
+              <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Basic Information</h5>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-blue-600" />
+                        </div>
+                <div>
+                          <p className="text-sm font-medium text-gray-900">Title</p>
+                          <p className="text-sm text-gray-600">{selectedSurvey.title}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <Badge className="w-4 h-4 text-green-600" />
+                </div>
+                <div>
+                          <p className="text-sm font-medium text-gray-900">Category</p>
+                          <p className="text-sm text-gray-600">{selectedSurvey.category}</p>
+                </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                          <UserIcon className="w-4 h-4 text-purple-600" />
+                        </div>
+                  <div>
+                          <p className="text-sm font-medium text-gray-900">Author</p>
+                          <p className="text-sm text-gray-600">{selectedSurvey.authorName}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                          <Users className="w-4 h-4 text-orange-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Responses</p>
+                          <p className="text-sm text-gray-600">{selectedSurvey.responses.length}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status Information */}
+                  <div className="space-y-4">
+                    <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Status Information</h5>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                          <CheckCircle className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Type</p>
+                    <span className={cn(
+                            "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                      getTypeColor(selectedSurvey.type)
+                    )}>
+                      {selectedSurvey.type.charAt(0).toUpperCase() + selectedSurvey.type.slice(1)}
+                    </span>
+                  </div>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <AlertCircle className="w-4 h-4 text-green-600" />
+                        </div>
+                  <div>
+                          <p className="text-sm font-medium text-gray-900">Status</p>
+                    <span className={cn(
+                            "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                      getStatusColor(selectedSurvey.status)
+                    )}>
+                      {selectedSurvey.status.charAt(0).toUpperCase() + selectedSurvey.status.slice(1)}
+                    </span>
+                  </div>
+                </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                          <ClockIcon className="w-4 h-4 text-purple-600" />
+                </div>
+                <div>
+                          <p className="text-sm font-medium text-gray-900">Priority</p>
+                          <span className={cn(
+                            "inline-flex items-center px-2 py-1 text-xs font-medium rounded-full",
+                            getPriorityColor(selectedSurvey.priority)
+                          )}>
+                            {selectedSurvey.priority.charAt(0).toUpperCase() + selectedSurvey.priority.slice(1)}
+                          </span>
+                </div>
+                </div>
+              </div>
+            </div>
+                </div>
+
+                {/* Description Section */}
+                <div className="space-y-4">
+                  <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Description</h5>
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-900">{selectedSurvey.description}</p>
+                  </div>
+                </div>
+
+                {/* Additional Information */}
+                <div className="space-y-4">
+                  <h5 className="text-lg font-medium text-gray-900 border-b border-gray-200 pb-2">Additional Information</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Anonymous</span>
+                        <span className="text-sm text-gray-900">{selectedSurvey.isAnonymous ? 'Yes' : 'No'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Multiple Responses</span>
+                        <span className="text-sm text-gray-900">{selectedSurvey.allowMultipleResponses ? 'Yes' : 'No'}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium text-gray-500">Target Audience</span>
+                        <span className="text-sm text-gray-900">{selectedSurvey.targetAudience.length} groups</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+              <button
+                onClick={() => setShowViewModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Survey Modal */}
+      {showEditModal && selectedSurvey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowEditModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Edit Survey</h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Survey Title *</label>
+                  <input
+                    type="text"
+                    value={formData.title || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Enter survey title"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                  <textarea
+                    value={formData.description || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    rows={3}
+                    placeholder="Enter survey description"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+                  <select
+                    value={formData.category || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select category</option>
+                    {surveyCategories.map(category => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select
+                      value={formData.type || 'feedback'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      {surveyTypes.map(type => (
+                        <option key={type} value={type}>{type.charAt(0).toUpperCase() + type.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={formData.status || 'draft'}
+                      onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value as any }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      {surveyStatuses.map(status => (
+                        <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Author Name</label>
+                  <input
+                    type="text"
+                    value={formData.authorName || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, authorName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Enter author name"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveSurvey}
+                disabled={!isFormValid}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Update Survey
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && selectedSurvey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowDeleteModal(false)}></div>
+          <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-md">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Delete Survey</h3>
+            </div>
+            <div className="px-6 py-4">
+              <p className="text-gray-600">
+                Are you sure you want to delete "{selectedSurvey.title}"? This action cannot be undone.
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteSurvey}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
-export default FeedbackSurveys; 
+export default FeedbackSurveys;

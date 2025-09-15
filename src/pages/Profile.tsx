@@ -1,25 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Paper,
-  Typography,
-  Button,
-  TextField,
-  Alert,
-  Snackbar,
-  Container,
-  Stack,
-  Avatar,
-  Chip,
-  IconButton,
-  CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Switch
-} from '@mui/material';
-import { 
   Edit, 
   Save, 
   X, 
@@ -27,8 +7,12 @@ import {
   Shield,
   Bell,
   UserCircle,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Key,
+  Eye
 } from 'lucide-react';
+import { cn } from '../utils/cn';
+import { showNotification } from '../utils/notification';
 import { useUser } from '@/stores/authStore';
 import userService from '@/services/userService';
 import { User as UserType } from '@/types';
@@ -58,11 +42,6 @@ const Profile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>('');
-  const [snackbar, setSnackbar] = useState({ 
-    open: false, 
-    message: '', 
-    severity: 'success' as 'success' | 'error' 
-  });
 
   const [formData, setFormData] = useState<ProfileFormData>({
     firstName: '',
@@ -157,11 +136,7 @@ const Profile: React.FC = () => {
       const result = await userService.updateUser(currentUser.id, updateData);
       
       if (result.success) {
-        setSnackbar({
-          open: true,
-          message: 'Profile updated successfully',
-          severity: 'success'
-        });
+        showNotification('Profile updated successfully', 'success');
     setIsEditing(false);
       } else {
         throw new Error(result.error || 'Failed to update profile');
@@ -169,11 +144,7 @@ const Profile: React.FC = () => {
     } catch (err: any) {
       console.error('Error saving profile:', err);
       setError(err.message || 'Failed to save profile');
-      setSnackbar({
-        open: true,
-        message: err.message || 'Failed to save profile',
-        severity: 'error'
-      });
+      showNotification(err.message || 'Failed to save profile', 'error');
     } finally {
       setSaving(false);
     }
@@ -216,474 +187,431 @@ const Profile: React.FC = () => {
     { id: 'preferences', name: 'Preferences', icon: SettingsIcon }
   ] as const;
 
-  const handleSnackbarClose = () => {
-    setSnackbar(prev => ({ ...prev, open: false }));
-  };
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-          <CircularProgress />
-        </Box>
-      </Container>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading profile...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={2}>
-          <Box>
-            <Typography variant="h4" component="h1" gutterBottom>
-              Profile
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Manage your personal information and preferences
-            </Typography>
-          </Box>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+          <p className="text-gray-600">Manage your personal information and preferences</p>
+        </div>
         {!isEditing && (
-            <Button
-              variant="contained"
-              startIcon={<Edit size={20} />}
+          <button
             onClick={() => setIsEditing(true)}
-              sx={{ minWidth: 140 }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
           >
-              Edit Profile
-            </Button>
+            <Edit className="w-4 h-4" />
+            <span>Edit Profile</span>
+          </button>
         )}
-        </Box>
+      </div>
 
       {/* Tab Navigation */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-          <Box sx={{ display: 'flex', gap: 1 }}>
+      <div className="border-b border-gray-200">
+        <nav className="flex space-x-8">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-                <Button
+              <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                  startIcon={<Icon size={18} />}
-                  variant={activeTab === tab.id ? 'contained' : 'text'}
-                  sx={{
-                    borderRadius: 0,
-                    borderBottom: activeTab === tab.id ? 2 : 0,
-                    borderColor: 'primary.main',
-                    minWidth: 120,
-                    justifyContent: 'flex-start'
-                  }}
-                >
-                  {tab.name}
-                </Button>
+                className={cn(
+                  "flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+                  activeTab === tab.id
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.name}</span>
+              </button>
             );
           })}
-          </Box>
-        </Box>
-      </Box>
+        </nav>
+      </div>
 
       {/* Error Alert */}
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-          {error}
-        </Alert>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <X className="w-5 h-5 text-red-600 mr-3" />
+            <p className="text-red-800">{error}</p>
+          </div>
+          <button onClick={() => setError('')} className="text-red-600 hover:text-red-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       )}
 
       {/* Profile Tab */}
       {activeTab === 'profile' && (
-        <Stack spacing={3}>
+        <div className="space-y-6">
           {/* Avatar Section */}
-          <Paper sx={{ p: 3 }}>
-            <Box display="flex" alignItems="center" gap={3}>
-              <Box position="relative">
-                <Avatar
-                  src={avatarFile ? URL.createObjectURL(avatarFile) : ''}
-                  sx={{ width: 80, height: 80, bgcolor: 'primary.main' }}
-                >
-                  <UserCircle size={40} />
-                </Avatar>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center space-x-6">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center">
+                  {avatarFile ? (
+                    <img
+                      src={URL.createObjectURL(avatarFile)}
+                      alt="Profile"
+                      className="w-20 h-20 rounded-full object-cover"
+                    />
+                  ) : (
+                    <UserCircle className="w-10 h-10 text-blue-600" />
+                  )}
+                </div>
                 {isEditing && (
-                  <IconButton
-                    component="label"
-                    sx={{
-                      position: 'absolute',
-                      bottom: -5,
-                      right: -5,
-                      bgcolor: 'primary.main',
-                      color: 'white',
-                      '&:hover': { bgcolor: 'primary.dark' },
-                      width: 32,
-                      height: 32
-                    }}
-                  >
-                    <Camera size={16} />
+                  <label className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-700 transition-colors">
+                    <Camera className="w-4 h-4" />
                     <input
                       type="file"
                       accept="image/*"
                       onChange={handleAvatarChange}
-                      hidden
+                      className="hidden"
                     />
-                  </IconButton>
+                  </label>
                 )}
-              </Box>
-              <Box>
-                <Typography variant="h5" component="h2" gutterBottom>
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-1">
                   {formData.firstName} {formData.lastName}
-                </Typography>
-                <Typography variant="body1" color="text.secondary" gutterBottom>
-                  {formData.position}
-                </Typography>
-                <Chip 
-                  label={formData.department} 
-                  size="small" 
-                  color="primary" 
-                  variant="outlined"
-                />
-              </Box>
-            </Box>
-          </Paper>
+                </h2>
+                <p className="text-gray-600 mb-2">{formData.position}</p>
+                <span className="inline-flex px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                  {formData.department}
+                </span>
+              </div>
+            </div>
+          </div>
 
           {/* Personal Information */}
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
-              Personal Information
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <TextField
-                  label="First Name"
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Personal Information</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <input
+                    type="text"
                   value={formData.firstName}
                   onChange={(e) => handleInputChange('firstName', e.target.value)}
                   disabled={!isEditing}
-                  sx={{ flex: 1, minWidth: 200 }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
                   required
                 />
-                <TextField
-                  label="Last Name"
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <input
+                    type="text"
                   value={formData.lastName}
                   onChange={(e) => handleInputChange('lastName', e.target.value)}
                   disabled={!isEditing}
-                  sx={{ flex: 1, minWidth: 200 }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
                   required
                 />
-              </Box>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <TextField
-                  label="Email"
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
                   type="email"
                   value={formData.email}
                   disabled
-                  sx={{ flex: 1, minWidth: 200 }}
-                  helperText="Email cannot be changed"
-                />
-                <TextField
-                  label="Phone"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   disabled={!isEditing}
-                  sx={{ flex: 1, minWidth: 200 }}
-                />
-              </Box>
-              <TextField
-                label="Address"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <textarea
                 value={formData.address}
                 onChange={(e) => handleInputChange('address', e.target.value)}
                 disabled={!isEditing}
-                fullWidth
-                multiline
                 rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
               />
-            </Box>
-          </Paper>
+              </div>
+            </div>
+          </div>
 
 
           {/* Employment Information */}
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
-              Employment Information
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <TextField
-                  label="Department"
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Employment Information</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <input
+                    type="text"
                   value={formData.department}
                   onChange={(e) => handleInputChange('department', e.target.value)}
                   disabled={!isEditing}
-                  sx={{ flex: 1, minWidth: 200 }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
                   required
                 />
-                <TextField
-                  label="Position"
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                  <input
+                    type="text"
                   value={formData.position}
                   onChange={(e) => handleInputChange('position', e.target.value)}
                   disabled={!isEditing}
-                  sx={{ flex: 1, minWidth: 200 }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
                   required
                 />
-              </Box>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <TextField
-                  label="Hire Date"
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Hire Date</label>
+                  <input
                   type="date"
                   value={formData.hireDate}
                   disabled
-                  sx={{ flex: 1, minWidth: 200 }}
-                  InputLabelProps={{ shrink: true }}
-                  helperText="Hire date cannot be changed"
-                />
-                <FormControl sx={{ flex: 1, minWidth: 200 }} disabled>
-                  <InputLabel>Status</InputLabel>
-                  <Select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Hire date cannot be changed</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
                     value={formData.status}
-                    label="Status"
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
                   >
-                    <MenuItem value="active">Active</MenuItem>
-                    <MenuItem value="inactive">Inactive</MenuItem>
-                    <MenuItem value="terminated">Terminated</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-            </Box>
-          </Paper>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="terminated">Terminated</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Emergency Contact */}
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
-              Emergency Contact
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <TextField
-                  label="Contact Name"
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Emergency Contact</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                  <input
+                    type="text"
                   value={formData.emergencyContact.name}
                   onChange={(e) => handleEmergencyContactChange('name', e.target.value)}
                   disabled={!isEditing}
-                  sx={{ flex: 1, minWidth: 200 }}
-                />
-                <TextField
-                  label="Phone Number"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                  <input
                   type="tel"
                   value={formData.emergencyContact.phone}
                   onChange={(e) => handleEmergencyContactChange('phone', e.target.value)}
                   disabled={!isEditing}
-                  sx={{ flex: 1, minWidth: 200 }}
-                />
-              </Box>
-              <TextField
-                label="Relationship"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Relationship</label>
+                <input
+                  type="text"
                 value={formData.emergencyContact.relationship}
                 onChange={(e) => handleEmergencyContactChange('relationship', e.target.value)}
                 disabled={!isEditing}
-                fullWidth
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
               />
-            </Box>
-          </Paper>
+              </div>
+            </div>
+          </div>
 
           {/* Action Buttons */}
           {isEditing && (
-            <Box display="flex" justifyContent="flex-end" gap={2} sx={{ mt: 3 }}>
-              <Button
-                variant="outlined"
-                startIcon={<X size={18} />}
+            <div className="flex justify-end space-x-3">
+              <button
                 onClick={handleCancel}
                 disabled={saving}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
-                Cancel
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={saving ? <CircularProgress size={18} /> : <Save size={18} />}
+                <X className="w-4 h-4" />
+                <span>Cancel</span>
+              </button>
+              <button
                 onClick={handleSave}
                 disabled={saving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
-                {saving ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </Box>
+                {saving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+              </button>
+            </div>
           )}
-        </Stack>
+        </div>
       )}
 
       {/* Security Tab */}
       {activeTab === 'security' && (
-        <Stack spacing={3}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
-              Security Settings
-            </Typography>
-            <Stack spacing={2}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    Change Password
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Update your password regularly for security
-                  </Typography>
-                </Box>
-                <Button variant="contained" size="small">
-                  Change
-                </Button>
-              </Box>
-              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    Two-Factor Authentication
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Add an extra layer of security to your account
-                  </Typography>
-                </Box>
-                <Button variant="outlined" size="small">
-                  Enable
-                </Button>
-              </Box>
-              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    Login Sessions
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Manage your active login sessions
-                  </Typography>
-                </Box>
-                <Button variant="outlined" size="small">
-                  View
-                </Button>
-              </Box>
-            </Stack>
-          </Paper>
-        </Stack>
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Security Settings</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-900">Change Password</h4>
+                  <p className="text-sm text-gray-500">Update your password regularly for security</p>
+                </div>
+                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
+                  <Key className="w-4 h-4" />
+                  <span>Change</span>
+                </button>
+              </div>
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-900">Two-Factor Authentication</h4>
+                  <p className="text-sm text-gray-500">Add an extra layer of security to your account</p>
+                </div>
+                <button className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2">
+                  <Shield className="w-4 h-4" />
+                  <span>Enable</span>
+                </button>
+              </div>
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-900">Login Sessions</h4>
+                  <p className="text-sm text-gray-500">Manage your active login sessions</p>
+                </div>
+                <button className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2">
+                  <Eye className="w-4 h-4" />
+                  <span>View</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Notifications Tab */}
       {activeTab === 'notifications' && (
-        <Stack spacing={3}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
-              Notification Preferences
-            </Typography>
-            <Stack spacing={2}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    Email Notifications
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Receive notifications via email
-                  </Typography>
-                </Box>
-                <Switch defaultChecked />
-              </Box>
-              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    Push Notifications
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Receive push notifications on your device
-                  </Typography>
-                </Box>
-                <Switch />
-              </Box>
-              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    SMS Notifications
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Receive notifications via SMS
-                  </Typography>
-                </Box>
-                <Switch />
-              </Box>
-            </Stack>
-          </Paper>
-        </Stack>
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Notification Preferences</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-900">Email Notifications</h4>
+                  <p className="text-sm text-gray-500">Receive notifications via email</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" defaultChecked />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-900">Push Notifications</h4>
+                  <p className="text-sm text-gray-500">Receive push notifications on your device</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-900">SMS Notifications</h4>
+                  <p className="text-sm text-gray-500">Receive notifications via SMS</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Preferences Tab */}
       {activeTab === 'preferences' && (
-        <Stack spacing={3}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" component="h3" gutterBottom sx={{ mb: 3 }}>
-              Account Preferences
-            </Typography>
-            <Stack spacing={2}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    Language
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Choose your preferred language
-                  </Typography>
-                </Box>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <Select defaultValue="english">
-                    <MenuItem value="english">English</MenuItem>
-                    <MenuItem value="spanish">Spanish</MenuItem>
-                    <MenuItem value="french">French</MenuItem>
-                    <MenuItem value="german">German</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    Time Zone
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Set your local time zone
-                  </Typography>
-                </Box>
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <Select defaultValue="utc-5">
-                    <MenuItem value="utc-5">UTC-5 (Eastern Time)</MenuItem>
-                    <MenuItem value="utc-6">UTC-6 (Central Time)</MenuItem>
-                    <MenuItem value="utc-7">UTC-7 (Mountain Time)</MenuItem>
-                    <MenuItem value="utc-8">UTC-8 (Pacific Time)</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-              <Box display="flex" justifyContent="space-between" alignItems="center" p={2} border={1} borderColor="divider" borderRadius={1}>
-                <Box>
-                  <Typography variant="subtitle1" fontWeight="medium">
-                    Date Format
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Choose your preferred date format
-                  </Typography>
-                </Box>
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <Select defaultValue="mm-dd-yyyy">
-                    <MenuItem value="mm-dd-yyyy">MM/DD/YYYY</MenuItem>
-                    <MenuItem value="dd-mm-yyyy">DD/MM/YYYY</MenuItem>
-                    <MenuItem value="yyyy-mm-dd">YYYY-MM-DD</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-            </Stack>
-          </Paper>
-        </Stack>
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Preferences</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-900">Language</h4>
+                  <p className="text-sm text-gray-500">Choose your preferred language</p>
+                </div>
+                <select defaultValue="english" className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]">
+                  <option value="english">English</option>
+                  <option value="spanish">Spanish</option>
+                  <option value="french">French</option>
+                  <option value="german">German</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-900">Time Zone</h4>
+                  <p className="text-sm text-gray-500">Set your local time zone</p>
+                </div>
+                <select defaultValue="utc-5" className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]">
+                  <option value="utc-5">UTC-5 (Eastern Time)</option>
+                  <option value="utc-6">UTC-6 (Central Time)</option>
+                  <option value="utc-7">UTC-7 (Mountain Time)</option>
+                  <option value="utc-8">UTC-8 (Pacific Time)</option>
+                </select>
+              </div>
+              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-900">Date Format</h4>
+                  <p className="text-sm text-gray-500">Choose your preferred date format</p>
+                </div>
+                <select defaultValue="mm-dd-yyyy" className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]">
+                  <option value="mm-dd-yyyy">MM/DD/YYYY</option>
+                  <option value="dd-mm-yyyy">DD/MM/YYYY</option>
+                  <option value="yyyy-mm-dd">YYYY-MM-DD</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Snackbar for notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert 
-          onClose={handleSnackbarClose} 
-          severity={snackbar.severity} 
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
-    </Container>
+    </div>
   );
 };
 

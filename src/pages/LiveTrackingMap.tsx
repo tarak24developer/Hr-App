@@ -1,32 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  Paper,
-  Card,
-  CardContent,
-  Alert,
-  Pagination,
-  Avatar,
-  Badge,
-  Chip,
-  CircularProgress
-} from '@mui/material';
-import {
-  Map as MapIcon,
-  Person as PersonIcon,
-  LocationOn as LocationIcon,
-  MyLocation as MyLocationIcon,
-  Timeline as TimelineIcon,
-  DirectionsWalk as WalkIcon,
-  Computer as ComputerIcon,
-  Phone as PhoneIcon,
-  Tablet as TabletIcon,
-  Watch as WatchIcon,
-  Analytics as AnalyticsIcon,
-  History as HistoryIcon
-} from '@mui/icons-material';
+  Map,
+  User as UserIcon,
+  MapPin,
+  Navigation,
+  Clock,
+  UserCheck,
+  Monitor,
+  Smartphone,
+  Tablet,
+  Watch,
+  BarChart3,
+  History,
+  RefreshCw,
+  X
+} from 'lucide-react';
+import { cn } from '../utils/cn';
 import realtimeTrackingService from '../services/realtimeTracking';
 import locationTrackingService from '../services/locationTracking';
 import authService from '../services/authService';
@@ -82,15 +71,15 @@ const statusColors = {
 };
 
 const deviceTypeIcons = {
-  desktop: <ComputerIcon />,
-  laptop: <ComputerIcon />,
-  tablet: <TabletIcon />,
-  mobile: <PhoneIcon />,
-  smartwatch: <WatchIcon />
+  desktop: <Monitor className="w-4 h-4" />,
+  laptop: <Monitor className="w-4 h-4" />,
+  tablet: <Tablet className="w-4 h-4" />,
+  mobile: <Smartphone className="w-4 h-4" />,
+  smartwatch: <Watch className="w-4 h-4" />
 };
 
 const getDeviceIcon = (deviceType: string) => {
-  return deviceTypeIcons[deviceType as keyof typeof deviceTypeIcons] || <ComputerIcon />;
+  return deviceTypeIcons[deviceType as keyof typeof deviceTypeIcons] || <Monitor className="w-4 h-4" />;
 };
 
 const LiveTrackingMap: React.FC = () => {
@@ -160,15 +149,15 @@ const LiveTrackingMap: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'online':
-        return <MyLocationIcon color="success" />;
+        return <Navigation className="w-4 h-4 text-green-600" />;
       case 'idle':
-        return <TimelineIcon color="warning" />;
+        return <Clock className="w-4 h-4 text-yellow-600" />;
       case 'away':
-        return <WalkIcon color="error" />;
+        return <UserCheck className="w-4 h-4 text-red-600" />;
       case 'offline':
-        return <MyLocationIcon color="disabled" />;
+        return <Navigation className="w-4 h-4 text-gray-400" />;
       default:
-        return <MyLocationIcon />;
+        return <Navigation className="w-4 h-4 text-gray-600" />;
     }
   };
 
@@ -265,214 +254,200 @@ const LiveTrackingMap: React.FC = () => {
   // Show loading state
   if (loading) {
     return (
-      <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <Box sx={{ textAlign: 'center' }}>
-          <CircularProgress size={60} />
-          <Typography variant="h6" sx={{ mt: 2 }}>
-            Loading tracking data...
-          </Typography>
-        </Box>
-      </Box>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading tracking data...</p>
+        </div>
+      </div>
     );
   }
 
   // Show error state
   if (error) {
     return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-        <Button
-          variant="contained"
+      <div className="space-y-6 p-4 sm:p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <X className="w-5 h-5 text-red-600 mr-3" />
+            <p className="text-red-800">{error}</p>
+          </div>
+          <button onClick={() => window.location.reload()} className="text-red-600 hover:text-red-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <button
           onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
           Retry
-        </Button>
-      </Box>
+        </button>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Live Tracking Map
-        </Typography>
-        <Box>
-          <Button
-            variant="outlined"
-            startIcon={<AnalyticsIcon />}
-            sx={{ mr: 1 }}
-          >
-            Analytics
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<HistoryIcon />}
-            sx={{ mr: 1 }}
-          >
-            History
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<MapIcon />}
+    <div className="space-y-6 p-4 sm:p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Live Tracking Map</h1>
+          <p className="text-gray-600">Real-time location tracking and monitoring</p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+          <button className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2">
+            <BarChart3 className="w-4 h-4" />
+            <span>Analytics</span>
+          </button>
+          <button className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2">
+            <History className="w-4 h-4" />
+            <span>History</span>
+          </button>
+          <button
             onClick={handleRequestLocationConsent}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
           >
-            Enable Location Tracking
-          </Button>
-        </Box>
-      </Box>
+            <Map className="w-4 h-4" />
+            <span>Enable Location Tracking</span>
+          </button>
+        </div>
+      </div>
 
-      {/* Statistics Cards */}
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 3, mb: 3 }}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Online Users
-              </Typography>
-              <Typography variant="h4" component="div" color="success.main">
-                {getOnlineUsersCount()}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                of {trackingData.length} total users
-              </Typography>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Active Users
-              </Typography>
-              <Typography variant="h4" component="div" color="primary.main">
-                {getActiveUsersCount()}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Currently active
-              </Typography>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Total Devices
-              </Typography>
-              <Typography variant="h4" component="div">
-                {getTotalDevicesCount()}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Being tracked
-              </Typography>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Locations
-              </Typography>
-              <Typography variant="h4" component="div" color="info.main">
-                {getLocationDistribution()}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Different cities
-              </Typography>
-            </CardContent>
-          </Card>
-        </Box>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <UserCheck className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Online Users</p>
+              <p className="text-2xl font-bold text-gray-900">{getOnlineUsersCount()}</p>
+              <p className="text-xs text-gray-500">of {trackingData.length} total users</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Navigation className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Active Users</p>
+              <p className="text-2xl font-bold text-gray-900">{getActiveUsersCount()}</p>
+              <p className="text-xs text-gray-500">Currently active</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Monitor className="w-6 h-6 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Devices</p>
+              <p className="text-2xl font-bold text-gray-900">{getTotalDevicesCount()}</p>
+              <p className="text-xs text-gray-500">Being tracked</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <MapPin className="w-6 h-6 text-orange-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Locations</p>
+              <p className="text-2xl font-bold text-gray-900">{getLocationDistribution()}</p>
+              <p className="text-xs text-gray-500">Different cities</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
              {/* Map View Controls */}
-       <Paper sx={{ p: 2, mb: 3 }}>
-         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-           <Typography variant="h6">Live Tracking Map</Typography>
-           <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-             <Button
-               variant={mapView === 'all-users' ? 'contained' : 'outlined'}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Live Tracking Map</h3>
+          <div className="flex flex-wrap gap-2">
+            <button
                onClick={() => setMapView('all-users')}
-               size="small"
+              className={cn(
+                "px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                mapView === 'all-users'
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              )}
              >
                All Users ({trackingData.length})
-             </Button>
-             <Button
-               variant={mapView === 'my-location' ? 'contained' : 'outlined'}
+            </button>
+            <button
                onClick={() => setMapView('my-location')}
-               size="small"
+              className={cn(
+                "px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                mapView === 'my-location'
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              )}
              >
                My Location
-             </Button>
-             <Button
-               variant={mapView === 'selected-users' ? 'contained' : 'outlined'}
+            </button>
+            <button
                onClick={() => setMapView('selected-users')}
-               size="small"
                disabled={selectedUsers.length === 0}
+              className={cn(
+                "px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                mapView === 'selected-users'
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200",
+                selectedUsers.length === 0 ? "opacity-50 cursor-not-allowed" : ""
+              )}
              >
                Selected ({selectedUsers.length})
-             </Button>
+            </button>
              {selectedUsers.length > 0 && (
-               <Button
-                 variant="outlined"
+              <button
                  onClick={() => setSelectedUsers([])}
-                 size="small"
-                 color="secondary"
+                className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
                >
                  Clear Selection
-               </Button>
+              </button>
              )}
-             <Button
-               variant="outlined"
+            <button
                onClick={handleForceLocationUpdate}
-               size="small"
-               startIcon={<MyLocationIcon />}
-               color="primary"
-             >
-               Update My Location
-             </Button>
-           </Box>
-         </Box>
+              className="px-3 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors flex items-center space-x-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Update My Location</span>
+            </button>
+          </div>
+        </div>
         
         {/* Live Map */}
-        <Box
-          sx={{
-            height: 400,
-            borderRadius: 1,
-            overflow: 'hidden',
-            border: '1px solid',
-            borderColor: 'grey.300',
-            position: 'relative'
-          }}
-        >
+        <div className="h-96 rounded-lg overflow-hidden border border-gray-300 relative">
           {filteredData.length === 0 ? (
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                backgroundColor: 'grey.50',
-                color: 'text.secondary'
-              }}
-            >
-              <MyLocationIcon sx={{ fontSize: 64, mb: 2, opacity: 0.5 }} />
-              <Typography variant="h6" gutterBottom>
-                No Location Data Available
-              </Typography>
-              <Typography variant="body2" textAlign="center" sx={{ maxWidth: 400 }}>
+            <div className="flex flex-col items-center justify-center h-full bg-gray-50 text-gray-500">
+              <MapPin className="w-16 h-16 mb-4 opacity-50" />
+              <h4 className="text-lg font-semibold mb-2">No Location Data Available</h4>
+              <p className="text-sm text-center max-w-md">
                 {trackingData.length === 0 
                   ? "No users are currently being tracked. Grant location permission to start tracking your location."
                   : "No users match the current filter. Try selecting 'All Users' or adjust your selection."
                 }
-              </Typography>
+              </p>
               {trackingData.length === 0 && (
-                <Button
-                  variant="contained"
-                  startIcon={<MyLocationIcon />}
+                <button
                   onClick={handleRequestLocationConsent}
-                  sx={{ mt: 2 }}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
                 >
-                  Start Location Tracking
-                </Button>
+                  <MapPin className="w-4 h-4" />
+                  <span>Start Location Tracking</span>
+                </button>
               )}
-            </Box>
+            </div>
           ) : (
             <LiveMap
               users={filteredData}
@@ -481,120 +456,138 @@ const LiveTrackingMap: React.FC = () => {
               onUserSelect={handleUserSelect}
             />
           )}
-        </Box>
-      </Paper>
+        </div>
+      </div>
 
       {/* User Tracking Table */}
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6">User Tracking Data</Typography>
-        </Box>
-        <Box sx={{ p: 2 }}>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">User Tracking Data</h3>
+        </div>
+        <div className="p-6">
           {paginatedData.length === 0 ? (
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              py: 6,
-              textAlign: 'center'
-            }}>
-              <LocationIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                No Tracking Data
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 400 }}>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <MapPin className="w-16 h-16 text-gray-400 mb-4" />
+              <h4 className="text-lg font-semibold text-gray-500 mb-2">No Tracking Data</h4>
+              <p className="text-sm text-gray-500 max-w-md">
                 {trackingData.length === 0 
                   ? "No users are currently being tracked. Start location tracking to see data here."
                   : "No users match the current filter or page."
                 }
-              </Typography>
-            </Box>
+              </p>
+            </div>
           ) : (
-            paginatedData.map((user) => (
-            <Card key={user.id} sx={{ mb: 2 }}>
-              <CardContent>
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(4, 1fr)' }, gap: 2, alignItems: 'center' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Avatar sx={{ width: 40, height: 40 }}>
-                      <PersonIcon />
-                    </Avatar>
-                    <Box>
-                      <Typography variant="subtitle1" fontWeight="bold">
-                        {user.userName}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        {user.userEmail}
-                      </Typography>
-                      <Chip
-                        label={user.userRole}
-                        size="small"
-                        variant="outlined"
-                        sx={{ mt: 0.5 }}
-                      />
-                    </Box>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <div className="space-y-4">
+              {paginatedData.map((user) => (
+                <div key={user.id} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-center">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                        <UserIcon className="w-5 h-5 text-gray-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{user.userName}</p>
+                        <p className="text-xs text-gray-500">{user.userEmail}</p>
+                        <span className="inline-flex px-2 py-1 text-xs font-medium bg-gray-200 text-gray-800 rounded-full mt-1">
+                          {user.userRole}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
                     {getDeviceIcon(user.deviceInfo.deviceType)}
-                    <Box>
-                      <Typography variant="body2" fontWeight="medium">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
                         {user.deviceInfo.browser} {user.deviceInfo.browserVersion}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
+                        </p>
+                        <p className="text-xs text-gray-500">
                         {user.deviceInfo.os} {user.deviceInfo.osVersion}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <LocationIcon fontSize="small" color="action" />
-                    <Box>
-                      <Typography variant="body2">
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="w-4 h-4 text-gray-500" />
+                      <div>
+                        <p className="text-sm text-gray-900">
                         {user.currentLocation.latitude.toFixed(4)}, {user.currentLocation.longitude.toFixed(4)}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
+                        </p>
+                        <p className="text-xs text-gray-500">
                         Accuracy: {user.currentLocation.accuracy}m
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
                     {getStatusIcon(user.status)}
-                    <Chip
-                      label={user.status}
-                      size="small"
-                      sx={{
-                        bgcolor: statusColors[user.status],
-                        color: 'white',
-                        fontWeight: 'bold'
-                      }}
-                    />
+                      <span 
+                        className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white"
+                        style={{ backgroundColor: statusColors[user.status] }}
+                      >
+                        {user.status}
+                      </span>
                     {user.isOnline && (
-                      <Badge
-                        variant="dot"
-                        color="success"
-                        sx={{ '& .MuiBadge-dot': { width: 8, height: 8 } }}
-                      />
-                    )}
-                  </Box>
-                </Box>
-              </CardContent>
-            </Card>
-            ))
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
-        </Box>
-      </Paper>
+        </div>
+      </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(_, page) => setCurrentPage(page)}
-            color="primary"
-            showFirstButton
-            showLastButton
-          />
-        </Box>
+        <div className="flex justify-center mt-6">
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              First
+            </button>
+            <button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  "px-3 py-2 text-sm font-medium border-t border-b border-gray-300",
+                  page === currentPage
+                    ? "bg-blue-50 text-blue-600 border-blue-300"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                )}
+              >
+                {page}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border-t border-b border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Last
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Location Consent Modal */}
@@ -604,7 +597,7 @@ const LiveTrackingMap: React.FC = () => {
         onAccept={handleConsentAccept}
         onDecline={handleConsentDecline}
       />
-    </Box>
+    </div>
   );
 };
 

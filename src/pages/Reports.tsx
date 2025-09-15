@@ -1,47 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
-  Card,
-  CardContent,
-  Typography,
-  Grid,
-  Button,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
   CircularProgress,
   Tabs,
-  Tab,
-  LinearProgress
+  Tab
 } from '@mui/material';
 import { 
-  Assessment as AssessmentIcon,
   People as PeopleIcon,
   AttachMoney as MoneyIcon,
   Schedule as ScheduleIcon,
-  Refresh as RefreshIcon,
-  Visibility as ViewIcon,
-  GetApp as ExportIcon,
-  BarChart as BarChartIcon,
-  Business as BusinessIcon,
-  CalendarToday as CalendarIcon,
-  CheckCircle as CheckCircleIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import firebaseService from '@/services/firebaseService';
 import { showNotification } from '@/utils/notification';
 import type { User, Attendance, Payroll, Asset, Training, Incident } from '@/types';
+import DashboardCard from '../components/DashboardCard';
 
 // Report Types
 interface ReportData {
@@ -115,8 +89,8 @@ const Reports: React.FC = () => {
   const [selectedReportType, setSelectedReportType] = useState<string>('');
   const [reportFilters, setReportFilters] = useState<ReportFilters>({
     dateRange: {
-      start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      end: new Date().toISOString().split('T')[0]
+      start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] || '',
+      end: new Date().toISOString().split('T')[0] || ''
     },
     departments: [],
     employees: []
@@ -177,7 +151,7 @@ const Reports: React.FC = () => {
         (monthAttendance.filter(att => att.status === 'present').length / monthAttendance.length) * 100 : 0;
 
       // Calculate average salary
-      const totalSalary = activeUsers.reduce((sum, user) => sum + (user.salary || 0), 0);
+      const totalSalary = activeUsers.reduce((sum, user) => sum + ((user as any).salary || 0), 0);
       const averageSalary = activeUsers.length > 0 ? totalSalary / activeUsers.length : 0;
 
       // Generate monthly trends
@@ -223,7 +197,7 @@ const Reports: React.FC = () => {
           department: dept,
           employeeCount: deptUsers.length,
           avgSalary: deptUsers.length > 0 ? 
-            deptUsers.reduce((sum, user) => sum + (user.salary || 0), 0) / deptUsers.length : 0,
+            deptUsers.reduce((sum, user) => sum + ((user as any).salary || 0), 0) / deptUsers.length : 0,
           attendanceRate: deptAttendance.length > 0 ? 
             (deptAttendance.filter(att => att.status === 'present').length / deptAttendance.length) * 100 : 0,
           performance: Math.random() * 100 // Placeholder - would be calculated from actual performance data
@@ -326,29 +300,29 @@ const Reports: React.FC = () => {
     }
   };
 
-  const exportReport = (reportId: string) => {
+  const exportReport = (_reportId: string) => {
     showNotification('Export functionality coming soon', 'info');
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'excellent': return 'success';
-      case 'good': return 'info';
-      case 'average': return 'warning';
-      case 'poor': return 'error';
-      default: return 'default';
-    }
-  };
+  // const getStatusColor = (_status: string) => {
+  //   switch (status) {
+  //     case 'excellent': return 'success';
+  //     case 'good': return 'info';
+  //     case 'average': return 'warning';
+  //     case 'poor': return 'error';
+  //     default: return 'default';
+  //   }
+  // };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'excellent': return <CheckCircleIcon />;
-      case 'good': return <CheckCircleIcon />;
-      case 'average': return <WarningIcon />;
-      case 'poor': return <ErrorIcon />;
-      default: return <WarningIcon />;
-    }
-  };
+  // const getStatusIcon = (_status: string) => {
+  //   switch (status) {
+  //     case 'excellent': return <CheckCircleIcon />;
+  //     case 'good': return <CheckCircleIcon />;
+  //     case 'average': return <WarningIcon />;
+  //     case 'poor': return <ErrorIcon />;
+  //     default: return <WarningIcon />;
+  //   }
+  // };
 
   if (loading && !analyticsData) {
     return (
@@ -378,10 +352,10 @@ const Reports: React.FC = () => {
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={selectedTab} onChange={(e, newValue) => setSelectedTab(newValue)}>
-          <Tab label="Analytics Dashboard" icon={<BarChartIcon />} />
-          <Tab label="Generated Reports" icon={<AssessmentIcon />} />
-          <Tab label="Create Report" icon={<AssessmentIcon />} />
+        <Tabs value={selectedTab} onChange={(_e, newValue) => setSelectedTab(newValue)}>
+          <Tab label="Analytics Dashboard" />
+          <Tab label="Generated Reports" />
+          <Tab label="Create Report" />
         </Tabs>
       </Box>
 
@@ -389,54 +363,31 @@ const Reports: React.FC = () => {
       {selectedTab === 0 && analyticsData && (
         <div className="space-y-6">
           {/* Key Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Employees</p>
-                  <p className="text-3xl font-bold text-gray-900">{analyticsData.totalEmployees}</p>
-            </div>
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <PeopleIcon className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Active Employees</p>
-                  <p className="text-3xl font-bold text-green-600">{analyticsData.activeEmployees}</p>
-            </div>
-                <div className="p-3 bg-green-100 rounded-full">
-                  <CheckCircleIcon className="h-6 w-6 text-green-600" />
-            </div>
-          </div>
-        </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Attendance Rate</p>
-                  <p className="text-3xl font-bold text-blue-600">{analyticsData.attendanceRate.toFixed(1)}%</p>
-            </div>
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <ScheduleIcon className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Avg Salary</p>
-                  <p className="text-3xl font-bold text-yellow-600">₹{analyticsData.averageSalary.toLocaleString()}</p>
-            </div>
-                <div className="p-3 bg-yellow-100 rounded-full">
-                  <MoneyIcon className="h-6 w-6 text-yellow-600" />
-            </div>
-          </div>
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <DashboardCard
+              name="Total Employees"
+              value={analyticsData.totalEmployees}
+              icon={PeopleIcon as any}
+              color="blue"
+            />
+            <DashboardCard
+              name="Active Employees"
+              value={analyticsData.activeEmployees}
+              icon={CheckCircleIcon as any}
+              color="green"
+            />
+            <DashboardCard
+              name="Attendance Rate"
+              value={`${analyticsData.attendanceRate.toFixed(1)}%`}
+              icon={ScheduleIcon as any}
+              color="indigo"
+            />
+            <DashboardCard
+              name="Avg Salary"
+              value={`₹${analyticsData.averageSalary.toLocaleString()}`}
+              icon={MoneyIcon as any}
+              color="yellow"
+            />
       </div>
 
           {/* Charts */}
@@ -498,7 +449,7 @@ const Reports: React.FC = () => {
                       fill="#8884d8"
                       dataKey="employeeCount"
                     >
-                      {analyticsData.departmentStats.map((entry, index) => (
+                      {analyticsData.departmentStats.map((_entry, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -546,9 +497,9 @@ const Reports: React.FC = () => {
                           'bg-red-500'
                         }`}
                         role="progressbar"
-                        aria-valuenow="0"
-                        aria-valuemin="0"
-                        aria-valuemax="100"
+                        aria-valuenow={0}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
                         aria-label={`${metric.category} progress: ${roundedValue}%`}
                         data-width={progressWidth}
                       ></div>
@@ -583,7 +534,7 @@ const Reports: React.FC = () => {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-8 w-8">
                             <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                              <BusinessIcon className="h-4 w-4 text-blue-600" />
+                              <div className="h-4 w-4 text-blue-600" />
                             </div>
                           </div>
                           <div className="ml-3">
@@ -621,7 +572,7 @@ const Reports: React.FC = () => {
               onClick={fetchReports}
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
-              <RefreshIcon className="h-4 w-4 mr-2" />
+              <div className="h-4 w-4 mr-2" />
               Refresh
             </button>
           </div>
@@ -643,7 +594,7 @@ const Reports: React.FC = () => {
                 <p className="text-sm text-gray-600 mb-4">{report.description}</p>
                 
                 <div className="flex items-center mb-4">
-                  <CalendarIcon className="h-4 w-4 mr-2 text-gray-400" />
+                  <div className="h-4 w-4 mr-2 text-gray-400" />
                   <span className="text-xs text-gray-500">
                     {new Date(report.generatedAt).toLocaleDateString()}
                   </span>
@@ -654,7 +605,7 @@ const Reports: React.FC = () => {
                     disabled={report.status !== 'completed'}
                     className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <ViewIcon className="h-4 w-4 mr-1" />
+                    <div className="h-4 w-4 mr-1" />
                     View
                   </button>
                   <button
@@ -662,7 +613,7 @@ const Reports: React.FC = () => {
                     onClick={() => exportReport(report.id)}
                     className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <ExportIcon className="h-4 w-4 mr-1" />
+                    <div className="h-4 w-4 mr-1" />
                     Export
           </button>
                 </div>
@@ -733,7 +684,7 @@ const Reports: React.FC = () => {
                 disabled={!selectedReportType || loading}
                 className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <AssessmentIcon className="h-4 w-4 mr-2" />
+                <div className="h-4 w-4 mr-2" />
                 {loading ? 'Generating...' : 'Generate Report'}
               </button>
             </div>
