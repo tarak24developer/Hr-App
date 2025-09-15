@@ -249,7 +249,7 @@ const Profile: React.FC = () => {
             <X className="w-5 h-5 text-red-600 mr-3" />
             <p className="text-red-800">{error}</p>
           </div>
-          <button onClick={() => setError('')} className="text-red-600 hover:text-red-800">
+          <button onClick={() => setError('')} className="text-red-600 hover:text-red-800" aria-label="Dismiss error">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -281,6 +281,7 @@ const Profile: React.FC = () => {
                       accept="image/*"
                       onChange={handleAvatarChange}
                       className="hidden"
+                      aria-label="Upload profile picture"
                     />
                   </label>
                 )}
@@ -311,6 +312,7 @@ const Profile: React.FC = () => {
                   disabled={!isEditing}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
                   required
+                  aria-label="First name"
                 />
                 </div>
                 <div>
@@ -322,6 +324,7 @@ const Profile: React.FC = () => {
                   disabled={!isEditing}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
                   required
+                  aria-label="Last name"
                 />
                 </div>
               </div>
@@ -333,6 +336,7 @@ const Profile: React.FC = () => {
                   value={formData.email}
                   disabled
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                  aria-label="Email"
                   />
                   <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
                 </div>
@@ -344,6 +348,7 @@ const Profile: React.FC = () => {
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   disabled={!isEditing}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                  aria-label="Phone"
                   />
                 </div>
               </div>
@@ -355,6 +360,7 @@ const Profile: React.FC = () => {
                 disabled={!isEditing}
                 rows={2}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                  aria-label="Address"
               />
               </div>
             </div>
@@ -375,6 +381,7 @@ const Profile: React.FC = () => {
                   disabled={!isEditing}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
                   required
+                  aria-label="Department"
                 />
                 </div>
                 <div>
@@ -386,6 +393,7 @@ const Profile: React.FC = () => {
                   disabled={!isEditing}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
                   required
+                  aria-label="Position"
                 />
                 </div>
               </div>
@@ -397,6 +405,7 @@ const Profile: React.FC = () => {
                   value={formData.hireDate}
                   disabled
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                  aria-label="Hire date"
                   />
                   <p className="text-xs text-gray-500 mt-1">Hire date cannot be changed</p>
                 </div>
@@ -406,6 +415,7 @@ const Profile: React.FC = () => {
                     value={formData.status}
                     disabled
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500"
+                    aria-label="Employment status"
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -429,6 +439,7 @@ const Profile: React.FC = () => {
                   onChange={(e) => handleEmergencyContactChange('name', e.target.value)}
                   disabled={!isEditing}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                  aria-label="Emergency contact name"
                   />
                 </div>
                 <div>
@@ -439,6 +450,7 @@ const Profile: React.FC = () => {
                   onChange={(e) => handleEmergencyContactChange('phone', e.target.value)}
                   disabled={!isEditing}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                  aria-label="Emergency contact phone"
                   />
                 </div>
               </div>
@@ -450,6 +462,7 @@ const Profile: React.FC = () => {
                 onChange={(e) => handleEmergencyContactChange('relationship', e.target.value)}
                 disabled={!isEditing}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-500"
+                  aria-label="Emergency contact relationship"
               />
               </div>
             </div>
@@ -536,7 +549,7 @@ const Profile: React.FC = () => {
                   <p className="text-sm text-gray-500">Receive notifications via email</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" defaultChecked />
+                  <input type="checkbox" className="sr-only peer" defaultChecked aria-label="Enable email notifications" />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
               </div>
@@ -546,7 +559,7 @@ const Profile: React.FC = () => {
                   <p className="text-sm text-gray-500">Receive push notifications on your device</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" />
+                  <input type="checkbox" className="sr-only peer" aria-label="Enable push notifications" />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
               </div>
@@ -556,7 +569,7 @@ const Profile: React.FC = () => {
                   <p className="text-sm text-gray-500">Receive notifications via SMS</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" />
+                  <input type="checkbox" className="sr-only peer" aria-label="Enable SMS notifications" />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
               </div>
@@ -576,7 +589,7 @@ const Profile: React.FC = () => {
                   <h4 className="font-medium text-gray-900">Language</h4>
                   <p className="text-sm text-gray-500">Choose your preferred language</p>
                 </div>
-                <select defaultValue="english" className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]">
+                <select defaultValue="english" className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]" aria-label="Language preference">
                   <option value="english">English</option>
                   <option value="spanish">Spanish</option>
                   <option value="french">French</option>
@@ -588,7 +601,7 @@ const Profile: React.FC = () => {
                   <h4 className="font-medium text-gray-900">Time Zone</h4>
                   <p className="text-sm text-gray-500">Set your local time zone</p>
                 </div>
-                <select defaultValue="utc-5" className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]">
+                <select defaultValue="utc-5" className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]" aria-label="Time zone">
                   <option value="utc-5">UTC-5 (Eastern Time)</option>
                   <option value="utc-6">UTC-6 (Central Time)</option>
                   <option value="utc-7">UTC-7 (Mountain Time)</option>
@@ -600,7 +613,7 @@ const Profile: React.FC = () => {
                   <h4 className="font-medium text-gray-900">Date Format</h4>
                   <p className="text-sm text-gray-500">Choose your preferred date format</p>
                 </div>
-                <select defaultValue="mm-dd-yyyy" className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]">
+                <select defaultValue="mm-dd-yyyy" className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[120px]" aria-label="Date format">
                   <option value="mm-dd-yyyy">MM/DD/YYYY</option>
                   <option value="dd-mm-yyyy">DD/MM/YYYY</option>
                   <option value="yyyy-mm-dd">YYYY-MM-DD</option>

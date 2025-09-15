@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   Search, 
   Users, 
@@ -23,6 +25,8 @@ import {
 import { cn } from '../utils/cn';
 import firebaseService from '../services/firebaseService';
 import DashboardCard from '../components/DashboardCard';
+import { onSnapshot, collection, query } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 interface Employee {
   id: string;
@@ -80,6 +84,8 @@ interface PayrollRecord {
   totalDeductions?: number;
   arrears?: number;
   differenceAmount?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface PFContribution {
@@ -137,8 +143,8 @@ const Payroll: React.FC = () => {
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'salary' | 'pf' | 'esi' | 'settings'>('salary');
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
-  const [pfContributions, setPfContributions] = useState<PFContribution[]>([]);
-  const [esiContributions, setEsiContributions] = useState<ESIContribution[]>([]);
+  const [pfContributions] = useState<PFContribution[]>([]);
+  const [esiContributions] = useState<ESIContribution[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -154,6 +160,9 @@ const Payroll: React.FC = () => {
   // Export dropdown state
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Realtime listener ref
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
   // Form data
   const [formData, setFormData] = useState<Partial<PayrollRecord>>({
@@ -207,9 +216,16 @@ const Payroll: React.FC = () => {
     const initializeData = async () => {
       await loadEmployees();
       await loadSettings();
-      await loadPayrollData();
+      setupRealtimePayrollListener();
     };
     initializeData();
+
+    // Cleanup listener on unmount
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
   }, []);
 
   // Close dropdown when clicking outside
@@ -229,168 +245,62 @@ const Payroll: React.FC = () => {
     };
   }, [showExportDropdown]);
 
+  // Sync formData with selectedRecord when modal opens
+  useEffect(() => {
+    if (showEditModal && selectedRecord) {
+      console.log('Syncing formData with selectedRecord:', selectedRecord);
+      setFormData(selectedRecord);
+    }
+  }, [showEditModal, selectedRecord]);
 
-  const loadPayrollData = async () => {
+
+  const setupRealtimePayrollListener = () => {
+    if (!db) {
+      console.warn('Firebase not available for realtime listener');
+      setError('Firebase not available');
+      return;
+    }
+
     setLoading(true);
+    
     try {
-      const response = await firebaseService.getCollection('payrollRecords');
-      if (response.success && response.data && response.data.length > 0) {
-        setPayrollRecords(response.data as PayrollRecord[]);
-      } else {
-        // Generate payroll records from employee data if no payroll records exist
-        await generatePayrollFromEmployees();
-      }
+      const payrollCollection = collection(db, 'payrollRecords');
+      const q = query(payrollCollection);
+      
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        console.log('Payroll realtime update received, documents:', querySnapshot.size);
+        const records: PayrollRecord[] = [];
+        querySnapshot.forEach((doc) => {
+          const record = {
+            id: doc.id,
+            ...doc.data()
+          } as PayrollRecord;
+          console.log('Processing payroll record:', record);
+          records.push(record);
+        });
+        
+        console.log('Setting payroll records:', records.length);
+        setPayrollRecords(records);
+        setLoading(false);
+        setError('');
+      }, (error) => {
+        console.error('Error in payroll realtime listener:', error);
+        setError('Failed to load payroll data in realtime');
+        setLoading(false);
+      });
+      
+      // Store unsubscribe function
+      unsubscribeRef.current = unsubscribe;
     } catch (error) {
-      console.error('Error loading payroll data:', error);
-      setError('Failed to load payroll data');
-      // Don't load sample data, let the user generate payroll manually
-    } finally {
+      console.error('Error setting up payroll listener:', error);
+      setError('Failed to setup realtime listener');
       setLoading(false);
     }
   };
 
-  const generatePayrollFromEmployees = async () => {
-    try {
-      if (employees.length === 0) {
-        await loadEmployees();
-      }
-      
-      if (employees.length === 0) {
-        setError('No employees found. Please add employees first.');
-        return;
-      }
-      
-      const currentDate = new Date();
-      const currentMonth = currentDate.getMonth() + 1;
-      const currentYear = currentDate.getFullYear();
-      
-      const payrollRecords: PayrollRecord[] = employees.map((employee) => {
-        const grossSalary = employee.salary;
-        const basicSalary = grossSalary * 0.6; // 60% basic
-        const hra = grossSalary * 0.3; // 30% HRA
-        const specialAllowance = grossSalary * 0.1; // 10% special allowance
-        
-        // Calculate PF and ESI based on settings
-        const pfEmployee = settings.pfApplicable ? basicSalary * (settings.pfEmployeeRate / 100) : 0;
-        const esiEmployee = settings.esiApplicable ? grossSalary * (settings.esiEmployeeRate / 100) : 0;
-        
-        // Default values for now - will be calculated from attendance
-        const payableDays = 22;
-        const otHours = 0;
-        const otPayment = otHours * settings.otHourlyRate;
-        const otherDeductions = 0;
-        
-        const netPayable = grossSalary - pfEmployee - esiEmployee - otherDeductions + otPayment;
-        const totalPayableAmount = netPayable;
-        
-        // Calculate additional detailed fields
-        const basicDA = basicSalary; // Basic + DA (assuming DA is 0 for now)
-        const balanceAdvance = 0;
-        const tds = grossSalary > 250000 ? Math.min((grossSalary - 250000) * 0.1, 10000) : 0; // Simple TDS calculation
-        const totalDeductions = pfEmployee + esiEmployee + 200 + otherDeductions + tds; // PT + other deductions + TDS
-        const arrears = 0;
-        const differenceAmount = 0;
+  // Removed auto-generation function to avoid mock/placeholder data
 
-        return {
-          id: `payroll_${employee.id}_${currentYear}_${currentMonth}`,
-          employeeId: employee.employeeId,
-          employeeName: `${employee.firstName} ${employee.lastName}`,
-          grossSalary,
-          payableDays,
-          otHours,
-          netPayable,
-          totalPayableAmount,
-          remarks: 'Auto-generated from employee data',
-          basicSalary,
-          hra,
-          specialAllowance,
-          pfEmployee,
-          esiEmployee,
-          pt: 200, // Professional Tax
-          salaryAdvance: 0,
-          otherDeductions,
-          otPayment,
-          pfApplicable: settings.pfApplicable,
-          esiApplicable: settings.esiApplicable,
-          uanNumber: employee.uanNumber || '',
-          esiNumber: employee.esiNumber || '',
-          // Additional detailed fields
-          pfStatus: employee.pfStatus || 'inactive',
-          esiStatus: 'active', // Default to active for ESI
-          basicDA,
-          balanceAdvance,
-          tds,
-          totalDeductions,
-          arrears,
-          differenceAmount
-        };
-      });
-      
-      setPayrollRecords(payrollRecords);
-      
-      // Save to Firebase
-      await savePayrollRecords(payrollRecords);
-      
-      // Generate PF and ESI contributions
-      generatePFContributions(payrollRecords);
-      generateESIContributions(payrollRecords);
-      
-    } catch (error) {
-      console.error('Error generating payroll from employees:', error);
-      setError('Failed to generate payroll from employee data');
-    }
-  };
-
-  const generatePFContributions = (payrollRecords: PayrollRecord[]) => {
-    const pfContributions: PFContribution[] = payrollRecords.map((record) => {
-      const pfBasic = record.basicSalary;
-      const employeePF = record.pfEmployee;
-      const eps = pfBasic * (settings.epsContributionRate / 100);
-      const epf = pfBasic * (settings.epfContributionRate / 100);
-      const edli = pfBasic * (settings.edliContributionRate / 100);
-      const adminCharges = pfBasic * (settings.adminChargesRate / 100);
-      const edliAdmin = pfBasic * (settings.edliAdminChargesRate / 100);
-      const employerPFTotal = eps + epf + edli + adminCharges + edliAdmin;
-      
-      return {
-        id: `pf_${record.id}`,
-        employeeId: record.employeeId,
-        employeeName: record.employeeName,
-        uanNumber: record.uanNumber || '',
-        pfBasic,
-        employeePF,
-        eps,
-        epf,
-        edli,
-        adminCharges,
-        edliAdmin,
-        employerPFTotal
-      };
-    });
-    
-    setPfContributions(pfContributions);
-  };
-
-  const generateESIContributions = (payrollRecords: PayrollRecord[]) => {
-    const esiContributions: ESIContribution[] = payrollRecords.map((record) => {
-      const employeeContribution = record.esiEmployee;
-      const employerContribution = record.grossSalary * (settings.esiEmployerRate / 100);
-      const total = employeeContribution + employerContribution;
-      
-      return {
-        id: `esi_${record.id}`,
-        employeeId: record.employeeId,
-        employeeName: record.employeeName,
-        esiNumber: record.esiNumber || '',
-        grossSalary: record.grossSalary,
-        employeeContribution,
-        employerContribution,
-        total
-      };
-    });
-    
-    setEsiContributions(esiContributions);
-  };
+  // Removed PF/ESI generation functions to avoid mock data
 
 
   const loadEmployees = async () => {
@@ -421,9 +331,54 @@ const Payroll: React.FC = () => {
           aadhaarNumber: user.governmentInfo?.aadharNumber || user.aadhaarNumber || ''
         }));
         setEmployees(transformedEmployees);
+        
+        // Migrate existing payroll records if needed
+        await migratePayrollRecords(transformedEmployees);
       }
     } catch (error) {
       console.error('Error loading employees:', error);
+    }
+  };
+
+  // Migrate existing payroll records to use correct employeeId format
+  const migratePayrollRecords = async (employees: Employee[]) => {
+    try {
+      const response = await firebaseService.getCollection('payrollRecords');
+      if (response.success && response.data) {
+        const recordsToUpdate: any[] = [];
+        
+        response.data.forEach((record: any) => {
+          // Check if the employeeId looks like a document ID (longer than typical employee IDs)
+          if (record.employeeId && record.employeeId.length > 10) {
+            // Find the employee by document ID
+            const employee = employees.find(emp => emp.id === record.employeeId);
+            if (employee) {
+              recordsToUpdate.push({
+                id: record.id,
+                employeeId: employee.employeeId
+              });
+            }
+          }
+        });
+        
+        // Update records that need migration
+        for (const update of recordsToUpdate) {
+          try {
+            await firebaseService.updateDocument('payrollRecords', update.id, {
+              employeeId: update.employeeId
+            });
+            console.log(`Migrated payroll record ${update.id} to use employeeId: ${update.employeeId}`);
+          } catch (error) {
+            console.error(`Failed to migrate payroll record ${update.id}:`, error);
+          }
+        }
+        
+        if (recordsToUpdate.length > 0) {
+          console.log(`Migration completed: ${recordsToUpdate.length} payroll records updated`);
+        }
+      }
+    } catch (error) {
+      console.error('Error migrating payroll records:', error);
     }
   };
 
@@ -555,16 +510,7 @@ const Payroll: React.FC = () => {
     }
   };
 
-  // Save payroll records to Firebase
-  const savePayrollRecords = async (records: PayrollRecord[]) => {
-    try {
-      for (const record of records) {
-        await firebaseService.setDocument('payrollRecords', record.id, record);
-      }
-    } catch (error) {
-      console.error('Error saving payroll records:', error);
-    }
-  };
+  // Removed bulk save function to avoid mock data creation
 
   // Update payroll record in Firebase
   const updatePayrollRecord = async (record: PayrollRecord) => {
@@ -578,10 +524,13 @@ const Payroll: React.FC = () => {
   // Create new payroll record
   const createPayrollRecord = async (record: PayrollRecord) => {
     try {
+      console.log('Creating payroll record in Firebase:', record);
       await firebaseService.setDocument('payrollRecords', record.id, record);
-      setPayrollRecords(prev => [...prev, record]);
+      console.log('Payroll record created successfully - realtime listener will update UI');
+      // Note: Local state update removed - realtime listener will handle this automatically
     } catch (error) {
       console.error('Error creating payroll record:', error);
+      throw error; // Re-throw to be handled by calling function
     }
   };
 
@@ -706,15 +655,24 @@ const Payroll: React.FC = () => {
     if (!selectedRecord) return;
 
     try {
-      const updatedRecord = { ...selectedRecord, ...formData } as PayrollRecord;
+      const updatedRecord = { 
+        ...selectedRecord, 
+        ...formData,
+        updatedAt: new Date().toISOString()
+      } as PayrollRecord;
+      console.log('Saving record:', updatedRecord);
+      console.log('Selected record:', selectedRecord);
+      console.log('Form data:', formData);
       
       // Check if this is a new record (no employeeId means it's new)
       if (!selectedRecord.employeeId || selectedRecord.employeeId === '') {
         // Create new record
+        console.log('Creating new payroll record');
         await createPayrollRecord(updatedRecord);
         setSuccessMessage('New payroll record created successfully');
       } else {
         // Update existing record
+        console.log('Updating existing payroll record');
         await updatePayrollRecord(updatedRecord);
         setPayrollRecords(prev => prev.map(r => r.id === selectedRecord.id ? updatedRecord : r));
         setSuccessMessage('Payroll record updated successfully');
@@ -722,6 +680,7 @@ const Payroll: React.FC = () => {
       
       setShowEditModal(false);
     } catch (error) {
+      console.error('Error saving payroll record:', error);
       setError('Failed to save payroll record');
     }
   };
@@ -746,152 +705,148 @@ const Payroll: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const exportToPDF = (content: string | string[], filename: string) => {
+  // Deprecated: replaced by jsPDF-based renderPayslip flows
+  /* const exportToPDF = (content: string | string[], filename: string) => {
     try {
-      let pdfContent = '';
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      const maxWidth = pageWidth - margin * 2;
+      const lineHeight = 16;
+
+      const addTextBlock = (text: string, isFirstPage: boolean) => {
+        if (!isFirstPage) {
+          doc.addPage();
+        }
+        let y = margin;
+        const lines = doc.splitTextToSize(text, maxWidth);
+        lines.forEach((line: string) => {
+          if (y > pageHeight - margin) {
+            doc.addPage();
+            y = margin;
+          }
+          doc.text(line, margin, y);
+          y += lineHeight;
+        });
+      };
       
       if (Array.isArray(content)) {
-        pdfContent = content.join('\n\n' + '='.repeat(80) + '\n\n');
+        content.forEach((block, idx) => addTextBlock(block, idx === 0));
       } else {
-        pdfContent = content;
+        addTextBlock(content, true);
       }
-      
-      
-      // Create a simple PDF using a minimal working structure
-      const pdfData = createMinimalPDF(pdfContent);
-      const blob = new Blob([pdfData], { type: 'application/pdf' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `${filename}.pdf`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
+
+      doc.save(`${filename}.pdf`);
     } catch (error) {
       console.error('Error in exportToPDF:', error);
       throw new Error(`Failed to export PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  };
+  }; */
 
-  const createMinimalPDF = (content: string): string => {
-    // Create a very simple PDF that will definitely work
-    const lines = content.split('\n');
-    const maxLines = 60;
-    const pages = Math.ceil(lines.length / maxLines);
-    
-    let pdf = `%PDF-1.4
-1 0 obj
-<<
-/Type /Catalog
-/Pages 2 0 R
->>
-endobj
+  // Removed custom minimal PDF builder in favor of jsPDF for higher quality output
 
-2 0 obj
-<<
-/Type /Pages
-/Kids [`;
+  const renderPayslip = (
+    doc: jsPDF,
+    record: PayrollRecord,
+    employee: Employee | undefined,
+    month: string,
+    year: number
+  ) => {
+    const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const headerY = margin;
 
-    // Add page references
-    for (let i = 0; i < pages; i++) {
-      pdf += `${3 + i * 2} 0 R `;
-    }
-    
-    pdf += `]
-/Count ${pages}
->>
-endobj
+    // Header
+    doc.setFontSize(14);
+    doc.text(`PAY SLIP FOR THE MONTH OF ${month.toUpperCase()}-${year}`, margin, headerY);
 
-`;
+    // Employee details table
+    autoTable(doc, {
+      startY: headerY + 16,
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 6 },
+      head: [['Employee Details', 'Value']].map((h) => h),
+      body: [
+        ['Employee ID', record.employeeId],
+        ['Name', record.employeeName],
+        ['Department', employee?.department || ''],
+        ['Designation', employee?.position || ''],
+        ['Bank A/C No', employee?.bankAccount || '0'],
+        ['PF / UAN Number', employee?.pfNumber || '0'],
+        ['ESI Number', employee?.esiNumber || '0'],
+        ['Days in Month', String(new Date(year, new Date().getMonth() + 1, 0).getDate())],
+        ['Days to Pay', String(record.payableDays)],
+        ['Overtime Hours', String(record.otHours)],
+        ['Advance', String(record.salaryAdvance)],
+        ['Balance Advance', String(record.balanceAdvance || 0)]
+      ]
+    });
 
-    // Create each page
-    for (let pageNum = 0; pageNum < pages; pageNum++) {
-      const startLine = pageNum * maxLines;
-      const endLine = Math.min(startLine + maxLines, lines.length);
-      const pageLines = lines.slice(startLine, endLine);
-      
-      // Create content stream
-      let contentStream = '';
-      let yPos = 750;
-      
-      for (const line of pageLines) {
-        // Escape special characters
-        const escapedLine = line.replace(/[()\\]/g, '\\$&');
-        contentStream += `BT\n/F1 10 Tf\n50 ${yPos} Td\n(${escapedLine}) Tj\nET\n`;
-        yPos -= 12;
-      }
-      
-      const contentLength = contentStream.length;
-      
-      // Page object
-      pdf += `${3 + pageNum * 2} 0 obj
-<<
-/Type /Page
-/Parent 2 0 R
-/MediaBox [0 0 612 792]
-/Contents ${4 + pageNum * 2} 0 R
-/Resources <<
-/Font <<
-/F1 5 0 R
->>
->>
->>
-endobj
+    // Earnings table
+    const earningsStartY = (doc as any).lastAutoTable.finalY + 14;
+    autoTable(doc, {
+      startY: earningsStartY,
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 6 },
+      head: [['Earnings', 'Amount (Rs.)', 'Payable (Rs.)']],
+      body: [
+        ['Basic', record.basicSalary.toLocaleString(),
+          Math.round(record.basicSalary * (record.payableDays / new Date(year, new Date().getMonth() + 1, 0).getDate())).toLocaleString()
+        ],
+        ['HRA', record.hra.toLocaleString(),
+          Math.round(record.hra * (record.payableDays / new Date(year, new Date().getMonth() + 1, 0).getDate())).toLocaleString()
+        ],
+        ['Special Allowance', record.specialAllowance.toLocaleString(),
+          Math.round(record.specialAllowance * (record.payableDays / new Date(year, new Date().getMonth() + 1, 0).getDate())).toLocaleString()
+        ],
+        ['Total Earnings', record.grossSalary.toLocaleString(),
+          Math.round(record.grossSalary * (record.payableDays / new Date(year, new Date().getMonth() + 1, 0).getDate())).toLocaleString()
+        ]
+      ]
+    });
 
-${4 + pageNum * 2} 0 obj
-<<
-/Length ${contentLength}
->>
-stream
-${contentStream}endstream
-endobj
+    // Deductions table
+    const deductionsStartY = (doc as any).lastAutoTable.finalY + 14;
+    autoTable(doc, {
+      startY: deductionsStartY,
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 6 },
+      head: [['Deductions', 'Amount (Rs.)']],
+      body: [
+        ['PF Employee', String(record.pfEmployee || 0)],
+        ['ESI Employee', String(record.esiEmployee || 0)],
+        ['Professional Tax', String(record.pt || 0)],
+        ['Advance Deducted', String(record.salaryAdvance || 0)],
+        ['TDS', String(record.tds || 0)],
+        ['Total Deductions', String(record.totalDeductions || 0)]
+      ]
+    });
 
-`;
-    }
+    // Summary table
+    const summaryStartY = (doc as any).lastAutoTable.finalY + 14;
+    autoTable(doc, {
+      startY: summaryStartY,
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 6 },
+      head: [['Summary', 'Value']],
+      body: [
+        ['PF & ESI Account Deposit', String((record.pfEmployee + record.esiEmployee))],
+        ['OT Amount', String(record.otPayment)],
+        ['Allowance', String(record.arrears || 0)],
+        ['Cost to Company', String(record.totalPayableAmount)],
+        ['To Bank', String(record.netPayable)],
+        ['Cash to Pay', String(record.otPayment)],
+        ['Salary After Deduction', String(record.totalPayableAmount)],
+        ['Generated on', new Date().toLocaleDateString()],
+        ['Generated at', new Date().toLocaleTimeString()]
+      ]
+    });
 
-    // Font object
-    pdf += `5 0 obj
-<<
-/Type /Font
-/Subtype /Type1
-/BaseFont /Courier
->>
-endobj
-
-xref
-0 ${5 + pages * 2}
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-`;
-
-    // Add xref entries
-    let offset = 100;
-    for (let i = 0; i < pages; i++) {
-      pdf += `${offset.toString().padStart(10, '0')} 00000 n 
-`;
-      offset += 200;
-      pdf += `${offset.toString().padStart(10, '0')} 00000 n 
-`;
-      offset += 200;
-    }
-
-    offset += 100;
-    pdf += `${offset.toString().padStart(10, '0')} 00000 n 
-`;
-
-    pdf += `trailer
-<<
-/Size ${5 + pages * 2}
-/Root 1 0 R
->>
-startxref
-${offset + 50}
-%%EOF`;
-
-    return pdf;
+    // Footer line
+    const footerY = (doc as any).lastAutoTable.finalY + 16;
+    doc.setDrawColor(200);
+    doc.line(margin, footerY, pageWidth - margin, footerY);
   };
 
 
@@ -954,7 +909,7 @@ ${offset + 50}
     };
   };
 
-  const generatePayslipPDF = (record: PayrollRecord, employee: Employee | undefined, month: string, year: number): string => {
+  /* const generatePayslipPDF = (record: PayrollRecord, employee: Employee | undefined, month: string, year: number): string => {
     const daysInMonth = new Date(year, new Date().getMonth() + 1, 0).getDate();
     const basicPayable = Math.round(record.basicSalary * (record.payableDays / daysInMonth));
     const hraPayable = Math.round(record.hra * (record.payableDays / daysInMonth));
@@ -1018,7 +973,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 ${'='.repeat(80)}
 Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}
     `.trim();
-  };
+  }; */
 
   const handleExport = async (format: 'pdf' | 'excel') => {
     setIsExporting(true);
@@ -1056,7 +1011,7 @@ Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStr
   };
 
   const exportSinglePayslip = async (record: PayrollRecord, format: 'pdf' | 'excel') => {
-    const employee = employees.find(emp => emp.id === record.employeeId);
+    const employee = employees.find(emp => emp.employeeId === record.employeeId);
     const currentDate = new Date();
     const month = currentDate.toLocaleString('default', { month: 'long' });
     const year = currentDate.getFullYear();
@@ -1065,8 +1020,10 @@ Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStr
       const payslipData = generatePayslipData(record, employee, month, year);
       exportToExcel([payslipData], `payslip_${record.employeeName.replace(/\s+/g, '_')}_${month}_${year}`);
     } else {
-      const payslipContent = generatePayslipPDF(record, employee, month, year);
-      exportToPDF(payslipContent, `payslip_${record.employeeName.replace(/\s+/g, '_')}_${month}_${year}`);
+      // Generate a structured PDF using jsPDF + autoTable
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      renderPayslip(doc, record, employee, month, year);
+      doc.save(`payslip_${record.employeeName.replace(/\s+/g, '_')}_${month}_${year}.pdf`);
     }
   };
 
@@ -1077,18 +1034,23 @@ Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStr
     
     if (format === 'excel') {
       const payslipsData = payrollRecords.map(record => {
-        const employee = employees.find(emp => emp.id === record.employeeId);
+        const employee = employees.find(emp => emp.employeeId === record.employeeId);
         return generatePayslipData(record, employee, month, year);
       });
       exportToExcel(payslipsData, `payslips_${month}_${year}`);
     } else {
-      // Create a comprehensive bulk PDF with all payslips - direct download
-      const bulkPayslipContent = generateBulkPayslipPDF(month, year);
-      exportToPDF(bulkPayslipContent, `payslips_${month}_${year}`);
+      // Create a comprehensive bulk PDF with one page per payslip
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      payrollRecords.forEach((record, index) => {
+        const employee = employees.find(emp => emp.employeeId === record.employeeId);
+        if (index > 0) doc.addPage();
+        renderPayslip(doc, record, employee, month, year);
+      });
+      doc.save(`payslips_${month}_${year}.pdf`);
     }
   };
 
-  const generateBulkPayslipPDF = (month: string, year: number): string => {
+  /* const generateBulkPayslipPDF = (month: string, year: number): string => {
     
     let bulkContent = `
                     BULK PAYSLIP REPORT - ${month.toUpperCase()} ${year}
@@ -1103,7 +1065,7 @@ ${'='.repeat(80)}
 
     payrollRecords.forEach((record, index) => {
       try {
-        const employee = employees.find(emp => emp.id === record.employeeId);
+        const employee = employees.find(emp => emp.employeeId === record.employeeId);
         const payslipContent = generatePayslipPDF(record, employee, month, year);
         
         bulkContent += `
@@ -1133,7 +1095,7 @@ ${'='.repeat(80)}
     });
 
     return bulkContent.trim();
-  };
+  }; */
 
 
 
@@ -1182,23 +1144,6 @@ ${'='.repeat(80)}
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
           <button 
-            onClick={async () => {
-              setLoading(true);
-              try {
-                await generatePayrollFromEmployees();
-                setSuccessMessage('Payroll generated successfully from employee data');
-              } catch (error) {
-                setError('Failed to generate payroll from employee data');
-              } finally {
-                setLoading(false);
-              }
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
-          >
-            <Calculator className="w-4 h-4" />
-            <span>Generate Payroll</span>
-          </button>
-          <button 
             onClick={() => {
               // Create a new payroll record
               const newRecord: PayrollRecord = {
@@ -1229,9 +1174,12 @@ ${'='.repeat(80)}
                 tds: 0,
                 totalDeductions: 0,
                 arrears: 0,
-                differenceAmount: 0
+                differenceAmount: 0,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
               };
               setSelectedRecord(newRecord);
+              setFormData(newRecord); // Initialize formData with the new record
               setShowEditModal(true);
             }}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
@@ -1365,6 +1313,7 @@ ${'='.repeat(80)}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search by employee name or ID"
+                aria-label="Search employees by name or ID"
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
               />
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -1373,6 +1322,7 @@ ${'='.repeat(80)}
               <select
                   value={departmentFilter}
                   onChange={(e) => setDepartmentFilter(e.target.value)}
+                aria-label="Filter by department"
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
               >
                   <option value="all">All Departments</option>
@@ -1397,29 +1347,10 @@ ${'='.repeat(80)}
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No Payroll Records Found</h3>
                 <p className="text-gray-600 mb-6">
                   {employees.length > 0 
-                    ? "Generate payroll records from your employee data to get started."
-                    : "Add employees first, then generate payroll records."
+                    ? "Create payroll records manually or import from your source."
+                    : "Add employees first, then create payroll records."
                   }
                 </p>
-                {employees.length > 0 && (
-                  <button
-                    onClick={async () => {
-                      setLoading(true);
-                      try {
-                        await generatePayrollFromEmployees();
-                        setSuccessMessage('Payroll generated successfully from employee data');
-                      } catch (error) {
-                        setError('Failed to generate payroll from employee data');
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 mx-auto"
-                  >
-                    <Calculator className="w-5 h-5" />
-                    <span>Generate Payroll from Employee Data</span>
-                  </button>
-                )}
               </div>
             )}
 
@@ -1778,6 +1709,7 @@ ${'='.repeat(80)}
                       <select
                         value={settings.holidayPayType}
                         onChange={(e) => setSettings({ ...settings, holidayPayType: e.target.value as 'paid' | 'unpaid' })}
+                        aria-label="Holiday pay type"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                       >
                         <option value="paid">Paid Holidays</option>
@@ -1789,6 +1721,7 @@ ${'='.repeat(80)}
                       <select
                         value={settings.holidayPayRules}
                         onChange={(e) => setSettings({ ...settings, holidayPayRules: e.target.value as 'paid' | 'unpaid' })}
+                        aria-label="Holiday pay rules"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                       >
                         <option value="paid">Paid Holidays</option>
@@ -1884,6 +1817,7 @@ ${'='.repeat(80)}
                 <button
                   onClick={() => setShowViewModal(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Close view modal"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -2106,6 +2040,7 @@ ${'='.repeat(80)}
               <button
                 onClick={() => setShowEditModal(false)}
                 className="text-gray-400 hover:text-gray-600"
+                aria-label="Close edit modal"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -2119,17 +2054,21 @@ ${'='.repeat(80)}
                       <label className="block text-sm font-medium text-gray-700 mb-1">Employee</label>
                       {selectedRecord && (!selectedRecord.employeeId || selectedRecord.employeeId === '') ? (
                         <select
-                          value={formData.employeeId || ''}
+                          value={employees.find(emp => emp.employeeId === formData.employeeId)?.id || ''}
                           onChange={(e) => {
                             const selectedEmployee = employees.find(emp => emp.id === e.target.value);
-                            setFormData({ 
+                            const updatedFormData = { 
                               ...formData, 
-                              employeeId: e.target.value,
+                              employeeId: selectedEmployee ? selectedEmployee.employeeId : '',
                               employeeName: selectedEmployee ? `${selectedEmployee.firstName} ${selectedEmployee.lastName}` : '',
                               grossSalary: selectedEmployee ? selectedEmployee.salary : 0
-                            });
+                            };
+                            console.log('Employee selected:', selectedEmployee);
+                            console.log('Updated form data:', updatedFormData);
+                            setFormData(updatedFormData);
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          aria-label="Select employee"
                         >
                           <option value="">Select Employee</option>
                           {employees.map((employee) => (
@@ -2144,6 +2083,7 @@ ${'='.repeat(80)}
                           value={formData.employeeId || ''}
                           onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          aria-label="Employee ID"
                           readOnly
                         />
                       )}
@@ -2155,6 +2095,7 @@ ${'='.repeat(80)}
                         value={formData.employeeName || ''}
                         onChange={(e) => setFormData({ ...formData, employeeName: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        aria-label="Employee name"
                         readOnly
                       />
                       </div>
@@ -2166,6 +2107,7 @@ ${'='.repeat(80)}
                           value={formData.grossSalary || 0}
                           onChange={(e) => setFormData({ ...formData, grossSalary: Number(e.target.value) })}
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          aria-label="Gross salary"
                         />
                         <button
                           onClick={() => handleAutoCalculate(formData.employeeId || '', formData.grossSalary || 0)}
@@ -2184,6 +2126,7 @@ ${'='.repeat(80)}
                         value={formData.payableDays || 0}
                         onChange={(e) => setFormData({ ...formData, payableDays: Number(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        aria-label="Payable days"
                       />
                       </div>
                       <div>
@@ -2193,6 +2136,7 @@ ${'='.repeat(80)}
                         value={formData.otHours || 0}
                         onChange={(e) => setFormData({ ...formData, otHours: Number(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        aria-label="Overtime hours"
                       />
                       </div>
                     </div>
@@ -2208,6 +2152,7 @@ ${'='.repeat(80)}
                         value={formData.basicSalary || 0}
                         onChange={(e) => setFormData({ ...formData, basicSalary: Number(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        aria-label="Basic salary"
                       />
                       </div>
                       <div>
@@ -2217,6 +2162,7 @@ ${'='.repeat(80)}
                         value={formData.hra || 0}
                         onChange={(e) => setFormData({ ...formData, hra: Number(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        aria-label="HRA"
                       />
                       </div>
                       <div>
@@ -2226,6 +2172,7 @@ ${'='.repeat(80)}
                         value={formData.specialAllowance || 0}
                         onChange={(e) => setFormData({ ...formData, specialAllowance: Number(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        aria-label="Special allowance"
                       />
                       </div>
                       <div>
@@ -2235,6 +2182,7 @@ ${'='.repeat(80)}
                         value={formData.otPayment || 0}
                         onChange={(e) => setFormData({ ...formData, otPayment: Number(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        aria-label="OT payment"
                       />
                       </div>
                       <div>
@@ -2244,6 +2192,7 @@ ${'='.repeat(80)}
                         value={formData.otherDeductions || 0}
                         onChange={(e) => setFormData({ ...formData, otherDeductions: Number(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          aria-label="Other deductions"
                           />
                         </div>
                       </div>
@@ -2258,6 +2207,7 @@ ${'='.repeat(80)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   rows={3}
                   placeholder="Enter remarks"
+                  aria-label="Remarks"
                    />
                     </div>
                   </div>

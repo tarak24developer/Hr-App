@@ -1,5 +1,4 @@
 import firebaseService from './firebaseService';
-import { getSampleData } from './dataInitializationService';
 
 interface DataServiceOptions {
   filters?: Record<string, any>;
@@ -71,18 +70,6 @@ class DataService {
   async fetchFromFirestore(endpoint: string, options: DataServiceOptions = {}) {
     try {
       const collectionName = this.getCollectionNameFromEndpoint(endpoint);
-      const sampleData = getSampleData(collectionName) || [];
-      
-      // Ensure sampleData is an array
-      if (!Array.isArray(sampleData)) {
-        console.warn(`Sample data for ${collectionName} is not an array:`, sampleData);
-        return { 
-          success: true, 
-          data: [], 
-          source: 'firestore',
-          message: 'No sample data available' 
-        };
-      }
       
       // Convert filters to Firestore format
       const firestoreFilters = this.convertFiltersToFirestoreFormat(options.filters || {});
@@ -92,34 +79,24 @@ class DataService {
         originalFilters: options.filters || {},
         convertedFilters: firestoreFilters,
         orderBy: options.orderBy || null,
-        limit: options.limit || null,
-        sampleDataLength: sampleData.length
+        limit: options.limit || null
       });
       
-      const result = await (firebaseService as any).getCollectionWithFallback(
-        collectionName, 
-        sampleData,
-        firestoreFilters,
-        options.orderBy || null,
-        options.limit || null
-      );
+      // Use the standard getCollection method
+      const result = await firebaseService.getCollection(collectionName, {
+        where: firestoreFilters,
+        orderBy: options.orderBy,
+        limit: options.limit
+      });
 
       return { 
-        success: true, 
-        data: result.data, 
+        success: result.success, 
+        data: result.data || [], 
         source: 'firestore',
-        message: result.message 
+        message: result.success ? 'Data loaded successfully' : result.error
       };
     } catch (error) {
-      console.error(`Firestore fallback failed for ${endpoint}:`, error);
-      
-      // Log additional context for debugging
-      console.error('Error context:', {
-        endpoint,
-        options,
-        errorMessage: (error as Error).message,
-        errorStack: (error as Error).stack
-      });
+      console.error(`Firestore fetch failed for ${endpoint}:`, error);
       
       return { 
         success: false, 

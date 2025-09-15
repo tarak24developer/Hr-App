@@ -22,6 +22,8 @@ import {
 import { cn } from '../utils/cn';
 import firebaseService from '../services/firebaseService';
 import DashboardCard from '../components/DashboardCard';
+import { db } from '../services/firebase';
+import { onSnapshot, collection, query, orderBy } from 'firebase/firestore';
 // import { useAuthStore } from '../stores/authStore';
 import { formatIndianCurrency } from '../utils/currency';
 
@@ -119,30 +121,50 @@ const EmployeeDirectory: React.FC = () => {
     severity: 'info'
   });
 
+  // Realtime listener ref
+  const unsubscribeRef = React.useRef<(() => void) | null>(null);
+
   
 
   //
 
-  // Load data from Firebase
+  // Load data from Firebase with realtime listener
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+    const setupRealtimeListener = () => {
+      if (!db) {
+        console.warn('Firebase not available for realtime listener');
+        setError('Firebase not available');
+        return;
+      }
 
-        // Load users from the existing users collection
-        const usersResult = await firebaseService.getCollection('users');
-        if (usersResult && usersResult.success && Array.isArray(usersResult.data)) {
+      setLoading(true);
+      
+      try {
+        const usersCollection = collection(db, 'users');
+        const q = query(usersCollection, orderBy('createdAt', 'desc'));
+        
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+          console.log('Realtime update received for users collection');
+          const users: any[] = [];
+          querySnapshot.forEach((doc) => {
+            users.push({
+              id: doc.id,
+              ...doc.data()
+            });
+          });
+          
           // Transform the user data to match our Employee interface
-          const transformedEmployees = usersResult.data.map((user: any, index: number): Employee => {
+          const transformedEmployees = users.map((user: any, index: number): Employee => {
             // Ensure all required fields are present and valid
             const employeeId = typeof user.employeeId === 'string' && user.employeeId.trim() !== ''
               ? user.employeeId
               : `EMP${(index + 1).toString().padStart(3, '0')}`;
 
-            const name = user.firstName && user.lastName
-              ? `${user.firstName} ${user.lastName}`
-              : (user.email || '');
+            // Handle name construction - prioritize full name, then construct from parts
+            const name = user.name || 
+              (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : '') ||
+              (user.firstName || '') ||
+              (user.email || '');
 
             const joiningDate = user.hireDate
               ? new Date(user.hireDate)
@@ -206,15 +228,14 @@ const EmployeeDirectory: React.FC = () => {
               resigned: !!user.resigned
             } as Employee;
           });
+          
+          console.log('Setting employees:', transformedEmployees.length);
           setEmployees(transformedEmployees);
-        } else {
-          console.warn('No users data received or request failed:', usersResult);
-          setEmployees([]);
-        }
-
-        // Extract departments from users
-        if (usersResult && usersResult.success && usersResult.data) {
-          const departments = [...new Set(usersResult.data
+          setLoading(false);
+          setError('');
+          
+          // Extract departments from users
+          const departments = [...new Set(users
             .map((user: any) => user.department)
             .filter((dept: string) => dept && dept !== 'Unassigned')
           )];
@@ -226,23 +247,29 @@ const EmployeeDirectory: React.FC = () => {
             headOfDepartment: ''
           }));
           setDepartments(transformedDepartments);
-        } else {
-          setDepartments([]);
-        }
-      } catch (err: any) {
-        console.error('Error loading data:', err);
-        setError(err.message || 'Failed to load data');
-        setSnackbar({
-          open: true,
-          message: 'Failed to load data from Firebase',
-          severity: 'error'
+        }, (error) => {
+          console.error('Error in realtime listener:', error);
+          setError('Failed to load data in realtime');
+          setLoading(false);
         });
-      } finally {
+        
+        // Store unsubscribe function
+        unsubscribeRef.current = unsubscribe;
+      } catch (error) {
+        console.error('Error setting up realtime listener:', error);
+        setError('Failed to setup realtime listener');
         setLoading(false);
       }
     };
 
-    loadData();
+    setupRealtimeListener();
+
+    // Cleanup listener on unmount
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
   }, []);
 
   // Update filtered employees when employees or filters change
@@ -323,9 +350,26 @@ const EmployeeDirectory: React.FC = () => {
   const handleSaveEmployee = async () => {
     try {
       setIsSaving(true);
+      console.log('Starting employee update process...');
+      console.log('Selected employee:', selectedEmployee);
+      console.log('Edit form data:', editFormData);
+      
+      // Check if Firebase is properly configured
+      if (!db) {
+        console.error('Firebase not configured - db is null');
+        throw new Error('Firebase is not properly configured. Please check your environment variables.');
+      }
+      
+      // Split name properly, handling edge cases
+      const nameParts = (editFormData.name || '').trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
       const payload: any = {
-        firstName: (editFormData.name || '').split(' ')[0] || '',
-        lastName: (editFormData.name || '').split(' ').slice(1).join(' '),
+        firstName,
+        lastName,
+        // Also store the full name for consistency
+        name: editFormData.name || '',
         email: editFormData.email || '',
         phone: editFormData.phone || '',
         department: editFormData.department || '',
@@ -353,22 +397,20 @@ const EmployeeDirectory: React.FC = () => {
         updatedAt: new Date().toISOString()
       };
 
+      console.log('Payload to be sent:', payload);
+
       if (selectedEmployee) {
+        console.log('Updating employee with ID:', selectedEmployee.id);
         const res = await firebaseService.updateDocument('users', selectedEmployee.id, payload);
-        if (!res || !res.success) throw new Error(res?.error || 'Failed to update employee');
-        setEmployees(prev => prev.map(emp => emp.id === selectedEmployee.id ? {
-          ...emp,
-          name: editFormData.name || emp.name,
-          email: editFormData.email || emp.email,
-          phone: editFormData.phone || emp.phone,
-          department: editFormData.department || emp.department,
-          position: editFormData.position || emp.position,
-          joiningDate: editFormData.joiningDate || emp.joiningDate,
-          salary: editFormData.salary ?? emp.salary,
-          status: (editFormData.status as any) || emp.status,
-          address: editFormData.address || emp.address,
-          officeLocation: editFormData.officeLocation || emp.officeLocation
-        } : emp));
+        console.log('Firebase update response:', res);
+        
+        if (!res || !res.success) {
+          console.error('Update failed:', res?.error);
+          throw new Error(res?.error || 'Failed to update employee');
+        }
+        
+        console.log('Update successful - realtime listener will update the UI automatically');
+        // Note: Local state update removed - realtime listener will handle this automatically
         } else {
         const res = await firebaseService.addDocument('users', { ...payload, createdAt: new Date().toISOString() });
         const newId = (res as any)?.id || (res as any)?.data?.id;
@@ -409,11 +451,13 @@ const EmployeeDirectory: React.FC = () => {
         setEmployees(prev => [newEmp, ...prev]);
       }
 
+      console.log('Employee operation completed successfully');
       setSnackbar({ open: true, message: selectedEmployee ? 'Employee updated' : 'Employee added', severity: 'success' });
       setIsEditDialogOpen(false);
       setSelectedEmployee(null);
       setEditFormData({});
     } catch (e: any) {
+      console.error('Error in employee operation:', e);
       setSnackbar({ open: true, message: e.message || 'Failed to save employee', severity: 'error' });
     } finally {
       setIsSaving(false);

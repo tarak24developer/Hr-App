@@ -45,14 +45,12 @@ export const useFirestoreData = (collectionName: string, options: UseFirestoreDa
       setError(null);
       setMessage('');
 
-      console.log(`Fetching ${collectionName} with fallback...`);
-      const result = await (firebaseService as any).getCollectionWithFallback(
-        collectionName,
-        [], // Use default sample data
-        filters,
-        orderBy,
-        limit
-      );
+      console.log(`Fetching ${collectionName} from Firebase...`);
+      const result = await firebaseService.getCollection(collectionName, {
+        where: filters,
+        orderBy: orderBy,
+        limit: limit
+      });
 
       if (result.success) {
         setData(result.data || []);
