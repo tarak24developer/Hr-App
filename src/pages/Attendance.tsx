@@ -17,7 +17,8 @@ import {
   Badge,
   MapPin,
   Calendar as CalendarIcon,
-  Clock as ClockIcon
+  Clock as ClockIcon,
+  Upload
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { collection, onSnapshot, query, orderBy, limit as fsLimit, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -82,6 +83,12 @@ const Attendance: React.FC = () => {
   const [alerts, setAlerts] = useState<string[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [successMessage, setSuccessMessage] = useState<string>('');
+
+  // Upload CSV state
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadParsing, setUploadParsing] = useState(false);
+  const [uploadRows, setUploadRows] = useState<any[]>([]);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
   // Admin: Add attendance record dialog state
   const [showAddRecordDialog, setShowAddRecordDialog] = useState(false);
@@ -158,7 +165,7 @@ const Attendance: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const isDateWithinRange = (dateStr: string, startStr: string, endStr?: string) => {
+  const isDateWithinRange = (dateStr: string, startStr?: string, endStr?: string) => {
     if (!startStr) return false;
     const d = dateStr;
     const start = startStr;
@@ -310,9 +317,133 @@ const Attendance: React.FC = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `attendance_report_${today}.csv`;
+    const dateStr = new Date().toISOString().split('T')[0];
+    a.download = `attendance_report_${dateStr}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
+  };
+
+  // CSV Upload helpers
+  const parseCsv = (text: string) => {
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length === 0) return { headers: [], rows: [] };
+    const firstLine = lines[0] ?? '';
+    const headers = firstLine.split(',').map(h => h.trim());
+    const rows = lines.slice(1).map(line => {
+      const cols = line.split(',').map(c => c.trim());
+      const obj: any = {};
+      headers.forEach((h, i) => { obj[h] = cols[i] ?? ''; });
+      return obj;
+    });
+    return { headers, rows };
+  };
+
+  const requiredUploadHeaders = ['Employee ID','Employee Name','Date','Clock In','Clock Out','Status','Location'];
+
+  const handleUploadFileChange = async (file: File) => {
+    setUploadErrors([]);
+    setUploadRows([]);
+    if (!file) return;
+    setUploadParsing(true);
+    try {
+      const text = await file.text();
+      const { headers, rows } = parseCsv(text);
+      const missing = requiredUploadHeaders.filter(h => !headers.includes(h));
+      if (missing.length) {
+        setUploadErrors([`Missing required columns: ${missing.join(', ')}`]);
+        setUploadParsing(false);
+        return;
+      }
+      // Basic normalize/validate
+      const normalized = rows.map((r: any, idx: number) => {
+        const date = (r['Date'] || '').slice(0, 10);
+        const status = (r['Status'] || 'present').toLowerCase();
+        return {
+          _row: idx + 2,
+          employeeId: r['Employee ID'] || '',
+          employeeName: r['Employee Name'] || '',
+          date,
+          clockIn: r['Clock In'] || '',
+          clockOut: r['Clock Out'] || '',
+          status: (['present','absent','late','half-day','leave'] as const).includes(status as any) ? status : 'present',
+          location: r['Location'] || 'Main Office',
+          notes: '',
+        };
+      });
+      const errs: string[] = [];
+      normalized.forEach(n => {
+        if (!n.employeeId || !n.employeeName || !n.date) {
+          errs.push(`Row ${n._row}: employeeId, employeeName, date are required.`);
+        }
+      });
+      setUploadErrors(errs);
+      setUploadRows(normalized);
+    } catch (e: any) {
+      setUploadErrors([e?.message || 'Failed to read file']);
+    } finally {
+      setUploadParsing(false);
+    }
+  };
+
+  const upsertAttendanceRow = async (row: any) => {
+    // Try find existing by employeeId + date
+    const existingRes = await firebaseService.getCollection('attendance', {
+      where: [
+        { field: 'employeeId', operator: '==', value: row.employeeId },
+        { field: 'date', operator: '==', value: row.date }
+      ],
+      limit: 1
+    });
+    const payload: any = {
+      employeeId: row.employeeId,
+      employeeName: row.employeeName,
+      date: row.date,
+      clockIn: row.clockIn,
+      clockOut: row.clockOut,
+      status: row.status,
+      location: row.location,
+      notes: row.notes || ''
+    };
+    if (payload.clockIn && payload.clockOut) {
+      payload.totalHours = calculateHours(payload.clockIn, payload.clockOut);
+    }
+    if (existingRes.success && existingRes.data && existingRes.data.length > 0) {
+      const doc = existingRes.data[0] as any;
+      await firebaseService.updateDocument('attendance', doc.id, payload);
+      return { id: doc.id, action: 'updated' as const };
+    } else {
+      const addRes = await firebaseService.addDocument('attendance', payload);
+      return { id: (addRes.data as any)?.id, action: 'created' as const };
+    }
+  };
+
+  const handleConfirmUpload = async () => {
+    if (uploadRows.length === 0) {
+      setShowUploadModal(false);
+      return;
+    }
+    setUploadParsing(true);
+    const errors: string[] = [];
+    let created = 0, updated = 0;
+    for (const row of uploadRows) {
+      try {
+        const res = await upsertAttendanceRow(row);
+        if (res.action === 'created') created++; else updated++;
+      } catch (e: any) {
+        errors.push(`Row ${row._row}: ${e?.message || 'Failed to save'}`);
+      }
+    }
+    setUploadParsing(false);
+    if (errors.length) {
+      setUploadErrors(errors);
+    } else {
+      setShowUploadModal(false);
+      setUploadRows([]);
+      setSuccessMessage(`Upload complete: ${created} created, ${updated} updated`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+      // Refresh view
+      window.location.reload();
+    }
   };
 
   // Admin: Add attendance handler
@@ -664,7 +795,8 @@ const Attendance: React.FC = () => {
           <p className="text-gray-600">Track employee attendance, clock in/out, and generate reports</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
-           <button 
+              <button 
+                aria-label="Quick Clock In"
              onClick={() => {
                setClockAction('in');
                setError('');
@@ -676,7 +808,18 @@ const Attendance: React.FC = () => {
             <Plus className="w-4 h-4" />
              <span>Quick Clock In</span>
           </button>
+           {user?.role === 'admin' && (
+             <button 
+               aria-label="Upload CSV"
+               onClick={() => setShowUploadModal(true)}
+               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center space-x-2"
+             >
+               <Upload className="w-4 h-4" />
+               <span>Upload CSV</span>
+             </button>
+           )}
            <button 
+            aria-label="Export Report"
             onClick={handleExportReport}
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
           >
@@ -684,6 +827,7 @@ const Attendance: React.FC = () => {
             <span>Export Report</span>
           </button>
            <button 
+             aria-label="View Alerts"
              onClick={() => setShowAlerts(true)}
              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors flex items-center justify-center space-x-2"
            >
@@ -765,7 +909,8 @@ const Attendance: React.FC = () => {
               </div>
                  </div>
                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                   <button 
+                  <button 
+                    aria-label="Clock In"
                      onClick={() => {
                        setClockAction('in');
                        setError('');
@@ -781,7 +926,8 @@ const Attendance: React.FC = () => {
                      <span className="text-xs text-gray-500 text-center mt-1">Start work day</span>
                    </button>
                    
-                   <button 
+                  <button 
+                    aria-label="Clock Out"
                      onClick={() => {
                        setClockAction('out');
                        setError('');
@@ -797,7 +943,8 @@ const Attendance: React.FC = () => {
                      <span className="text-xs text-gray-500 text-center mt-1">End work day</span>
                    </button>
                    
-                   <button 
+                  <button 
+                    aria-label="View Calendar"
                      onClick={() => setShowCalendarModal(true)}
                      className="group flex flex-col items-center p-6 rounded-lg border-2 border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 transform hover:scale-105"
                    >
@@ -808,7 +955,8 @@ const Attendance: React.FC = () => {
                      <span className="text-xs text-gray-500 text-center mt-1">Monthly overview</span>
                    </button>
                    
-                   <button 
+                  <button 
+                    aria-label="Open Export Modal"
                      onClick={() => setShowExportModal(true)}
                      className="group flex flex-col items-center p-6 rounded-lg border-2 border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 transform hover:scale-105"
                    >
@@ -818,8 +966,21 @@ const Attendance: React.FC = () => {
                      <span className="text-sm font-medium text-gray-900 text-center">Export Report</span>
                      <span className="text-xs text-gray-500 text-center mt-1">Download CSV</span>
                    </button>
+                   {user?.role === 'admin' && (
+                     <button 
+                       onClick={() => setShowUploadModal(true)}
+                       className="group flex flex-col items-center p-6 rounded-lg border-2 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all duration-200 transform hover:scale-105"
+                     >
+                       <div className="p-3 bg-indigo-100 rounded-full mb-3 group-hover:bg-indigo-200 transition-colors">
+                         <Upload className="w-8 h-8 text-indigo-600" />
+                       </div>
+                       <span className="text-sm font-medium text-gray-900 text-center">Upload CSV</span>
+                       <span className="text-xs text-gray-500 text-center mt-1">Import attendance</span>
+                     </button>
+                   )}
                    
-                   <button 
+                  <button 
+                    aria-label="Open Alerts"
                      onClick={() => setShowAlertsModal(true)}
                      className="group flex flex-col items-center p-6 rounded-lg border-2 border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-all duration-200 transform hover:scale-105"
                    >
@@ -978,6 +1139,17 @@ const Attendance: React.FC = () => {
                          <Plus className="w-4 h-4 mr-2" />
                          Add Attendance
                        </button>
+                       <label className="ml-2 inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors cursor-pointer shadow-sm border border-indigo-700">
+                         <Upload className="w-4 h-4 mr-2" />
+                         <span>Upload CSV</span>
+                         <input type="file" accept=".csv" className="hidden" onChange={(e) => {
+                           const f = e.target.files && e.target.files[0];
+                           if (f) {
+                             setShowUploadModal(true);
+                             handleUploadFileChange(f);
+                           }
+                         }} />
+                       </label>
                      </div>
                    )}
                  </div>
@@ -1024,18 +1196,21 @@ const Attendance: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
                           <button 
+                            aria-label={`View ${record.employeeName} attendance`}
                                     onClick={() => handleViewRecord(record)}
                                     className="text-blue-600 hover:text-blue-900"
                                   >
                                     <Eye className="w-4 h-4" />
                                   </button>
                           <button 
+                            aria-label={`Edit ${record.employeeName} attendance`}
                                     onClick={() => handleEditRecord(record)}
                                     className="text-green-600 hover:text-green-900"
                                   >
                                     <Edit className="w-4 h-4" />
                                   </button>
                           <button 
+                            aria-label={`Delete ${record.employeeName} attendance`}
                                     onClick={() => handleDeleteRecord(record)}
                                     className="text-red-600 hover:text-red-900"
                                   >
@@ -1048,6 +1223,79 @@ const Attendance: React.FC = () => {
                        )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload CSV Modal */}
+      {user?.role === 'admin' && showUploadModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black bg-opacity-30" onClick={() => setShowUploadModal(false)} />
+          <div className="relative bg-white rounded-lg p-6 w-full max-w-lg mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Upload Attendance CSV</h3>
+              <button onClick={() => setShowUploadModal(false)} className="text-gray-400 hover:text-gray-600" aria-label="Close upload modal">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="text-sm text-gray-700">
+                <p className="mb-2">Expected columns:</p>
+                <p className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                  Employee ID, Employee Name, Date, Clock In, Clock Out, Status, Location
+                </p>
+              </div>
+              <div>
+                <label
+                  className="group flex flex-col items-center justify-center p-6 rounded-lg border-2 border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-all duration-200 cursor-pointer"
+                >
+                  <div className="p-3 bg-indigo-100 rounded-full mb-3 group-hover:bg-indigo-200 transition-colors">
+                    <Upload className="w-8 h-8 text-indigo-600" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-900 text-center">Upload Attendance CSV</span>
+                  <span className="text-xs text-gray-500 text-center mt-1">Click to select a .csv file</span>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files && e.target.files[0];
+                      if (f) handleUploadFileChange(f);
+                    }}
+                  />
+                </label>
+              </div>
+              {uploadParsing && (
+                <p className="text-sm text-gray-600">Parsing file...</p>
+              )}
+              {uploadErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded p-3 text-sm max-h-40 overflow-auto">
+                  {uploadErrors.map((er, i) => (
+                    <div key={i}>{er}</div>
+                  ))}
+                </div>
+              )}
+              {uploadRows.length > 0 && (
+                <div className="text-sm text-gray-700">
+                  Preview: {uploadRows.length} rows ready
+                </div>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end space-x-2">
+              <button
+                onClick={() => setShowUploadModal(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmUpload}
+                disabled={uploadParsing || uploadRows.length === 0}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {uploadParsing ? 'Saving...' : 'Import'}
+              </button>
             </div>
           </div>
         </div>
@@ -1163,7 +1411,8 @@ const Attendance: React.FC = () => {
                                   >
                                     {employee.currentStatus === 'clocked-in' ? 'Clock Out' : 'Clock In'}
                                   </button>
-                                  <button 
+                          <button 
+                            aria-label={`View ${employee.name} details`}
                                     onClick={() => handleViewEmployee(employee)}
                                     className="text-blue-600 hover:text-blue-900"
                           >
@@ -1171,6 +1420,7 @@ const Attendance: React.FC = () => {
                           </button>
                           
                           <button 
+                            aria-label={`Delete ${employee.name}`}
                                     onClick={() => handleDeleteEmployee(employee)}
                                     className="text-red-600 hover:text-red-900"
                                   >
@@ -1804,7 +2054,8 @@ const Attendance: React.FC = () => {
                    </div>
                    <h3 className="text-base font-semibold text-gray-900">Attendance Record Details</h3>
                  </div>
-                 <button
+                <button
+                  aria-label="Close view record dialog"
                    onClick={() => setShowViewDialog(false)}
                    className="text-gray-400 hover:text-gray-600 transition-colors"
                  >
@@ -2389,10 +2640,10 @@ const Attendance: React.FC = () => {
            <div className="bg-white rounded-lg p-3 sm:p-4 w-full max-w-sm sm:max-w-md mx-2 sm:mx-4 shadow-xl max-h-[85vh] overflow-hidden">
              <div className="flex items-center justify-between mb-3 sm:mb-4">
                <h3 className="text-base sm:text-lg font-medium text-gray-900">Export Attendance Report</h3>
-               <button
+              <button
+                aria-label="Close export modal"
                  onClick={() => setShowExportModal(false)}
                  className="text-gray-400 hover:text-gray-600"
-                 aria-label="Close export modal"
                >
                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
                </button>
@@ -2439,10 +2690,10 @@ const Attendance: React.FC = () => {
            <div className="bg-white rounded-lg p-3 sm:p-4 w-full max-w-sm sm:max-w-md mx-2 sm:mx-4 shadow-xl max-h-[85vh] overflow-hidden">
              <div className="flex items-center justify-between mb-3 sm:mb-4">
                <h3 className="text-base sm:text-lg font-medium text-gray-900">System Alerts</h3>
-               <button
+              <button
+                aria-label="Close alerts modal"
                  onClick={() => setShowAlertsModal(false)}
                  className="text-gray-400 hover:text-gray-600"
-                 aria-label="Close alerts modal"
                >
                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
                </button>
