@@ -28,7 +28,7 @@ export const useFirestoreData = (collectionName: string, options: UseFirestoreDa
   const {
     filters = [],
     orderBy = null,
-    limit = null,
+    limit = undefined,
     autoFetch = true,
     onSuccess = null,
     onError = null
@@ -46,11 +46,11 @@ export const useFirestoreData = (collectionName: string, options: UseFirestoreDa
       setMessage('');
 
       console.log(`Fetching ${collectionName} from Firebase...`);
-      const result = await firebaseService.getCollection(collectionName, {
-        where: filters,
-        orderBy: orderBy,
-        limit: limit
-      });
+      const queryOptions: any = { where: filters, orderBy: orderBy };
+      if (typeof limit === 'number') {
+        queryOptions.limit = limit;
+      }
+      const result = await firebaseService.getCollection(collectionName, queryOptions);
 
       if (result.success) {
         setData(result.data || []);
@@ -60,7 +60,7 @@ export const useFirestoreData = (collectionName: string, options: UseFirestoreDa
           onSuccess(result.data);
         }
         
-        console.log(`✅ ${collectionName} loaded:`, result.data.length, 'items');
+        console.log(`✅ ${collectionName} loaded:`, (result.data || []).length, 'items');
       } else {
         setError(result.error || 'Failed to fetch data');
         setData([]);

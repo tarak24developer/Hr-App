@@ -1376,6 +1376,8 @@ const Training: React.FC = () => {
                     setViewingCourse(null);
                   }}
                     className="text-gray-400 hover:text-gray-600 transition-colors"
+                    aria-label="Close modal"
+                    title="Close modal"
                 >
                     <X className="w-4 h-4" />
                 </button>

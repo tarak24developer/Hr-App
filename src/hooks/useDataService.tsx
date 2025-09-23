@@ -49,7 +49,7 @@ export const useDataService = (endpoint: string, options: UseDataServiceOptions 
     return cleaned;
   }, [filters]);
 
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
@@ -67,7 +67,7 @@ export const useDataService = (endpoint: string, options: UseDataServiceOptions 
       });
 
       if (result.success) {
-        setData(result.data);
+        setData((result as any).data || []);
         setSource(result.source);
         setMessage(result.message || '');
         

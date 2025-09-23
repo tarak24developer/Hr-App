@@ -83,11 +83,14 @@ class DataService {
       });
       
       // Use the standard getCollection method
-      const result = await firebaseService.getCollection(collectionName, {
+      const queryOptions: any = {
         where: firestoreFilters,
-        orderBy: options.orderBy,
-        limit: options.limit
-      });
+        orderBy: options.orderBy
+      };
+      if (typeof options.limit === 'number') {
+        queryOptions.limit = options.limit;
+      }
+      const result = await firebaseService.getCollection(collectionName, queryOptions);
 
       return { 
         success: result.success, 

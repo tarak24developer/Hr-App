@@ -497,9 +497,6 @@ const Reports: React.FC = () => {
                           'bg-red-500'
                         }`}
                         role="progressbar"
-                        aria-valuenow={0}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
                         aria-label={`${metric.category} progress: ${roundedValue}%`}
                         data-width={progressWidth}
                       ></div>

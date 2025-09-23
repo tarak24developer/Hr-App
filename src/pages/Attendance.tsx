@@ -27,6 +27,8 @@ import firebaseService from '../services/firebaseService';
 import type { User } from '../types';
 import { useUser } from '@/stores/authStore';
 import DashboardCard from '../components/DashboardCard';
+import { parseEsslCsv, summarizeByDepartment, toMonthlyExportRows } from '@/utils/esslMonthlyParser';
+import { exportData } from '@/utils/exportUtils';
 
 interface AttendanceRecord {
   id: string;
@@ -75,6 +77,12 @@ const Attendance: React.FC = () => {
   const [showClockDialog, setShowClockDialog] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  // Monthly ESSL import state
+  const [showMonthlyImport, setShowMonthlyImport] = useState(false);
+  const [monthlyMonthKey, setMonthlyMonthKey] = useState<string>(''); // YYYY-MM
+  const [monthlyRows, setMonthlyRows] = useState<any[]>([]);
+  const [monthlyErrors, setMonthlyErrors] = useState<string[]>([]);
+  const [monthlyBusy, setMonthlyBusy] = useState(false);
   const [showAlertsModal, setShowAlertsModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [clockAction, setClockAction] = useState<'in' | 'out'>('in');
@@ -1301,6 +1309,91 @@ const Attendance: React.FC = () => {
         </div>
       )}
 
+      {/* Monthly ESSL Import Modal */}
+      {user?.role === 'admin' && showMonthlyImport && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black bg-opacity-30" onClick={() => setShowMonthlyImport(false)} />
+          <div className="relative bg-white rounded-lg p-6 w-full max-w-xl mx-4 shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Import ESSL Monthly CSV</h3>
+              <button onClick={() => setShowMonthlyImport(false)} className="text-gray-400 hover:text-gray-600" aria-label="Close monthly import modal">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label htmlFor="monthly-month" className="block text-sm text-gray-700 mb-1">Month</label>
+                  <input id="monthly-month" type="text" inputMode="numeric" pattern="\\d{4}-\\d{2}" title="Enter month as YYYY-MM" placeholder="YYYY-MM" value={monthlyMonthKey} onChange={(e) => setMonthlyMonthKey(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label htmlFor="monthly-file" className="block text-sm text-gray-700 mb-1">CSV File</label>
+                  <input id="monthly-file" type="file" title="Choose ESSL CSV" placeholder="ESSL Monthly CSV" accept=".csv" onChange={async (e) => {
+                    const f = e.target.files && e.target.files[0];
+                    if (!f) return;
+                    if (!monthlyMonthKey) { setMonthlyErrors(["Please select Month first (YYYY-MM)"]); return; }
+                    setMonthlyBusy(true);
+                    const result = await parseEsslCsv(f, monthlyMonthKey);
+                    setMonthlyErrors(result.errors);
+                    setMonthlyRows(result.rows);
+                    setMonthlyBusy(false);
+                  }} className="w-full" />
+                </div>
+              </div>
+              {monthlyBusy && <p className="text-sm text-gray-600">Parsing file...</p>}
+              {!!monthlyErrors.length && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded p-3 text-sm max-h-40 overflow-auto">
+                  {monthlyErrors.map((er, i) => (<div key={i}>{er}</div>))}
+                </div>
+              )}
+              {!!monthlyRows.length && (
+                <div className="text-sm text-gray-700">
+                  Parsed rows: {monthlyRows.length}
+                  <div className="mt-2 p-2 bg-gray-50 rounded border text-xs max-h-40 overflow-auto">
+                    <pre className="whitespace-pre-wrap break-all">{JSON.stringify(summarizeByDepartment(monthlyRows), null, 2)}</pre>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mt-6 flex justify-between">
+              <button onClick={() => { setMonthlyRows([]); setMonthlyErrors([]); setMonthlyMonthKey(''); }} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">Reset</button>
+              <div className="space-x-2">
+                <button onClick={async () => {
+                  if (!monthlyRows.length) return;
+                  await exportData(toMonthlyExportRows(monthlyRows), 'attendanceMonthly', { filename: `attendance_monthly_${monthlyMonthKey}`});
+                }} disabled={!monthlyRows.length} className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50">Export</button>
+                <button onClick={async () => {
+                  if (!monthlyRows.length) return;
+                  setMonthlyBusy(true);
+                  // Upsert per employee per month doc
+                  for (const r of monthlyRows) {
+                    const docId = `${r.monthKey}_${r.empCode}`;
+                    await firebaseService.setDocument('attendanceMonthly', docId, r, true);
+                  }
+                  // Save department summary for month
+                  const deptSummary = summarizeByDepartment(monthlyRows);
+                  const totals = Object.values(deptSummary).reduce((acc, s) => ({
+                    employees: acc.employees + s.employees,
+                    presentDays: acc.presentDays + s.presentDays,
+                    absentDays: acc.absentDays + s.absentDays,
+                    totalLeave: acc.totalLeave + s.totalLeave,
+                    totalPayDays: acc.totalPayDays + s.totalPayDays,
+                    otHours: acc.otHours + s.otHours
+                  }), { employees: 0, presentDays: 0, absentDays: 0, totalLeave: 0, totalPayDays: 0, otHours: 0 });
+                  await firebaseService.setDocument('attendanceMonthlySummary', monthlyMonthKey, {
+                    monthKey: monthlyMonthKey,
+                    departments: deptSummary,
+                    totals
+                  }, true);
+                  setMonthlyBusy(false);
+                  setShowMonthlyImport(false);
+                }} disabled={!monthlyRows.length || monthlyBusy} className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50">Save to Database</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Employees Tab */}
       {activeTab === 'employees' && (
              <div className="space-y-6">
@@ -1476,9 +1569,17 @@ const Attendance: React.FC = () => {
                        <h4 className="font-medium text-gray-900">Monthly Report</h4>
                      </div>
                      <p className="text-sm text-gray-600 mb-3">Generate attendance report for this month</p>
-                     <button className="w-full px-3 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 transition-colors">
-                       Generate
-                     </button>
+                    <div className="flex gap-2">
+                      <button className="flex-1 px-3 py-2 bg-purple-600 text-white text-sm rounded-md hover:bg-purple-700 transition-colors" onClick={() => setShowMonthlyImport(true)}>
+                        Import ESSL CSV
+                      </button>
+                      <button className="flex-1 px-3 py-2 bg-primary-600 text-white text-sm rounded-md hover:bg-primary-700 transition-colors" onClick={async () => {
+                        if (!monthlyRows.length) return;
+                        await exportData(toMonthlyExportRows(monthlyRows), 'attendanceMonthly', { filename: `attendance_monthly_${monthlyMonthKey || new Date().toISOString().slice(0,7)}`});
+                      }}>
+                        Export Processed
+                      </button>
+                    </div>
                    </div>
                  </div>
                </div>

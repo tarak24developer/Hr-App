@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 
 export type ExportFormat = 'xlsx' | 'csv' | 'json';
-export type ExportDataType = 'employees' | 'attendance' | 'payroll' | 'leaves' | 'assets' | 'training' | 'incidents' | 'expenses' | 'holidays' | 'announcements' | 'documents' | 'departments' | 'designations';
+export type ExportDataType = 'employees' | 'attendance' | 'attendanceMonthly' | 'payroll' | 'leaves' | 'assets' | 'training' | 'incidents' | 'expenses' | 'holidays' | 'announcements' | 'documents' | 'departments' | 'designations';
 
 interface ExportData {
   [key: string]: any;
@@ -17,6 +17,7 @@ interface ExportOptions {
 const commonHeaders: Record<ExportDataType, string[]> = {
   employees: ['ID', 'Name', 'Email', 'Department', 'Position', 'Hire Date', 'Status'],
   attendance: ['ID', 'Employee', 'Date', 'Clock In', 'Clock Out', 'Total Hours', 'Status'],
+  attendanceMonthly: ['Emp Code','Employee Name','Department','Present Days','Absent Days','WO','CL','PL','SL','Total Leave','Total Present','Total Pay Days','OT Hours','Late By','Early By','Month'],
   payroll: ['ID', 'Employee', 'Month', 'Year', 'Basic Salary', 'Allowances', 'Deductions', 'Gross Salary', 'Net Salary'],
   leaves: ['ID', 'Employee', 'Type', 'Start Date', 'End Date', 'Days', 'Reason', 'Status'],
   assets: ['ID', 'Name', 'Type', 'Serial Number', 'Assigned To', 'Purchase Date', 'Cost', 'Status'],
