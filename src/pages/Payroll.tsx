@@ -1,3 +1,4 @@
+import { useDepartmentsList } from '@/hooks/useDepartments';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -141,6 +142,7 @@ interface PayrollSettings {
 const Payroll: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const departments = useDepartmentsList();
   const [activeTab, setActiveTab] = useState<'salary' | 'pf' | 'esi' | 'settings'>('salary');
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>([]);
   const [pfContributions] = useState<PFContribution[]>([]);
@@ -1326,7 +1328,7 @@ ${'='.repeat(80)}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
               >
                   <option value="all">All Departments</option>
-                  {[...new Set(employees.map(emp => emp.department))].map(dept => (
+                  {departments.map(dept => (
                   <option key={dept} value={dept}>{dept}</option>
                 ))}
               </select>
@@ -1766,7 +1768,7 @@ ${'='.repeat(80)}
                     }
                   }}
                   disabled={savingSettings}
-                  className="px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed border border-blue-700"
                 >
                   <Settings className="w-4 h-4" />
                   <span>Reset to Default</span>

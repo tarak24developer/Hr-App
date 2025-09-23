@@ -335,32 +335,7 @@ const Notifications: React.FC = () => {
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    const colors = {
-      low: '#4caf50',
-      medium: '#ff9800',
-      high: '#f44336',
-      urgent: '#9c27b0'
-    };
-    return colors[priority as keyof typeof colors] || '#9e9e9e';
-  };
-
-  const getTypeColor = (type: string) => {
-    const colors = {
-      info: '#2196f3',
-      success: '#4caf50',
-      warning: '#ff9800',
-      error: '#f44336',
-      system: '#9c27b0',
-      user: '#607d8b',
-      work: '#795548',
-      event: '#e91e63',
-      assignment: '#3f51b5',
-      payment: '#009688',
-      security: '#ff5722'
-    };
-    return colors[type as keyof typeof colors] || '#9e9e9e';
-  };
+  // removed unused color helpers
 
   const getUserName = (userId: string) => {
     const user = users.find(u => u.id === userId);
@@ -397,14 +372,14 @@ const Notifications: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
           <button
             onClick={handleArchiveAll}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 border border-blue-700"
           >
             <Archive className="w-4 h-4" />
             <span>Archive All</span>
           </button>
           <button
             onClick={handleRefresh}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 border border-blue-700"
           >
             <RefreshCw className="w-4 h-4" />
             <span>Refresh</span>
@@ -426,7 +401,7 @@ const Notifications: React.FC = () => {
             <AlertCircle className="w-5 h-5 text-red-600 mr-3" />
             <p className="text-red-800">{error}</p>
           </div>
-          <button onClick={() => setError('')} className="text-red-600 hover:text-red-800">
+          <button onClick={() => setError('')} className="text-red-600 hover:text-red-800" title="Dismiss error" aria-label="Dismiss error">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -483,6 +458,8 @@ const Notifications: React.FC = () => {
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Filter by type"
+              aria-label="Filter by type"
             >
               <option value="">All Types</option>
               <option value="info">Info</option>
@@ -502,6 +479,8 @@ const Notifications: React.FC = () => {
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Filter by priority"
+              aria-label="Filter by priority"
             >
               <option value="">All Priorities</option>
               <option value="low">Low</option>
@@ -514,6 +493,8 @@ const Notifications: React.FC = () => {
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Filter by category"
+              aria-label="Filter by category"
             >
               <option value="">All Categories</option>
               {categories.map(category => (
@@ -527,6 +508,8 @@ const Notifications: React.FC = () => {
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              title="Filter by status"
+              aria-label="Filter by status"
             >
               <option value="all">All Status</option>
               <option value="unread">Unread</option>
@@ -574,8 +557,14 @@ const Notifications: React.FC = () => {
                     <div className="flex items-center space-x-2">
                       {getNotificationIcon(notification.type)}
                       <span 
-                        className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white"
-                        style={{ backgroundColor: getTypeColor(notification.type) }}
+                        className={cn(
+                          "inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white",
+                          notification.type === 'info' ? 'bg-blue-500' :
+                          notification.type === 'success' ? 'bg-green-500' :
+                          notification.type === 'warning' ? 'bg-yellow-500' :
+                          notification.type === 'error' ? 'bg-red-600' :
+                          'bg-gray-500'
+                        )}
                       >
                         {notification.type}
                       </span>
@@ -599,8 +588,13 @@ const Notifications: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span 
-                      className="inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white"
-                      style={{ backgroundColor: getPriorityColor(notification.priority) }}
+                      className={cn(
+                        "inline-flex px-2 py-1 text-xs font-semibold rounded-full text-white",
+                        notification.priority === 'low' ? 'bg-green-500' :
+                        notification.priority === 'medium' ? 'bg-yellow-500' :
+                        notification.priority === 'high' ? 'bg-orange-500' :
+                        'bg-red-600'
+                      )}
                     >
                       {notification.priority}
                     </span>
@@ -760,6 +754,8 @@ const Notifications: React.FC = () => {
               <button
                 onClick={() => setIsDialogOpen(false)}
                 className="text-gray-400 hover:text-gray-600"
+                title="Close"
+                aria-label="Close"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -779,6 +775,8 @@ const Notifications: React.FC = () => {
                     <button
                       onClick={() => setIsDialogOpen(false)}
                       className="text-gray-400 hover:text-gray-600 transition-colors"
+                      title="Close"
+                      aria-label="Close"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -959,6 +957,8 @@ const Notifications: React.FC = () => {
                   onChange={(e) => handleFormChange('title', e.target.value)}
                   required
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter notification title"
+                      title="Notification title"
                     />
                   </div>
                   
@@ -970,6 +970,8 @@ const Notifications: React.FC = () => {
                   rows={3}
                   required
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Write the notification message"
+                      title="Notification message"
                     />
                   </div>
                   
@@ -981,6 +983,8 @@ const Notifications: React.FC = () => {
                     onChange={(e) => handleFormChange('type', e.target.value)}
                         required
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        title="Select notification type"
+                        aria-label="Select notification type"
                       >
                         <option value="info">Info</option>
                         <option value="success">Success</option>
@@ -1003,6 +1007,8 @@ const Notifications: React.FC = () => {
                     onChange={(e) => handleFormChange('priority', e.target.value)}
                         required
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        title="Select priority"
+                        aria-label="Select priority"
                       >
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
@@ -1020,6 +1026,8 @@ const Notifications: React.FC = () => {
                     onChange={(e) => handleFormChange('category', e.target.value)}
                         required
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        title="Select category"
+                        aria-label="Select category"
                   >
                         <option value="">Select Category</option>
                     {categories.map((category) => (
@@ -1037,6 +1045,8 @@ const Notifications: React.FC = () => {
                     onChange={(e) => handleFormChange('recipientId', e.target.value)}
                         required
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        title="Select recipient"
+                        aria-label="Select recipient"
                   >
                         <option value="">Select Recipient</option>
                     {users.map((user) => (
@@ -1055,6 +1065,8 @@ const Notifications: React.FC = () => {
                   value={formData.expiresAt}
                   onChange={(e) => handleFormChange('expiresAt', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="YYYY-MM-DDThh:mm"
+                      title="Expiry date and time"
                     />
                   </div>
                 </div>
@@ -1094,6 +1106,8 @@ const Notifications: React.FC = () => {
               <button
                 onClick={() => setIsDeleteDialogOpen(false)}
                 className="text-gray-400 hover:text-gray-600"
+                title="Close"
+                aria-label="Close"
               >
                 <X className="w-6 h-6" />
               </button>

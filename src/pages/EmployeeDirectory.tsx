@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useDepartmentsList } from '@/hooks/useDepartments';
 import {
   Search,
   Filter,
@@ -73,12 +74,7 @@ interface Employee {
   resigned?: boolean;
 }
 
-interface Department {
-  id: string;
-  name: string;
-  description: string;
-  headOfDepartment: string;
-}
+// removed unused Department interface; departments come from useDepartmentsList()
 
 interface EmployeeFilters {
   search: string;
@@ -100,7 +96,7 @@ const EmployeeDirectory: React.FC = () => {
   // Removed: user (unused)
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const departmentsList = useDepartmentsList();
   const [filters, setFilters] = useState<EmployeeFilters>(initialFilters);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -235,18 +231,7 @@ const EmployeeDirectory: React.FC = () => {
           setError('');
           
           // Extract departments from users
-          const departments = [...new Set(users
-            .map((user: any) => user.department)
-            .filter((dept: string) => dept && dept !== 'Unassigned')
-          )];
-          
-          const transformedDepartments = departments.map((dept: string, index: number) => ({
-            id: index.toString(),
-            name: dept,
-            description: `${dept} Department`,
-            headOfDepartment: ''
-          }));
-          setDepartments(transformedDepartments);
+          // Departments list now comes from the global Departments manager via hook
         }, (error) => {
           console.error('Error in realtime listener:', error);
           setError('Failed to load data in realtime');
@@ -638,7 +623,7 @@ const EmployeeDirectory: React.FC = () => {
           </button>
           <button
             onClick={handleCreateEmployee}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 border border-blue-700 opacity-100"
           >
             <Plus className="w-4 h-4" />
             <span>Add Employee</span>
@@ -660,9 +645,9 @@ const EmployeeDirectory: React.FC = () => {
           icon={CheckCircle}
           color="green"
         />
-        <DashboardCard
+          <DashboardCard
           name="Departments"
-          value={departments.length}
+          value={departmentsList.length}
           icon={Building}
           color="purple"
         />
@@ -711,11 +696,13 @@ const EmployeeDirectory: React.FC = () => {
               value={filters.department}
               onChange={(e) => handleFilterChange('department', e.target.value)}
               className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-xs"
+              aria-label="Filter by department"
+              title="Filter by department"
             >
               <option value="">All Departments</option>
-              {departments.map(dept => (
-                <option key={dept.id} value={dept.name}>
-                  {dept.name} ({getDepartmentCount(dept.name)})
+              {departmentsList.map(dept => (
+                <option key={dept} value={dept}>
+                  {dept} ({getDepartmentCount(dept)})
                 </option>
               ))}
             </select>
@@ -728,6 +715,8 @@ const EmployeeDirectory: React.FC = () => {
               value={filters.status}
               onChange={(e) => handleFilterChange('status', e.target.value)}
               className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-xs"
+              aria-label="Filter by status"
+              title="Filter by status"
             >
               <option value="">All Statuses</option>
               <option value="active">Active</option>
@@ -743,6 +732,8 @@ const EmployeeDirectory: React.FC = () => {
               value={filters.position}
               onChange={(e) => handleFilterChange('position', e.target.value)}
               className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-xs"
+              aria-label="Filter by position"
+              title="Filter by position"
             >
               <option value="">All Positions</option>
               {getUniquePositions().map(position => (
@@ -786,7 +777,7 @@ const EmployeeDirectory: React.FC = () => {
             {employees.length === 0 && (
               <button
                 onClick={handleCreateEmployee}
-                className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center space-x-2 mx-auto"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 mx-auto border border-blue-700 opacity-100"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Employee</span>
@@ -846,18 +837,24 @@ const EmployeeDirectory: React.FC = () => {
                               setIsEditDialogOpen(true);
                             }}
                           className="text-green-600 hover:text-green-900"
+                          aria-label="Edit employee"
+                          title="Edit employee"
                     >
                       <Edit className="w-4 h-4" />
                     </button>
                     <button
                             onClick={() => handleViewEmployee(employee)}
                           className="text-blue-600 hover:text-blue-900"
+                          aria-label="View employee"
+                          title="View employee"
                     >
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => { setSelectedEmployee(employee); handleDeleteEmployee(); }}
                           className="text-red-600 hover:text-red-900"
+                          aria-label="Mark employee terminated"
+                          title="Mark employee terminated"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -942,6 +939,8 @@ const EmployeeDirectory: React.FC = () => {
                 <button
                   onClick={() => setIsEditDialogOpen(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Close"
+                  title="Close"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -972,6 +971,8 @@ const EmployeeDirectory: React.FC = () => {
                         type="text"
                         value={selectedEmployee?.employeeId || `EMP${String(employees.length + 1).padStart(3, '0')}`}
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 text-sm"
+                        title="Employee ID"
+                        placeholder="Employee ID"
                         disabled
                       />
                     </div>
@@ -995,10 +996,12 @@ const EmployeeDirectory: React.FC = () => {
                         value={editFormData.department || ''}
                         onChange={(e) => setEditFormData({ ...editFormData, department: String(e.target.value) })}
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                        aria-label="Select department"
+                        title="Select department"
                       >
                         <option value="">Select Department</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.name}>{d.name}</option>
+                        {departmentsList.map((name) => (
+                          <option key={name} value={name}>{name}</option>
                         ))}
                       </select>
                     </div>
@@ -1011,6 +1014,8 @@ const EmployeeDirectory: React.FC = () => {
                         value={editFormData.status || 'active'}
                         onChange={(e) => setEditFormData({ ...editFormData, status: String(e.target.value) as Employee['status'] })}
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                        aria-label="Select employee status"
+                        title="Select employee status"
                       >
                         <option value="active">Active</option>
                         <option value="inactive">Inactive</option>
@@ -1025,6 +1030,8 @@ const EmployeeDirectory: React.FC = () => {
                         value={editFormData.employmentType || 'Permanent'}
                         onChange={(e) => setEditFormData({ ...editFormData, employmentType: String(e.target.value) })}
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                        aria-label="Select employment type"
+                        title="Select employment type"
                       >
                         <option value="Permanent">Permanent</option>
                         <option value="Contract">Contract</option>
@@ -1046,6 +1053,8 @@ const EmployeeDirectory: React.FC = () => {
                       <input
                         type="date"
                         value={(editFormData.joiningDate ? new Date(editFormData.joiningDate) : new Date()).toISOString().split('T')[0]}
+                        title="Date of Joining"
+                        placeholder="YYYY-MM-DD"
                         onChange={(e) => setEditFormData({ ...editFormData, joiningDate: e.target.value ? new Date(e.target.value) : new Date() })}
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
                       />
@@ -1057,6 +1066,8 @@ const EmployeeDirectory: React.FC = () => {
                       <input
                         type="date"
                         value={(editFormData.dateOfBirth ? new Date(editFormData.dateOfBirth) : new Date(0)).toISOString().split('T')[0]}
+                        title="Date of Birth"
+                        placeholder="YYYY-MM-DD"
                         onChange={(e) => setEditFormData({ ...editFormData, dateOfBirth: e.target.value ? new Date(e.target.value) : new Date(0) })}
                         className="w-full px-2.5 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
                       />
@@ -1160,6 +1171,8 @@ const EmployeeDirectory: React.FC = () => {
                 <button
                   onClick={handleCloseDialog}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Close"
+                  title="Close"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1355,6 +1368,8 @@ const EmployeeDirectory: React.FC = () => {
               <button
                 onClick={() => setSnackbar(prev => ({ ...prev, open: false }))}
                 className="ml-2 text-gray-400 hover:text-gray-600"
+                aria-label="Close notification"
+                title="Close notification"
               >
                 <X className="w-4 h-4" />
               </button>

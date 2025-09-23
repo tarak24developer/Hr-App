@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useDepartmentsList } from '@/hooks/useDepartments';
 import { Plus, Search, Eye, Edit, Trash2, AlertCircle, Users, X, User, Badge, Briefcase, Building, Mail, Phone, MapPin } from 'lucide-react';
 import firebaseService from '../services/firebaseService';
 import { formatIndianCurrency } from '../utils/currency';
@@ -113,11 +114,8 @@ const Employees: React.FC = () => {
     load();
   }, []);
 
-  const departmentOptions = useMemo(() => {
-    const set = new Set<string>();
-    employees.forEach(e => { if ((e.department || '').trim()) set.add(e.department); });
-    return ['all', ...Array.from(set).sort((a, b) => a.localeCompare(b))];
-  }, [employees]);
+  const departments = useDepartmentsList();
+  const departmentOptions = useMemo(() => ['all', ...departments], [departments]);
 
   const filteredEmployees = useMemo(() => {
     return employees.filter(e => {
@@ -377,6 +375,8 @@ const Employees: React.FC = () => {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+              title="Filter by status"
+              aria-label="Filter by status"
             >
               <option value="all">All</option>
               <option value="active">Active</option>
@@ -388,6 +388,8 @@ const Employees: React.FC = () => {
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
               className="px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 min-w-[160px] text-sm"
+              title="Filter by department"
+              aria-label="Filter by department"
             >
               {departmentOptions.map(d => (
                 <option key={d} value={d}>{d === 'all' ? 'All Departments' : d}</option>
@@ -474,18 +476,24 @@ const Employees: React.FC = () => {
                         <button
                           onClick={() => openView(employee)}
                           className="text-blue-600 hover:text-blue-900"
+                          title="View employee"
+                          aria-label="View employee"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => openEdit(employee)}
                           className="text-green-600 hover:text-green-900"
+                          title="Edit employee"
+                          aria-label="Edit employee"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => openDelete(employee)}
                           className="text-red-600 hover:text-red-900"
+                          title="Delete employee"
+                          aria-label="Delete employee"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -515,6 +523,8 @@ const Employees: React.FC = () => {
                 <button
                   onClick={() => setViewModalOpen(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Close"
+                  aria-label="Close"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -788,65 +798,73 @@ const Employees: React.FC = () => {
           <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-4xl max-h-[90vh] overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2"><Edit className="w-4 h-4" /> Edit Employee</h3>
-              <button onClick={() => setEditModalOpen(false)} className="text-gray-600 hover:text-gray-900">✕</button>
+              <button onClick={() => setEditModalOpen(false)} className="text-gray-600 hover:text-gray-900" title="Close" aria-label="Close">✕</button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)] space-y-4">
               {/* Personal Information */}
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">Personal Information</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div><label className="block text-sm text-gray-600 mb-1">S.No</label><input disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50" value={(selectedEmployee.employeeId || '').replace(/\D/g,'')} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Employee ID</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.employeeId || ''} onChange={(e) => setEditEmployee({ ...editEmployee, employeeId: e.target.value })} /></div>
-                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">Employee Name (As per Aadhaar)</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.name || ''} onChange={(e) => setEditEmployee({ ...editEmployee, name: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Gender</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.gender || ''} onChange={(e) => setEditEmployee({ ...editEmployee, gender: e.target.value })}><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">DOB</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.dateOfBirth || ''} onChange={(e) => setEditEmployee({ ...editEmployee, dateOfBirth: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Contact Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.phone || ''} onChange={(e) => setEditEmployee({ ...editEmployee, phone: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Residence</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.residence || ''} onChange={(e) => setEditEmployee({ ...editEmployee, residence: e.target.value })} /></div>
-                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">S/W/D/O</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.spouseName || ''} onChange={(e) => setEditEmployee({ ...editEmployee, spouseName: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Blood Group</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.bloodGroup || ''} onChange={(e) => setEditEmployee({ ...editEmployee, bloodGroup: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Educational Qualification</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.educationalQualification || ''} onChange={(e) => setEditEmployee({ ...editEmployee, educationalQualification: e.target.value })} /></div>
-                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">Remarks</label><textarea rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.remarks || ''} onChange={(e) => setEditEmployee({ ...editEmployee, remarks: e.target.value })} /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">S.No</label><input disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50" value={(selectedEmployee.employeeId || '').replace(/\D/g,'')} title="Serial number" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Employee ID</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.employeeId || ''} onChange={(e) => setEditEmployee({ ...editEmployee, employeeId: e.target.value })} placeholder="EMP001" title="Employee ID" /></div>
+                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">Employee Name (As per Aadhaar)</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.name || ''} onChange={(e) => setEditEmployee({ ...editEmployee, name: e.target.value })} placeholder="Enter full name" title="Employee name" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Gender</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.gender || ''} onChange={(e) => setEditEmployee({ ...editEmployee, gender: e.target.value })} title="Select gender" aria-label="Select gender"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">DOB</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.dateOfBirth || ''} onChange={(e) => setEditEmployee({ ...editEmployee, dateOfBirth: e.target.value })} title="Date of birth" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Contact Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.phone || ''} onChange={(e) => setEditEmployee({ ...editEmployee, phone: e.target.value })} placeholder="Enter contact number" title="Contact number" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Residence</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.residence || ''} onChange={(e) => setEditEmployee({ ...editEmployee, residence: e.target.value })} placeholder="Enter residence" title="Residence" /></div>
+                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">S/W/D/O</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.spouseName || ''} onChange={(e) => setEditEmployee({ ...editEmployee, spouseName: e.target.value })} placeholder="Enter relative's name" title="S/W/D/O" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Blood Group</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.bloodGroup || ''} onChange={(e) => setEditEmployee({ ...editEmployee, bloodGroup: e.target.value })} placeholder="Enter blood group" title="Blood group" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Educational Qualification</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.educationalQualification || ''} onChange={(e) => setEditEmployee({ ...editEmployee, educationalQualification: e.target.value })} placeholder="Enter qualification" title="Educational qualification" /></div>
+                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">Remarks</label><textarea rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.remarks || ''} onChange={(e) => setEditEmployee({ ...editEmployee, remarks: e.target.value })} placeholder="Enter remarks" title="Remarks" /></div>
                 </div>
               </div>
               {/* Employment Details */}
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">Employment Details</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div><label className="block text-sm text-gray-600 mb-1">Designation</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.position || ''} onChange={(e) => setEditEmployee({ ...editEmployee, position: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Department</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.department || ''} onChange={(e) => setEditEmployee({ ...editEmployee, department: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">DOJ</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.joiningDate || ''} onChange={(e) => setEditEmployee({ ...editEmployee, joiningDate: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Salary (₹)</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={Number(editEmployee.salary || 0)} onChange={(e) => setEditEmployee({ ...editEmployee, salary: Number(e.target.value) })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">On Roll / Off Roll</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.rollStatus || ''} onChange={(e) => setEditEmployee({ ...editEmployee, rollStatus: e.target.value as any })}><option value="">Select</option><option value="on">On Roll</option><option value="off">Off Roll</option></select></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Resigned</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={String(editEmployee.resigned || false)} onChange={(e) => setEditEmployee({ ...editEmployee, resigned: e.target.value === 'true' })}><option value="false">No</option><option value="true">Yes</option></select></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Retirement Age</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.retirementAge ?? ''} onChange={(e) => setEditEmployee({ ...editEmployee, retirementAge: Number(e.target.value) })} /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Designation</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.position || ''} onChange={(e) => setEditEmployee({ ...editEmployee, position: e.target.value })} placeholder="Enter designation" title="Designation" /></div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Department</label>
+                    <select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.department || ''} onChange={(e) => setEditEmployee({ ...editEmployee, department: e.target.value })} aria-label="Select department" title="Select department">
+                      <option value="">Select</option>
+                      {departments.map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div><label className="block text-sm text-gray-600 mb-1">DOJ</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.joiningDate || ''} onChange={(e) => setEditEmployee({ ...editEmployee, joiningDate: e.target.value })} title="Date of joining" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Salary (₹)</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={Number(editEmployee.salary || 0)} onChange={(e) => setEditEmployee({ ...editEmployee, salary: Number(e.target.value) })} placeholder="Enter salary" title="Salary" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">On Roll / Off Roll</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.rollStatus || ''} onChange={(e) => setEditEmployee({ ...editEmployee, rollStatus: e.target.value as any })} title="Select roll status" aria-label="Select roll status"><option value="">Select</option><option value="on">On Roll</option><option value="off">Off Roll</option></select></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Resigned</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={String(editEmployee.resigned || false)} onChange={(e) => setEditEmployee({ ...editEmployee, resigned: e.target.value === 'true' })} title="Select resigned status" aria-label="Select resigned status"><option value="false">No</option><option value="true">Yes</option></select></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Retirement Age</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.retirementAge ?? ''} onChange={(e) => setEditEmployee({ ...editEmployee, retirementAge: Number(e.target.value) })} placeholder="Enter retirement age" title="Retirement age" /></div>
                 </div>
               </div>
               {/* PF / ESI Details */}
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">PF / ESI Details</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div><label className="block text-sm text-gray-600 mb-1">PF Status</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.pfStatus || ''} onChange={(e) => setEditEmployee({ ...editEmployee, pfStatus: e.target.value as any })}><option value="">Select</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">PF Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.pfNumber || ''} onChange={(e) => setEditEmployee({ ...editEmployee, pfNumber: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">PF / UAN No</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.uanNumber || ''} onChange={(e) => setEditEmployee({ ...editEmployee, uanNumber: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">ESI Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.esiNumber || ''} onChange={(e) => setEditEmployee({ ...editEmployee, esiNumber: e.target.value })} /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">PF Status</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.pfStatus || ''} onChange={(e) => setEditEmployee({ ...editEmployee, pfStatus: e.target.value as any })} title="Select PF status" aria-label="Select PF status"><option value="">Select</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">PF Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.pfNumber || ''} onChange={(e) => setEditEmployee({ ...editEmployee, pfNumber: e.target.value })} placeholder="Enter PF number" title="PF number" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">PF / UAN No</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.uanNumber || ''} onChange={(e) => setEditEmployee({ ...editEmployee, uanNumber: e.target.value })} placeholder="Enter UAN number" title="UAN number" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">ESI Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.esiNumber || ''} onChange={(e) => setEditEmployee({ ...editEmployee, esiNumber: e.target.value })} placeholder="Enter ESI number" title="ESI number" /></div>
                 </div>
               </div>
               {/* Bank Details */}
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">Bank Details</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div><label className="block text-sm text-gray-600 mb-1">Bank Name</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.bankName || ''} onChange={(e) => setEditEmployee({ ...editEmployee, bankName: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Branch</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.branch || ''} onChange={(e) => setEditEmployee({ ...editEmployee, branch: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">IFSC Code</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.ifsc || ''} onChange={(e) => setEditEmployee({ ...editEmployee, ifsc: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Bank Account Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.bankAccount || ''} onChange={(e) => setEditEmployee({ ...editEmployee, bankAccount: e.target.value })} /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Bank Name</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.bankName || ''} onChange={(e) => setEditEmployee({ ...editEmployee, bankName: e.target.value })} placeholder="Enter bank name" title="Bank name" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Branch</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.branch || ''} onChange={(e) => setEditEmployee({ ...editEmployee, branch: e.target.value })} placeholder="Enter branch" title="Branch" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">IFSC Code</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.ifsc || ''} onChange={(e) => setEditEmployee({ ...editEmployee, ifsc: e.target.value })} placeholder="Enter IFSC" title="IFSC code" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Bank Account Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.bankAccount || ''} onChange={(e) => setEditEmployee({ ...editEmployee, bankAccount: e.target.value })} placeholder="Enter account number" title="Bank account number" /></div>
                 </div>
               </div>
               {/* Government IDs */}
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">Government IDs</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div><label className="block text-sm text-gray-600 mb-1">PAN Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.panNumber || ''} onChange={(e) => setEditEmployee({ ...editEmployee, panNumber: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Aadhaar Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.aadhaarNumber || ''} onChange={(e) => setEditEmployee({ ...editEmployee, aadhaarNumber: e.target.value })} /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">PAN Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.panNumber || ''} onChange={(e) => setEditEmployee({ ...editEmployee, panNumber: e.target.value })} placeholder="Enter PAN number" title="PAN number" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Aadhaar Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={editEmployee.aadhaarNumber || ''} onChange={(e) => setEditEmployee({ ...editEmployee, aadhaarNumber: e.target.value })} placeholder="Enter Aadhaar number" title="Aadhaar number" /></div>
                 </div>
               </div>
             </div>
@@ -865,7 +883,7 @@ const Employees: React.FC = () => {
           <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Trash2 className="w-4 h-4" /> Delete Employee</h4>
-              <button onClick={() => setDeleteModalOpen(false)} className="text-gray-600 hover:text-gray-900">✕</button>
+              <button onClick={() => setDeleteModalOpen(false)} className="text-gray-600 hover:text-gray-900" title="Close" aria-label="Close">✕</button>
             </div>
             <p className="text-sm text-gray-600">Are you sure you want to delete <span className="font-medium">{selectedEmployee.name}</span>? This action cannot be undone.</p>
             <div className="flex justify-end gap-3 mt-5">
@@ -883,60 +901,68 @@ const Employees: React.FC = () => {
           <div className="relative bg-white rounded-lg shadow-lg border border-gray-200 w-full max-w-3xl flex flex-col max-h-[85vh]">
             <div className="flex items-center justify-between px-6 py-3 border-b">
               <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2"><Plus className="w-4 h-4" /> Add New Employee</h3>
-              <button onClick={() => setAddModalOpen(false)} className="text-gray-600 hover:text-gray-900">✕</button>
+              <button onClick={() => setAddModalOpen(false)} className="text-gray-600 hover:text-gray-900" title="Close" aria-label="Close">✕</button>
             </div>
             <div className="overflow-y-auto px-6 py-4 space-y-4 flex-1">
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">Personal Information</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div><label className="block text-sm text-gray-600 mb-1">S.No</label><input disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50" value={(employees.length + 1).toString().padStart(3,'0')} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Employee ID</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.employeeId || ''} onChange={(e) => setNewEmployee({ ...newEmployee, employeeId: e.target.value })} placeholder="EMP001" /></div>
-                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">Employee Name (As per Aadhaar)</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.name || ''} onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Gender</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.gender || ''} onChange={(e) => setNewEmployee({ ...newEmployee, gender: e.target.value })}><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">DOB</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.dateOfBirth || ''} onChange={(e) => setNewEmployee({ ...newEmployee, dateOfBirth: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Contact Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.phone || ''} onChange={(e) => setNewEmployee({ ...newEmployee, phone: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Residence</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.residence || ''} onChange={(e) => setNewEmployee({ ...newEmployee, residence: e.target.value })} /></div>
-                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">S/W/D/O</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.spouseName || ''} onChange={(e) => setNewEmployee({ ...newEmployee, spouseName: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Blood Group</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.bloodGroup || ''} onChange={(e) => setNewEmployee({ ...newEmployee, bloodGroup: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Educational Qualification</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.educationalQualification || ''} onChange={(e) => setNewEmployee({ ...newEmployee, educationalQualification: e.target.value })} /></div>
-                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">Remarks</label><textarea rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.remarks || ''} onChange={(e) => setNewEmployee({ ...newEmployee, remarks: e.target.value })} /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">S.No</label><input disabled className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50" value={(employees.length + 1).toString().padStart(3,'0')} title="Serial number" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Employee ID</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.employeeId || ''} onChange={(e) => setNewEmployee({ ...newEmployee, employeeId: e.target.value })} placeholder="EMP001" title="Employee ID" /></div>
+                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">Employee Name (As per Aadhaar)</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.name || ''} onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })} placeholder="Enter full name" title="Employee name" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Gender</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.gender || ''} onChange={(e) => setNewEmployee({ ...newEmployee, gender: e.target.value })} title="Select gender" aria-label="Select gender"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">DOB</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.dateOfBirth || ''} onChange={(e) => setNewEmployee({ ...newEmployee, dateOfBirth: e.target.value })} title="Date of birth" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Contact Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.phone || ''} onChange={(e) => setNewEmployee({ ...newEmployee, phone: e.target.value })} placeholder="Enter contact number" title="Contact number" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Residence</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.residence || ''} onChange={(e) => setNewEmployee({ ...newEmployee, residence: e.target.value })} placeholder="Enter residence" title="Residence" /></div>
+                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">S/W/D/O</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.spouseName || ''} onChange={(e) => setNewEmployee({ ...newEmployee, spouseName: e.target.value })} placeholder="Enter relative's name" title="S/W/D/O" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Blood Group</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.bloodGroup || ''} onChange={(e) => setNewEmployee({ ...newEmployee, bloodGroup: e.target.value })} placeholder="Enter blood group" title="Blood group" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Educational Qualification</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.educationalQualification || ''} onChange={(e) => setNewEmployee({ ...newEmployee, educationalQualification: e.target.value })} placeholder="Enter qualification" title="Educational qualification" /></div>
+                  <div className="md:col-span-2"><label className="block text-sm text-gray-600 mb-1">Remarks</label><textarea rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.remarks || ''} onChange={(e) => setNewEmployee({ ...newEmployee, remarks: e.target.value })} placeholder="Enter remarks" title="Remarks" /></div>
                 </div>
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">Employment Details</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div><label className="block text-sm text-gray-600 mb-1">Designation</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.position || ''} onChange={(e) => setNewEmployee({ ...newEmployee, position: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Department</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.department || ''} onChange={(e) => setNewEmployee({ ...newEmployee, department: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">DOJ</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.joiningDate || ''} onChange={(e) => setNewEmployee({ ...newEmployee, joiningDate: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Salary (₹)</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={Number(newEmployee.salary || 0)} onChange={(e) => setNewEmployee({ ...newEmployee, salary: Number(e.target.value) })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">On Roll / Off Roll</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.rollStatus || ''} onChange={(e) => setNewEmployee({ ...newEmployee, rollStatus: e.target.value as any })}><option value="">Select</option><option value="on">On Roll</option><option value="off">Off Roll</option></select></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Resigned</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={String(newEmployee.resigned || false)} onChange={(e) => setNewEmployee({ ...newEmployee, resigned: e.target.value === 'true' })}><option value="false">No</option><option value="true">Yes</option></select></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Retirement Age</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.retirementAge ?? ''} onChange={(e) => setNewEmployee({ ...newEmployee, retirementAge: Number(e.target.value) })} /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Designation</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.position || ''} onChange={(e) => setNewEmployee({ ...newEmployee, position: e.target.value })} placeholder="Enter designation" title="Designation" /></div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Department</label>
+                    <select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.department || ''} onChange={(e) => setNewEmployee({ ...newEmployee, department: e.target.value })} aria-label="Select department" title="Select department">
+                      <option value="">Select</option>
+                      {departments.map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div><label className="block text-sm text-gray-600 mb-1">DOJ</label><input type="date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.joiningDate || ''} onChange={(e) => setNewEmployee({ ...newEmployee, joiningDate: e.target.value })} title="Date of joining" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Salary (₹)</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={Number(newEmployee.salary || 0)} onChange={(e) => setNewEmployee({ ...newEmployee, salary: Number(e.target.value) })} placeholder="Enter salary" title="Salary" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">On Roll / Off Roll</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.rollStatus || ''} onChange={(e) => setNewEmployee({ ...newEmployee, rollStatus: e.target.value as any })} title="Select roll status" aria-label="Select roll status"><option value="">Select</option><option value="on">On Roll</option><option value="off">Off Roll</option></select></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Resigned</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={String(newEmployee.resigned || false)} onChange={(e) => setNewEmployee({ ...newEmployee, resigned: e.target.value === 'true' })} title="Select resigned status" aria-label="Select resigned status"><option value="false">No</option><option value="true">Yes</option></select></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Retirement Age</label><input type="number" className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.retirementAge ?? ''} onChange={(e) => setNewEmployee({ ...newEmployee, retirementAge: Number(e.target.value) })} placeholder="Enter retirement age" title="Retirement age" /></div>
                 </div>
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">PF / ESI Details</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div><label className="block text-sm text-gray-600 mb-1">PF Status</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.pfStatus || ''} onChange={(e) => setNewEmployee({ ...newEmployee, pfStatus: e.target.value as any })}><option value="">Select</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">PF Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.pfNumber || ''} onChange={(e) => setNewEmployee({ ...newEmployee, pfNumber: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">PF / UAN No</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.uanNumber || ''} onChange={(e) => setNewEmployee({ ...newEmployee, uanNumber: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">ESI Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.esiNumber || ''} onChange={(e) => setNewEmployee({ ...newEmployee, esiNumber: e.target.value })} /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">PF Status</label><select className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.pfStatus || ''} onChange={(e) => setNewEmployee({ ...newEmployee, pfStatus: e.target.value as any })} title="Select PF status" aria-label="Select PF status"><option value="">Select</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">PF Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.pfNumber || ''} onChange={(e) => setNewEmployee({ ...newEmployee, pfNumber: e.target.value })} placeholder="Enter PF number" title="PF number" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">PF / UAN No</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.uanNumber || ''} onChange={(e) => setNewEmployee({ ...newEmployee, uanNumber: e.target.value })} placeholder="Enter UAN number" title="UAN number" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">ESI Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.esiNumber || ''} onChange={(e) => setNewEmployee({ ...newEmployee, esiNumber: e.target.value })} placeholder="Enter ESI number" title="ESI number" /></div>
                 </div>
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">Bank Details</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div><label className="block text-sm text-gray-600 mb-1">Bank Name</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.bankName || ''} onChange={(e) => setNewEmployee({ ...newEmployee, bankName: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Branch</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.branch || ''} onChange={(e) => setNewEmployee({ ...newEmployee, branch: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">IFSC Code</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.ifsc || ''} onChange={(e) => setNewEmployee({ ...newEmployee, ifsc: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Bank Account Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.bankAccount || ''} onChange={(e) => setNewEmployee({ ...newEmployee, bankAccount: e.target.value })} /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Bank Name</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.bankName || ''} onChange={(e) => setNewEmployee({ ...newEmployee, bankName: e.target.value })} placeholder="Enter bank name" title="Bank name" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Branch</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.branch || ''} onChange={(e) => setNewEmployee({ ...newEmployee, branch: e.target.value })} placeholder="Enter branch" title="Branch" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">IFSC Code</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.ifsc || ''} onChange={(e) => setNewEmployee({ ...newEmployee, ifsc: e.target.value })} placeholder="Enter IFSC" title="IFSC code" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Bank Account Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.bankAccount || ''} onChange={(e) => setNewEmployee({ ...newEmployee, bankAccount: e.target.value })} placeholder="Enter account number" title="Bank account number" /></div>
                 </div>
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-gray-900 mb-2">Government IDs</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div><label className="block text-sm text-gray-600 mb-1">PAN Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.panNumber || ''} onChange={(e) => setNewEmployee({ ...newEmployee, panNumber: e.target.value })} /></div>
-                  <div><label className="block text-sm text-gray-600 mb-1">Aadhaar Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.aadhaarNumber || ''} onChange={(e) => setNewEmployee({ ...newEmployee, aadhaarNumber: e.target.value })} /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">PAN Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.panNumber || ''} onChange={(e) => setNewEmployee({ ...newEmployee, panNumber: e.target.value })} placeholder="Enter PAN number" title="PAN number" /></div>
+                  <div><label className="block text-sm text-gray-600 mb-1">Aadhaar Number</label><input className="w-full px-3 py-2 border border-gray-300 rounded-lg" value={newEmployee.aadhaarNumber || ''} onChange={(e) => setNewEmployee({ ...newEmployee, aadhaarNumber: e.target.value })} placeholder="Enter Aadhaar number" title="Aadhaar number" /></div>
                 </div>
               </div>
             </div>

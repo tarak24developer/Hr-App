@@ -13,8 +13,14 @@ import {
   Settings,
   Sun,
   Moon,
-  Monitor
+  Monitor,
+  Building,
+  Plus,
+  X
 } from 'lucide-react';
+import firebaseService from '@/services/firebaseService';
+import { db } from '@/services/firebase';
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 
 const Header: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -22,6 +28,9 @@ const Header: React.FC = () => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
+  const [departments, setDepartments] = useState<Array<{ id: string; name: string; description?: string }>>([]);
+  const [newDept, setNewDept] = useState<{ name: string; description: string }>({ name: '', description: '' });
   
   const user = useUser();
   const { logout } = useAuthActions();
@@ -72,11 +81,74 @@ const Header: React.FC = () => {
     }
   ];
 
+  // Realtime departments listener
+  React.useEffect(() => {
+    if (!db) return undefined;
+    try {
+      const col = collection(db, 'departments');
+      const q = query(col, orderBy('name', 'asc'));
+      const unsub = onSnapshot(q, (snap) => {
+        const list: Array<{ id: string; name: string; description?: string }> = [];
+        snap.forEach((d) => list.push({ id: d.id, ...(d.data() as any) }));
+        setDepartments(list);
+        // If no explicit departments exist, derive from users as a fallback
+        if (list.length === 0) {
+          (async () => {
+            try {
+              const usersRes = await firebaseService.getCollection<any>('users');
+              if (usersRes.success && usersRes.data) {
+                const uniq = Array.from(new Set(usersRes.data
+                  .map((u: any) => (u && typeof u.department === 'string' ? u.department.trim() : ''))
+                  .filter((n: string) => n && n !== 'Unassigned')
+                ));
+                setDepartments(uniq.map((name, idx) => ({ id: `derived-${idx}`, name })));
+              }
+            } catch {}
+          })();
+        }
+      });
+      return () => unsub();
+    } catch {
+      return undefined;
+    }
+  }, []);
+
+  const addDepartment = async () => {
+    if (!newDept.name.trim()) return;
+    await firebaseService.addDocument('departments', {
+      name: newDept.name.trim(),
+      description: newDept.description?.trim() || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    setNewDept({ name: '', description: '' });
+  };
+
+  // Allow other pages to open the departments modal
+  React.useEffect(() => {
+    const handler = () => setIsDeptModalOpen(true);
+    window.addEventListener('open-departments-modal', handler as any);
+    return () => window.removeEventListener('open-departments-modal', handler as any);
+  }, []);
+
   return (
+    <>
     <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
       <div className="flex items-center justify-between">
         {/* Left side */}
         <div className="flex items-center space-x-2 sm:space-x-4">
+          {/* Quick Departments Manager */}
+          <div>
+            <button
+              onClick={() => setIsDeptModalOpen(true)}
+              className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+              title="Manage Departments"
+              aria-label="Manage Departments"
+            >
+              <Building className="w-4 h-4" />
+              <span>Departments</span>
+            </button>
+          </div>
           {/* Mobile menu button */}
           <button 
             onClick={() => setIsMobileMenuOpen(true)}
@@ -287,6 +359,72 @@ const Header: React.FC = () => {
         onClose={() => setIsMobileMenuOpen(false)} 
       />
     </header>
+    {isDeptModalOpen && (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center p-3">
+        <div className="absolute inset-0 bg-black/30" onClick={() => setIsDeptModalOpen(false)} />
+        <div className="relative bg-white rounded-lg shadow-xl w-full max-w-lg z-[210]">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Building className="w-5 h-5 text-blue-600" />
+              <h3 className="text-base font-semibold text-gray-900">Manage Departments</h3>
+            </div>
+            <button onClick={() => setIsDeptModalOpen(false)} className="text-gray-400 hover:text-gray-600" aria-label="Close" title="Close">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="p-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Department Name</label>
+                <input
+                  type="text"
+                  value={newDept.name}
+                  onChange={(e) => setNewDept({ ...newDept, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="e.g., HR"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+                <input
+                  type="text"
+                  value={newDept.description}
+                  onChange={(e) => setNewDept({ ...newDept, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button onClick={addDepartment} className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm inline-flex items-center" aria-label="Add department" title="Add department">
+                <Plus className="w-4 h-4 mr-1" />
+                Add Department
+              </button>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium text-gray-900 mb-2">Existing Departments</h4>
+              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded">
+                {departments.length === 0 ? (
+                  <div className="p-3 text-sm text-gray-500">No departments yet</div>
+                ) : (
+                  <ul className="divide-y divide-gray-200">
+                    {departments.map((d) => (
+                      <li key={d.id} className="p-3 text-sm flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-gray-900">{d.name}</div>
+                          {d.description ? <div className="text-gray-500">{d.description}</div> : null}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

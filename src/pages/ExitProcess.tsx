@@ -58,7 +58,9 @@ const ExitProcess: React.FC = () => {
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'overview' | 'processes' | 'employees' | 'reports'>('overview');
   const [exitProcesses, setExitProcesses] = useState<ExitProcess[]>([]);
-  // const [employees, setEmployees] = useState<Employee[]>([]);
+  // Minimal employees list for selector
+  const [employeesList, setEmployeesList] = useState<Array<{ id: string; displayName: string; email: string; department: string }>>([]);
+  const [employeeSearch, setEmployeeSearch] = useState('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
@@ -97,7 +99,25 @@ const ExitProcess: React.FC = () => {
   // Load data
   useEffect(() => {
     loadExitProcesses();
-    // loadEmployees();
+    // Load employees for the searchable dropdown
+    (async () => {
+      try {
+        const res = await firebaseService.getCollection<any>('users');
+        if (res.success && res.data) {
+          const list = (res.data as any[]).map((u: any) => ({
+            id: u.employeeId || u.id || '',
+            displayName: `${(u.firstName || '').trim()} ${(u.lastName || '').trim()}`.trim() || u.displayName || u.email || 'Employee',
+            email: u.email || '',
+            department: u.department || 'General'
+          }));
+          setEmployeesList(list);
+        } else {
+          setEmployeesList([]);
+        }
+      } catch {
+        setEmployeesList([]);
+      }
+    })();
   }, []);
 
   const loadExitProcesses = async () => {
@@ -423,7 +443,7 @@ const ExitProcess: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
           <button 
           onClick={handleCreateProcess}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 border border-blue-700 transition-colors flex items-center justify-center space-x-2"
           >
             <Plus className="w-4 h-4" />
             <span>Initiate Exit Process</span>
@@ -577,10 +597,10 @@ const ExitProcess: React.FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center space-x-2">
-                            <button onClick={() => handleViewProcess(process)} className="text-blue-600 hover:text-blue-900">
+                            <button onClick={() => handleViewProcess(process)} className="text-blue-600 hover:text-blue-900" title="View process" aria-label="View process">
                               <Eye className="w-4 h-4" />
                             </button>
-                            <button onClick={() => handleEditProcess(process)} className="text-green-600 hover:text-green-900">
+                            <button onClick={() => handleEditProcess(process)} className="text-green-600 hover:text-green-900" title="Edit process" aria-label="Edit process">
                               <Edit className="w-4 h-4" />
                             </button>
                             {process.status === 'pending' && (
@@ -626,6 +646,8 @@ const ExitProcess: React.FC = () => {
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                  title="Filter by status"
+                  aria-label="Filter by status"
                 >
                   <option value="all">All Status</option>
                   <option value="pending">Pending</option>
@@ -637,6 +659,8 @@ const ExitProcess: React.FC = () => {
                   value={priorityFilter}
                   onChange={(e) => setPriorityFilter(e.target.value)}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                  title="Filter by priority"
+                  aria-label="Filter by priority"
                 >
                   <option value="all">All Priority</option>
                   <option value="urgent">Urgent</option>
@@ -648,6 +672,8 @@ const ExitProcess: React.FC = () => {
                   value={departmentFilter}
                   onChange={(e) => setDepartmentFilter(e.target.value)}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                  title="Filter by department"
+                  aria-label="Filter by department"
                 >
                   <option value="all">All Departments</option>
                   {[...new Set(exitProcesses.map(p => p.employeeDepartment))].map(dept => (
@@ -736,23 +762,23 @@ const ExitProcess: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex items-center space-x-2">
-                              <button onClick={() => handleViewProcess(process)} className="text-blue-600 hover:text-blue-900">
+                            <button onClick={() => handleViewProcess(process)} className="text-blue-600 hover:text-blue-900" title="View process" aria-label="View process">
                                 <Eye className="w-4 h-4" />
                               </button>
-                              <button onClick={() => handleEditProcess(process)} className="text-green-600 hover:text-green-900">
+                            <button onClick={() => handleEditProcess(process)} className="text-green-600 hover:text-green-900" title="Edit process" aria-label="Edit process">
                                 <Edit className="w-4 h-4" />
                               </button>
                       {process.status === 'pending' && (
-                                <button onClick={() => handleStartProcess(process.id)} className="text-green-600 hover:text-green-900" title="Start Process">
+                                <button onClick={() => handleStartProcess(process.id)} className="text-green-600 hover:text-green-900" title="Start process" aria-label="Start process">
                                   <Play className="w-4 h-4" />
                                 </button>
                       )}
                       {process.status === 'in_progress' && (
-                                <button onClick={() => handleCompleteProcess(process.id)} className="text-green-600 hover:text-green-900" title="Complete Process">
+                                <button onClick={() => handleCompleteProcess(process.id)} className="text-green-600 hover:text-green-900" title="Complete process" aria-label="Complete process">
                                   <CheckCircle className="w-4 h-4" />
                                 </button>
                               )}
-                              <button onClick={() => handleDeleteProcess(process)} className="text-red-600 hover:text-red-900">
+                              <button onClick={() => handleDeleteProcess(process)} className="text-red-600 hover:text-red-900" title="Delete process" aria-label="Delete process">
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
@@ -780,64 +806,76 @@ const ExitProcess: React.FC = () => {
               <button
                 onClick={() => setShowCreateModal(false)}
                 className="text-gray-400 hover:text-gray-600"
+                title="Close"
+                aria-label="Close"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
               <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee ID *</label>
+                {/* Searchable Employee Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Employee *</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <input
                       type="text"
+                      value={employeeSearch}
+                      onChange={(e) => setEmployeeSearch(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      placeholder="Search by name, email, or ID"
+                      aria-label="Search employees"
+                      title="Search employees"
+                    />
+                    <select
                       value={formData.employeeId || ''}
-                      onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                      onChange={(e) => {
+                        const emp = employeesList.find(u => u.id === e.target.value);
+                        if (emp) {
+                          setFormData({
+                            ...formData,
+                            employeeId: emp.id,
+                            employeeName: emp.displayName,
+                            employeeEmail: emp.email,
+                            employeeDepartment: emp.department
+                          });
+                        } else {
+                          setFormData({ ...formData, employeeId: '', employeeName: '', employeeEmail: '', employeeDepartment: '' });
+                        }
+                      }}
                       className={cn(
                         "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2",
                         (formData.employeeId || '').trim() ? "border-gray-300 focus:ring-primary-500" : "border-red-300 focus:ring-red-500"
                       )}
-                      placeholder="Enter employee ID"
-                    />
+                      aria-label="Select employee"
+                      title="Select employee"
+                    >
+                      <option value="">Select Employee</option>
+                      {employeesList
+                        .filter(u => {
+                          const q = employeeSearch.toLowerCase();
+                          if (!q) return true;
+                          return (
+                            u.displayName.toLowerCase().includes(q) ||
+                            (u.email || '').toLowerCase().includes(q) ||
+                            (u.id || '').toLowerCase().includes(q)
+                          );
+                        })
+                        .slice(0, 100)
+                        .map(u => (
+                          <option key={`${u.id}-${u.email}`} value={u.id}>
+                            {u.displayName} ({u.id}) - {u.department}
+                          </option>
+                        ))}
+                    </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee Name *</label>
-                    <input
-                      type="text"
-                      value={formData.employeeName || ''}
-                      onChange={(e) => setFormData({ ...formData, employeeName: e.target.value })}
-                      className={cn(
-                        "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2",
-                        (formData.employeeName || '').trim() ? "border-gray-300 focus:ring-primary-500" : "border-red-300 focus:ring-red-500"
-                      )}
-                      placeholder="Enter employee name"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Employee Email *</label>
-                    <input
-                      type="email"
-                      value={formData.employeeEmail || ''}
-                      onChange={(e) => setFormData({ ...formData, employeeEmail: e.target.value })}
-                      className={cn(
-                        "w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2",
-                        /.+@.+\..+/.test((formData.employeeEmail || '').trim()) ? "border-gray-300 focus:ring-primary-500" : "border-red-300 focus:ring-red-500"
-                      )}
-                      placeholder="Enter employee email"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                    <input
-                      type="text"
-                      value={formData.employeeDepartment || ''}
-                      onChange={(e) => setFormData({ ...formData, employeeDepartment: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      placeholder="Enter department"
-                    />
-                  </div>
+                  {(formData.employeeName || formData.employeeEmail || formData.employeeDepartment) && (
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                      <p className="text-gray-700"><span className="font-medium">Name:</span> {formData.employeeName || '—'}</p>
+                      <p className="text-gray-700"><span className="font-medium">Email:</span> {formData.employeeEmail || '—'}</p>
+                      <p className="text-gray-700"><span className="font-medium">Department:</span> {formData.employeeDepartment || '—'}</p>
+                    </div>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -847,6 +885,7 @@ const ExitProcess: React.FC = () => {
                       value={formData.exitDate ? (formData.exitDate instanceof Date ? formData.exitDate.toISOString().split('T')[0] : new Date(formData.exitDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setFormData({ ...formData, exitDate: new Date(e.target.value) })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      title="Select exit date"
                     />
                   </div>
                   <div>
@@ -855,6 +894,8 @@ const ExitProcess: React.FC = () => {
                       value={formData.priority || 'medium'}
                       onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      title="Select priority"
+                      aria-label="Select priority"
                     >
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
@@ -925,6 +966,8 @@ const ExitProcess: React.FC = () => {
               <button
                 onClick={() => setShowViewModal(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Close"
+                  aria-label="Close"
               >
                   <X className="w-4 h-4" />
               </button>
@@ -1136,6 +1179,8 @@ const ExitProcess: React.FC = () => {
               <button
                 onClick={() => setShowEditModal(false)}
                 className="text-gray-400 hover:text-gray-600"
+                title="Close"
+                aria-label="Close"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -1203,6 +1248,7 @@ const ExitProcess: React.FC = () => {
                       value={formData.exitDate ? (formData.exitDate instanceof Date ? formData.exitDate.toISOString().split('T')[0] : new Date(formData.exitDate).toISOString().split('T')[0]) : ''}
                       onChange={(e) => setFormData({ ...formData, exitDate: new Date(e.target.value) })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      title="Select exit date"
                     />
                   </div>
                   <div>
@@ -1211,6 +1257,8 @@ const ExitProcess: React.FC = () => {
                       value={formData.priority || 'medium'}
                       onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      title="Select priority"
+                      aria-label="Select priority"
                     >
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>

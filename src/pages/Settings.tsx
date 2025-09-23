@@ -88,6 +88,7 @@ const Settings: React.FC = () => {
     { id: 'security', label: 'Security', icon: Shield },
     { id: 'account', label: 'Account', icon: UserIcon },
     { id: 'language', label: 'Language', icon: Globe },
+    { id: 'departments', label: 'Departments', icon: Globe },
   ];
 
   const getFontSizeClass = (size: FontSize) => {
@@ -409,7 +410,9 @@ const Settings: React.FC = () => {
           <button
             onClick={handleResetToDefault}
             disabled={saving}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 border border-blue-700"
+            title="Reset all settings to default"
+            aria-label="Reset to Default"
           >
             <RotateCcw className="w-4 h-4" />
             <span>Reset to Default</span>
@@ -418,6 +421,8 @@ const Settings: React.FC = () => {
             onClick={handleSaveSettings}
             disabled={saving}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            title="Save settings"
+            aria-label="Save settings"
           >
             {saving ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -457,6 +462,27 @@ const Settings: React.FC = () => {
 
         {/* Tab Content */}
         <div className="p-6">
+          {/* Departments Tab */}
+          {activeTab === 'departments' && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Departments</h3>
+              <p className="text-sm text-gray-600 mb-2">Use the Departments button in the header to add/edit departments. This updates all department dropdowns automatically.</p>
+              <div>
+                  <button
+                  onClick={() => {
+                    // Open the global header modal by toggling a body event
+                    const openEvent = new CustomEvent('open-departments-modal');
+                    window.dispatchEvent(openEvent as any);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  title="Open Departments Manager"
+                  aria-label="Open Departments Manager"
+                >
+                  Open Departments Manager
+                </button>
+              </div>
+            </div>
+          )}
           {/* Appearance Tab */}
           {activeTab === 'appearance' && (
             <div className="space-y-8">
@@ -809,6 +835,7 @@ const Settings: React.FC = () => {
                     onChange={(e) => setLanguage(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
                     aria-label="Select language"
+                    title="Select language"
                   >
                     <option value="en">English</option>
                     <option value="es">Español</option>
@@ -828,6 +855,7 @@ const Settings: React.FC = () => {
                     onChange={(e) => setTimezone(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
                     aria-label="Select time zone"
+                    title="Select time zone"
                   >
                     <option value="UTC">UTC</option>
                     <option value="America/New_York">Eastern Time</option>
@@ -865,6 +893,8 @@ const Settings: React.FC = () => {
               <button
                 onClick={() => setChangePasswordOpen(false)}
                 className="text-gray-400 hover:text-gray-600"
+                title="Close"
+                aria-label="Close"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -879,11 +909,15 @@ const Settings: React.FC = () => {
               value={passwordData.currentPassword}
               onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                    placeholder="Enter current password"
+                    title="Current password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    title="Toggle password visibility"
+                    aria-label="Toggle password visibility"
                   >
                     {showPasswords.current ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -898,11 +932,15 @@ const Settings: React.FC = () => {
               value={passwordData.newPassword}
               onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                    placeholder="Enter new password"
+                    title="New password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    title="Toggle password visibility"
+                    aria-label="Toggle password visibility"
                   >
                     {showPasswords.new ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -917,11 +955,15 @@ const Settings: React.FC = () => {
               value={passwordData.confirmPassword}
               onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+                    placeholder="Confirm new password"
+                    title="Confirm new password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    title="Toggle password visibility"
+                    aria-label="Toggle password visibility"
                   >
                     {showPasswords.confirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -963,6 +1005,8 @@ const Settings: React.FC = () => {
               <button
                 onClick={() => setTwoFactorOpen(false)}
                 className="text-gray-400 hover:text-gray-600"
+                title="Close"
+                aria-label="Close"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -1033,6 +1077,8 @@ const Settings: React.FC = () => {
               <button
                 onClick={() => setLoginHistoryOpen(false)}
                 className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center transition-colors"
+                title="Close"
+                aria-label="Close"
               >
                 <X className="w-4 h-4 text-gray-600" />
               </button>

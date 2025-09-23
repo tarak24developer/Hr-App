@@ -694,7 +694,7 @@ const Leaves: React.FC = () => {
           </button>
           <button 
             onClick={() => setShowExportModal(true)}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 border border-blue-700"
           >
             <Download className="w-4 h-4" />
             <span>Export</span>
@@ -2270,6 +2270,8 @@ const Leaves: React.FC = () => {
               <button
                 onClick={() => setShowViewBalanceModal(false)}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Close"
+                  aria-label="Close"
               >
                   <X className="w-4 h-4" />
               </button>

@@ -1,3 +1,172 @@
+[{
+	"resource": "/d:/HRMS/erp/New Hrms App/src/pages/Notifications.tsx",
+	"owner": "_generated_diagnostic_collection_name_#0",
+	"code": {
+		"value": "axe/forms",
+		"target": {
+			"$mid": 1,
+			"path": "/rules/axe/4.10/label",
+			"scheme": "https",
+			"authority": "dequeuniversity.com",
+			"query": "application=axeAPI"
+		}
+	},
+	"severity": 8,
+	"message": "Form elements must have labels: Element has no title attribute Element has no placeholder attribute",
+	"source": "Microsoft Edge Tools",
+	"startLineNumber": 979,
+	"startColumn": 22,
+	"endLineNumber": 979,
+	"endColumn": 27,
+	"modelVersionId": 4
+},{
+	"resource": "/d:/HRMS/erp/New Hrms App/src/pages/Notifications.tsx",
+	"owner": "_generated_diagnostic_collection_name_#0",
+	"code": {
+		"value": "axe/forms",
+		"target": {
+			"$mid": 1,
+			"path": "/rules/axe/4.10/label",
+			"scheme": "https",
+			"authority": "dequeuniversity.com",
+			"query": "application=axeAPI"
+		}
+	},
+	"severity": 8,
+	"message": "Form elements must have labels: Element has no title attribute Element has no placeholder attribute",
+	"source": "Microsoft Edge Tools",
+	"startLineNumber": 990,
+	"startColumn": 22,
+	"endLineNumber": 990,
+	"endColumn": 30,
+	"modelVersionId": 4
+},{
+	"resource": "/d:/HRMS/erp/New Hrms App/src/pages/Notifications.tsx",
+	"owner": "_generated_diagnostic_collection_name_#0",
+	"code": {
+		"value": "axe/forms",
+		"target": {
+			"$mid": 1,
+			"path": "/rules/axe/4.10/select-name",
+			"scheme": "https",
+			"authority": "dequeuniversity.com",
+			"query": "application=axeAPI"
+		}
+	},
+	"severity": 8,
+	"message": "Select element must have an accessible name: Element has no title attribute",
+	"source": "Microsoft Edge Tools",
+	"startLineNumber": 1002,
+	"startColumn": 24,
+	"endLineNumber": 1002,
+	"endColumn": 30,
+	"modelVersionId": 4
+},{
+	"resource": "/d:/HRMS/erp/New Hrms App/src/pages/Notifications.tsx",
+	"owner": "_generated_diagnostic_collection_name_#0",
+	"code": {
+		"value": "axe/forms",
+		"target": {
+			"$mid": 1,
+			"path": "/rules/axe/4.10/select-name",
+			"scheme": "https",
+			"authority": "dequeuniversity.com",
+			"query": "application=axeAPI"
+		}
+	},
+	"severity": 8,
+	"message": "Select element must have an accessible name: Element has no title attribute",
+	"source": "Microsoft Edge Tools",
+	"startLineNumber": 1024,
+	"startColumn": 24,
+	"endLineNumber": 1024,
+	"endColumn": 30,
+	"modelVersionId": 4
+},{
+	"resource": "/d:/HRMS/erp/New Hrms App/src/pages/Notifications.tsx",
+	"owner": "_generated_diagnostic_collection_name_#0",
+	"code": {
+		"value": "axe/forms",
+		"target": {
+			"$mid": 1,
+			"path": "/rules/axe/4.10/select-name",
+			"scheme": "https",
+			"authority": "dequeuniversity.com",
+			"query": "application=axeAPI"
+		}
+	},
+	"severity": 8,
+	"message": "Select element must have an accessible name: Element has no title attribute",
+	"source": "Microsoft Edge Tools",
+	"startLineNumber": 1041,
+	"startColumn": 24,
+	"endLineNumber": 1041,
+	"endColumn": 30,
+	"modelVersionId": 4
+},{
+	"resource": "/d:/HRMS/erp/New Hrms App/src/pages/Notifications.tsx",
+	"owner": "_generated_diagnostic_collection_name_#0",
+	"code": {
+		"value": "axe/forms",
+		"target": {
+			"$mid": 1,
+			"path": "/rules/axe/4.10/select-name",
+			"scheme": "https",
+			"authority": "dequeuniversity.com",
+			"query": "application=axeAPI"
+		}
+	},
+	"severity": 8,
+	"message": "Select element must have an accessible name: Element has no title attribute",
+	"source": "Microsoft Edge Tools",
+	"startLineNumber": 1058,
+	"startColumn": 24,
+	"endLineNumber": 1058,
+	"endColumn": 30,
+	"modelVersionId": 4
+},{
+	"resource": "/d:/HRMS/erp/New Hrms App/src/pages/Notifications.tsx",
+	"owner": "_generated_diagnostic_collection_name_#0",
+	"code": {
+		"value": "axe/forms",
+		"target": {
+			"$mid": 1,
+			"path": "/rules/axe/4.10/label",
+			"scheme": "https",
+			"authority": "dequeuniversity.com",
+			"query": "application=axeAPI"
+		}
+	},
+	"severity": 8,
+	"message": "Form elements must have labels: Element has no title attribute Element has no placeholder attribute",
+	"source": "Microsoft Edge Tools",
+	"startLineNumber": 1076,
+	"startColumn": 22,
+	"endLineNumber": 1076,
+	"endColumn": 27,
+	"modelVersionId": 4
+},{
+	"resource": "/d:/HRMS/erp/New Hrms App/src/pages/Notifications.tsx",
+	"owner": "_generated_diagnostic_collection_name_#0",
+	"code": {
+		"value": "axe/name-role-value",
+		"target": {
+			"$mid": 1,
+			"path": "/rules/axe/4.10/button-name",
+			"scheme": "https",
+			"authority": "dequeuniversity.com",
+			"query": "application=axeAPI"
+		}
+	},
+	"severity": 8,
+	"message": "Buttons must have discernible text: Element has no title attribute",
+	"source": "Microsoft Edge Tools",
+	"startLineNumber": 1117,
+	"startColumn": 16,
+	"endLineNumber": 1117,
+	"endColumn": 22,
+	"modelVersionId": 4
+}]
 import React, { useState, useEffect } from 'react';
 import { 
   GraduationCap, 
@@ -442,7 +611,7 @@ const Training: React.FC = () => {
               window.URL.revokeObjectURL(url);
               showNotification('Data exported successfully!', 'success');
             }}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center space-x-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 border border-blue-700"
           >
             <Download className="w-4 h-4" />
             <span>Export Data</span>

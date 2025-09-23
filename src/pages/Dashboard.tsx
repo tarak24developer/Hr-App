@@ -65,7 +65,8 @@ const Dashboard: React.FC = () => {
   const [showEventModal, setShowEventModal] = useState(false);
   const [hoveredDate, setHoveredDate] = useState<Date | null>(null);
   const [showEventPreview, setShowEventPreview] = useState(false);
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  // keep only the setter; no local state read needed
+  const [, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
   
   // Announcement form state
@@ -482,7 +483,7 @@ const Dashboard: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
           <button 
              onClick={handleRefresh}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center justify-center space-x-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 border border-blue-700"
           >
             <RefreshCw className="w-4 h-4" />
             <span>Refresh</span>
@@ -555,8 +556,8 @@ const Dashboard: React.FC = () => {
                 <button 
                   onClick={handleAddAnnouncement}
                   className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-md border border-blue-600"
-                  style={{ backgroundColor: '#2563eb', color: 'white' }}
                   title="Add Announcement"
+                  aria-label="Add Announcement"
                 >
                   <Plus className="w-5 h-5" />
                 </button>
@@ -568,6 +569,8 @@ const Dashboard: React.FC = () => {
                   <button
                     onClick={goToPreviousMonth}
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Previous month"
+                    aria-label="Previous month"
                   >
                     <ChevronLeft className="w-5 h-5 text-gray-600" />
                   </button>
@@ -577,6 +580,8 @@ const Dashboard: React.FC = () => {
                   <button
                     onClick={goToNextMonth}
                     className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Next month"
+                    aria-label="Next month"
                   >
                     <ChevronRight className="w-5 h-5 text-gray-600" />
                   </button>
@@ -644,12 +649,7 @@ const Dashboard: React.FC = () => {
 
                 {/* Event Preview Tooltip */}
                 {showEventPreview && hoveredDate && (
-                  <div className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 min-w-[250px] max-w-[300px]"
-                       style={{
-                         top: `${tooltipPosition.y}px`,
-                         left: `${tooltipPosition.x}px`,
-                         pointerEvents: 'none'
-                       }}>
+                  <div className="absolute right-4 top-20 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-4 min-w-[250px] max-w-[300px] pointer-events-none">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-semibold text-gray-900">
                         {hoveredDate.toLocaleDateString('en-US', { 
@@ -832,6 +832,8 @@ const Dashboard: React.FC = () => {
                     setSelectedDate(null);
                   }}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Close"
+                  aria-label="Close"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -943,6 +945,8 @@ const Dashboard: React.FC = () => {
                 <button
                   onClick={handleAnnouncementCancel}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
+                  title="Close"
+                  aria-label="Close"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -981,6 +985,8 @@ const Dashboard: React.FC = () => {
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
                       formErrors['type'] ? 'border-red-500' : 'border-gray-300'
                     }`}
+                    title="Select event type"
+                    aria-label="Select event type"
                   >
                     <option value="announcement">📢 Announcement</option>
                     <option value="holiday">🎉 Holiday</option>
@@ -1017,6 +1023,8 @@ const Dashboard: React.FC = () => {
                       value={announcementForm.date.toISOString().split('T')[0]}
                       onChange={(e) => handleAnnouncementFormChange('date', new Date(e.target.value))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      title="Select date"
+                      placeholder="YYYY-MM-DD"
                     />
                   </div>
                   <div>
@@ -1027,6 +1035,8 @@ const Dashboard: React.FC = () => {
                       value={announcementForm.priority}
                       onChange={(e) => handleAnnouncementFormChange('priority', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      title="Select priority"
+                      aria-label="Select priority"
                     >
                       <option value="low">🟢 Low</option>
                       <option value="medium">🟡 Medium</option>
@@ -1046,6 +1056,8 @@ const Dashboard: React.FC = () => {
                       value={announcementForm.startTime}
                       onChange={(e) => handleAnnouncementFormChange('startTime', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      title="Start time"
+                      placeholder="HH:MM"
                     />
                   </div>
                   <div>
@@ -1059,6 +1071,8 @@ const Dashboard: React.FC = () => {
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
                         formErrors['endTime'] ? 'border-red-500' : 'border-gray-300'
                       }`}
+                      title="End time"
+                      placeholder="HH:MM"
                     />
                     {formErrors['endTime'] && (
                       <p className="mt-1 text-sm text-red-600">{formErrors['endTime']}</p>
@@ -1091,12 +1105,7 @@ const Dashboard: React.FC = () => {
                 </button>
                 <button
                   onClick={handleAnnouncementSubmit}
-                  className="px-6 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90 transition-all flex items-center space-x-2 shadow-md"
-                  style={{ 
-                    backgroundColor: '#2563eb',
-                    border: '1px solid #2563eb',
-                    minWidth: '120px'
-                  }}
+                  className="px-6 py-2 text-sm font-medium text-white rounded-lg transition-all flex items-center space-x-2 shadow-md bg-blue-600 hover:bg-blue-700 border border-blue-600 min-w-[120px]"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add Event</span>

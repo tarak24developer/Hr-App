@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useDepartmentsList } from '@/hooks/useDepartments';
 import {
   Plus,
   Edit,
@@ -51,7 +52,7 @@ interface UserFormData {
 const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<UserType[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserType[]>([]);
-  const [departments, setDepartments] = useState<string[]>([]);
+  const departments = useDepartmentsList();
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
@@ -97,13 +98,11 @@ const UsersPage: React.FC = () => {
         setUsers(usersData);
         setFilteredUsers(usersData);
         
-        // Extract unique departments
-        const uniqueDepartments = [...new Set(usersData.map((user: UserType) => user.department))];
-      setDepartments(uniqueDepartments);
+        // Departments list now comes from useDepartmentsList()
       } else {
         setUsers([]);
         setFilteredUsers([]);
-        setDepartments([]);
+        // no-op for departments here
       }
     } catch (error) {
       console.error('Error loading users:', error);
@@ -415,7 +414,7 @@ const UsersPage: React.FC = () => {
             <div className="flex items-center space-x-3">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 border border-blue-700"
               >
                 <Filter className="w-4 h-4" />
                 <span>Filters</span>
@@ -446,6 +445,8 @@ const UsersPage: React.FC = () => {
                     value={roleFilter}
                     onChange={(e) => handleFilterChange('role', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="Filter by role"
+                    aria-label="Filter by role"
                   >
                     <option value="all">All Roles</option>
                     <option value="admin">Admin</option>
@@ -461,6 +462,8 @@ const UsersPage: React.FC = () => {
                     value={statusFilter}
                     onChange={(e) => handleFilterChange('status', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="Filter by status"
+                    aria-label="Filter by status"
                   >
                     <option value="all">All Statuses</option>
                     <option value="active">Active</option>
@@ -474,6 +477,8 @@ const UsersPage: React.FC = () => {
                     value={departmentFilter}
                     onChange={(e) => handleFilterChange('department', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="Filter by department"
+                    aria-label="Filter by department"
                   >
                     <option value="">All Departments</option>
                     {departments.map(dept => (
@@ -564,18 +569,24 @@ const UsersPage: React.FC = () => {
                         <button
                           onClick={() => handleViewUser(user)}
                           className="text-blue-600 hover:text-blue-900"
+                          title="View user"
+                          aria-label="View user"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleEditUser(user)}
                           className="text-green-600 hover:text-green-900"
+                          title="Edit user"
+                          aria-label="Edit user"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteClick(user)}
                           className="text-red-600 hover:text-red-900"
+                          title="Delete user"
+                          aria-label="Delete user"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -665,6 +676,8 @@ const UsersPage: React.FC = () => {
               <button
                 onClick={() => setShowCreateDialog(false)}
                 className="text-gray-400 hover:text-gray-600"
+                title="Close"
+                aria-label="Close"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -680,6 +693,8 @@ const UsersPage: React.FC = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    placeholder="Enter first name"
+                    title="First name"
                   />
                 </div>
                 
@@ -691,6 +706,8 @@ const UsersPage: React.FC = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    placeholder="Enter last name"
+                    title="Last name"
                   />
                 </div>
                 
@@ -702,6 +719,8 @@ const UsersPage: React.FC = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    placeholder="Enter email"
+                    title="Email"
                   />
                 </div>
                 
@@ -712,6 +731,8 @@ const UsersPage: React.FC = () => {
                     value={formData.phone}
                     onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter phone number"
+                    title="Phone number"
                   />
                 </div>
                 
@@ -722,6 +743,8 @@ const UsersPage: React.FC = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    title="Select role"
+                    aria-label="Select role"
                   >
                     <option value="employee">Employee</option>
                     <option value="manager">Manager</option>
@@ -731,13 +754,19 @@ const UsersPage: React.FC = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.department}
                     onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
-                  />
+                    title="Select department"
+                    aria-label="Select department"
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map((dept) => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
                 </div>
                 
                 <div className="md:col-span-2">
@@ -748,6 +777,8 @@ const UsersPage: React.FC = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    placeholder="Enter position"
+                    title="Position"
                   />
                 </div>
                 
@@ -769,12 +800,16 @@ const UsersPage: React.FC = () => {
               <button
                 onClick={() => setShowCreateDialog(false)}
                 className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                title="Cancel"
+                aria-label="Cancel"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateUser}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                title="Create user"
+                aria-label="Create user"
               >
                 Create User
               </button>
@@ -796,6 +831,8 @@ const UsersPage: React.FC = () => {
               <button
                 onClick={() => setShowEditDialog(false)}
                 className="text-gray-400 hover:text-gray-600"
+                title="Close"
+                aria-label="Close"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -811,6 +848,8 @@ const UsersPage: React.FC = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    placeholder="Enter first name"
+                    title="First name"
                   />
                 </div>
                 
@@ -822,6 +861,8 @@ const UsersPage: React.FC = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    placeholder="Enter last name"
+                    title="Last name"
                   />
                 </div>
                 
@@ -833,6 +874,8 @@ const UsersPage: React.FC = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    placeholder="Enter email"
+                    title="Email"
                   />
                 </div>
                 
@@ -843,6 +886,8 @@ const UsersPage: React.FC = () => {
                     value={formData.phone}
                     onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter phone number"
+                    title="Phone number"
                   />
                 </div>
                 
@@ -853,6 +898,8 @@ const UsersPage: React.FC = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value as UserRole }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    title="Select role"
+                    aria-label="Select role"
                   >
                     <option value="employee">Employee</option>
                     <option value="manager">Manager</option>
@@ -868,6 +915,8 @@ const UsersPage: React.FC = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    placeholder="Enter department"
+                    title="Department"
                   />
                 </div>
                 
@@ -879,6 +928,8 @@ const UsersPage: React.FC = () => {
                     onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
+                    placeholder="Enter position"
+                    title="Position"
                   />
                 </div>
                 
@@ -930,6 +981,8 @@ const UsersPage: React.FC = () => {
               <button
                 onClick={() => setShowViewDialog(false)}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
+                title="Close"
+                aria-label="Close"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1093,6 +1146,8 @@ const UsersPage: React.FC = () => {
               <button
                 onClick={() => setShowDeleteDialog(false)}
                 className="text-gray-400 hover:text-gray-600"
+                title="Close"
+                aria-label="Close"
               >
                 <X className="w-6 h-6" />
               </button>

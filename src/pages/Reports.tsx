@@ -138,7 +138,12 @@ const Reports: React.FC = () => {
 
       // Calculate analytics
       const activeUsers = users.filter(user => user.status === 'active');
-      const departments = [...new Set(users.map(user => user.department))];
+      // Prefer centralized departments (if present) else derive from users
+      const derivedDepartments = [...new Set(users.map(user => user.department))];
+      const deptRes = await firebaseService.getCollection<{ name: string }>('departments');
+      const departments = deptRes.success && deptRes.data && deptRes.data.length > 0
+        ? (deptRes.data as any[]).map(d => (d && typeof (d as any).name === 'string' ? (d as any).name : '')).filter(Boolean)
+        : derivedDepartments;
       
       // Calculate attendance rate
       const currentMonth = new Date().getMonth();
