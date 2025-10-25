@@ -1,48 +1,69 @@
-import React, { Suspense, useEffect, useState } from 'react';
+/**
+ * Main App Component
+ * Enhanced with subdomain routing, RBAC, and advanced security features
+ */
+
+import { Suspense, useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './stores/authStore';
 import { useThemeStore } from './stores/themeStore';
 import { useFontSizeStore } from './stores/fontSizeStore';
+import { subdomainRouter } from './lib/subdomain/subdomainRouter';
+import { rbacService } from './lib/rbac/rbacService';
+import { sessionManager } from './lib/security/sessionManager';
+import { auditLogger } from './lib/security/auditLogger';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 import ErrorBoundary from './components/UI/ErrorBoundary';
+import SubdomainGuard from './middleware/SubdomainGuard';
+import PermissionGuard from './middleware/PermissionGuard';
 import { authService } from './services/authService';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 
-// Lazy load pages for better performance
-const Dashboard = React.lazy(() => import('./pages/Dashboard'));
-const Employees = React.lazy(() => import('./pages/Employees'));
-const EmployeeDirectory = React.lazy(() => import('./pages/EmployeeDirectory'));
-const ExitProcess = React.lazy(() => import('./pages/ExitProcess'));
-const Attendance = React.lazy(() => import('./pages/Attendance'));
-const Leaves = React.lazy(() => import('./pages/Leaves'));
-const Holidays = React.lazy(() => import('./pages/Holidays'));
-const Training = React.lazy(() => import('./pages/Training'));
-const FeedbackSurveys = React.lazy(() => import('./pages/FeedbackSurveys'));
-const RequestPortal = React.lazy(() => import('./pages/RequestPortal'));
-const Payroll = React.lazy(() => import('./pages/Payroll'));
+// Lazy load pages with retry logic for better reliability
+const Login = lazyWithRetry(() => import('./pages/Login'));
+const Layout = lazyWithRetry(() => import('./components/Layout/Layout'));
+const Sidebar = lazyWithRetry(() => import('./components/Layout/Sidebar'));
+const Header = lazyWithRetry(() => import('./components/Layout/Header'));
 
-const ExpenseManagement = React.lazy(() => import('./pages/ExpenseManagement'));
-const AssetManagement = React.lazy(() => import('./pages/AssetManagement'));
-const Inventory = React.lazy(() => import('./pages/Inventory'));
-const AdvancedAnalytics = React.lazy(() => import('./pages/AdvancedAnalytics'));
-const Reports = React.lazy(() => import('./pages/Reports'));
-const UserTracking = React.lazy(() => import('./pages/UserTracking'));
-const Users = React.lazy(() => import('./pages/Users'));
-const DocumentManagement = React.lazy(() => import('./pages/DocumentManagement'));
-const Security = React.lazy(() => import('./pages/Security'));
-const EnhancedAccessControl = React.lazy(() => import('./pages/EnhancedAccessControl'));
-const IncidentManagement = React.lazy(() => import('./pages/IncidentManagement'));
-const Notifications = React.lazy(() => import('./pages/Notifications'));
-const Announcements = React.lazy(() => import('./pages/Announcements'));
-const LiveTrackingMap = React.lazy(() => import('./pages/LiveTrackingMap'));
-const Profile = React.lazy(() => import('./pages/Profile'));
-const Settings = React.lazy(() => import('./pages/Settings'));
-const Login = React.lazy(() => import('./pages/Login'));
+// Role-specific dashboards - preload based on user role
+const AdminDashboard = lazyWithRetry(() => import('./modules/admin/AdminDashboard'));
+const HRDashboard = lazyWithRetry(() => import('./modules/hr/HRDashboard'));
+const ManagerDashboard = lazyWithRetry(() => import('./modules/manager/ManagerDashboard'));
+const EmployeeDashboard = lazyWithRetry(() => import('./modules/employee/EmployeeDashboard'));
 
-// Layout components
-const Layout = React.lazy(() => import('./components/Layout/Layout'));
-const Sidebar = React.lazy(() => import('./components/Layout/Sidebar'));
-const Header = React.lazy(() => import('./components/Layout/Header'));
+// Core pages - load on demand
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
+const Employees = lazyWithRetry(() => import('./pages/Employees'));
+const EmployeeDirectory = lazyWithRetry(() => import('./pages/EmployeeDirectory'));
+const ExitProcess = lazyWithRetry(() => import('./pages/ExitProcess'));
+
+// Large pages - separate chunks with retry
+const Attendance = lazyWithRetry(() => import(/* webpackChunkName: "attendance" */ './pages/Attendance'));
+const Payroll = lazyWithRetry(() => import(/* webpackChunkName: "payroll" */ './pages/Payroll'));
+const Reports = lazyWithRetry(() => import(/* webpackChunkName: "reports" */ './pages/Reports'));
+const AdvancedAnalytics = lazyWithRetry(() => import(/* webpackChunkName: "analytics" */ './pages/AdvancedAnalytics'));
+const LiveTrackingMap = lazyWithRetry(() => import(/* webpackChunkName: "tracking" */ './pages/LiveTrackingMap'));
+
+// Standard pages
+const Leaves = lazyWithRetry(() => import('./pages/Leaves'));
+const Holidays = lazyWithRetry(() => import('./pages/Holidays'));
+const Training = lazyWithRetry(() => import('./pages/Training'));
+const FeedbackSurveys = lazyWithRetry(() => import('./pages/FeedbackSurveys'));
+const RequestPortal = lazyWithRetry(() => import('./pages/RequestPortal'));
+const ExpenseManagement = lazyWithRetry(() => import('./pages/ExpenseManagement'));
+const AssetManagement = lazyWithRetry(() => import('./pages/AssetManagement'));
+const Inventory = lazyWithRetry(() => import('./pages/Inventory'));
+const UserTracking = lazyWithRetry(() => import('./pages/UserTracking'));
+const Users = lazyWithRetry(() => import('./pages/Users'));
+const DocumentManagement = lazyWithRetry(() => import('./pages/DocumentManagement'));
+const Security = lazyWithRetry(() => import('./pages/Security'));
+const EnhancedAccessControl = lazyWithRetry(() => import('./pages/EnhancedAccessControl'));
+const IncidentManagement = lazyWithRetry(() => import('./pages/IncidentManagement'));
+const Notifications = lazyWithRetry(() => import('./pages/Notifications'));
+const Announcements = lazyWithRetry(() => import('./pages/Announcements'));
+const Profile = lazyWithRetry(() => import('./pages/Profile'));
+const Settings = lazyWithRetry(() => import('./pages/Settings'));
 
 function App() {
   const { user, loading, setUser, setLoading } = useAuthStore();
@@ -50,26 +71,47 @@ function App() {
   const { fontSize } = useFontSizeStore();
   const [firebaseError, setFirebaseError] = useState<string | null>(null);
 
-  // Initialize authentication state
+  // Initialize authentication, subdomain routing, and security
   useEffect(() => {
-    console.log('App: Initializing authentication state...');
+    // Get subdomain configuration (for future use)
+    // const config = subdomainRouter.getCurrentSubdomainConfig();
     
-    const unsubscribe = authService.subscribeToAuthState((state) => {
-      console.log('App: Auth state changed:', { 
-        user: state.user ? `authenticated (${state.user.email})` : 'not authenticated', 
-        loading: state.loading, 
-        error: state.error,
-        userId: state.user?.id || 'none'
-      });
+    const unsubscribe = authService.subscribeToAuthState(async (state) => {
       
-      // Only update if the state actually changed
       setUser(state.user);
       setLoading(state.loading);
+
+      // Handle authenticated user
+      if (state.user && !state.loading) {
+        // Initialize RBAC for user
+        rbacService.initializeUserRoles(state.user);
+        
+        // Create session
+        try {
+          await sessionManager.createSession(state.user.id);
+        } catch (error) {
+          console.error('Error creating session:', error);
+        }
+        
+        // Log successful authentication
+        await auditLogger.logLogin(
+          state.user.id,
+          state.user.email,
+          `${state.user.firstName} ${state.user.lastName}`,
+          true
+        );
+
+        // Check if user is on correct subdomain
+        const isCorrect = subdomainRouter.isOnCorrectSubdomain(state.user.role);
+        if (!isCorrect) {
+          // Uncomment below to enable subdomain redirection
+          // subdomainRouter.redirectToRoleSubdomain(state.user.role, false);
+        }
+      }
     });
 
     // Check Firebase availability
     try {
-      // This will throw an error if Firebase is not properly configured
       if (!import.meta.env.VITE_FIREBASE_API_KEY || 
           import.meta.env.VITE_FIREBASE_API_KEY === 'your_actual_api_key_here' ||
           import.meta.env.VITE_FIREBASE_API_KEY === 'demo-api-key') {
@@ -80,12 +122,42 @@ function App() {
     }
 
     return unsubscribe;
-  }, []); // Empty dependency array to prevent re-initialization
+  }, []);
 
-  // Apply theme to document
+  // Apply theme
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
   }, [isDark]);
+
+  // Preload critical components based on user role
+  // Must be called before any conditional returns to follow Rules of Hooks
+  useEffect(() => {
+    if (user) {
+      // Preload dashboard for current role
+      const preloadDashboard = async () => {
+        switch (user.role) {
+          case 'admin':
+          case 'it_admin':
+            import('./modules/admin/AdminDashboard');
+            break;
+          case 'hr':
+          case 'hr_manager':
+          case 'recruiter':
+          case 'payroll_admin':
+          case 'training_coordinator':
+            import('./modules/hr/HRDashboard');
+            break;
+          case 'manager':
+            import('./modules/manager/ManagerDashboard');
+            break;
+          case 'employee':
+            import('./modules/employee/EmployeeDashboard');
+            break;
+        }
+      };
+      preloadDashboard();
+    }
+  }, [user]);
 
   // Show Firebase configuration error
   if (firebaseError) {
@@ -142,13 +214,36 @@ function App() {
     );
   }
 
+  // Get role-specific dashboard
+  const getRoleDashboard = () => {
+    switch (user.role) {
+      case 'admin':
+      case 'it_admin':
+        return <AdminDashboard />;
+      case 'hr':
+      case 'hr_manager':
+      case 'recruiter':
+      case 'payroll_admin':
+      case 'training_coordinator':
+        return <HRDashboard />;
+      case 'manager':
+        return <ManagerDashboard />;
+      case 'employee':
+        return <EmployeeDashboard />;
+      default:
+        return <Dashboard />;
+    }
+  };
+
   // If authenticated, show main app
   return (
     <ErrorBoundary>
       <div className={`min-h-screen ${isDark ? 'dark' : ''}`}>
         <div className={`flex flex-col lg:flex-row min-h-screen bg-gray-50 dark:bg-gray-900 text-${fontSize}`}>
           <Suspense fallback={<LoadingSpinner />}>
-            <Sidebar />
+            <SubdomainGuard>
+              <Sidebar />
+            </SubdomainGuard>
           </Suspense>
           <div className="flex-1 flex flex-col overflow-hidden">
             <Suspense fallback={<LoadingSpinner />}>
@@ -160,15 +255,28 @@ function App() {
                   <Suspense fallback={<LoadingSpinner />}>
                     <Routes>
                       <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/dashboard" element={getRoleDashboard()} />
                       
-                      {/* Employee Management Routes */}
-                      <Route path="/employee-management" element={<Employees />} />
+                      {/* Employee Management - Protected by RBAC */}
+                      <Route 
+                        path="/employee-management" 
+                        element={
+                          <PermissionGuard resource="employees" action="read">
+                            <Employees />
+                          </PermissionGuard>
+                        } 
+                      />
                       <Route path="/employee-directory" element={<EmployeeDirectory />} />
-                      {/* Employee Profile temporarily removed for redesign */}
-                      <Route path="/exit-process" element={<ExitProcess />} />
+                      <Route 
+                        path="/exit-process" 
+                        element={
+                          <PermissionGuard resource="employees" action="update">
+                            <ExitProcess />
+                          </PermissionGuard>
+                        } 
+                      />
                       
-                      {/* HR Operations Routes */}
+                      {/* HR Operations */}
                       <Route path="/attendance" element={<Attendance />} />
                       <Route path="/leaves" element={<Leaves />} />
                       <Route path="/holidays" element={<Holidays />} />
@@ -176,24 +284,66 @@ function App() {
                       <Route path="/feedback-surveys" element={<FeedbackSurveys />} />
                       <Route path="/request-portal" element={<RequestPortal />} />
                       
-                      {/* Financial Management Routes */}
-                      <Route path="/payroll" element={<Payroll />} />
+                      {/* Financial Management - Protected */}
+                      <Route 
+                        path="/payroll" 
+                        element={
+                          <PermissionGuard resource="payroll" action="read">
+                            <Payroll />
+                          </PermissionGuard>
+                        } 
+                      />
                       <Route path="/expense-management" element={<ExpenseManagement />} />
                       
-                      {/* Asset & Inventory Routes */}
+                      {/* Asset & Inventory */}
                       <Route path="/assets" element={<AssetManagement />} />
                       <Route path="/inventory" element={<Inventory />} />
                       
-                      {/* Analytics & Reports Routes */}
-                      <Route path="/advanced-analytics" element={<AdvancedAnalytics />} />
+                      {/* Analytics & Reports - Protected */}
+                      <Route 
+                        path="/advanced-analytics" 
+                        element={
+                          <PermissionGuard resource="analytics" action="read">
+                            <AdvancedAnalytics />
+                          </PermissionGuard>
+                        } 
+                      />
                       <Route path="/reports" element={<Reports />} />
-                      <Route path="/user-tracking" element={<UserTracking />} />
+                      <Route 
+                        path="/user-tracking" 
+                        element={
+                          <PermissionGuard resource="security" action="read">
+                            <UserTracking />
+                          </PermissionGuard>
+                        } 
+                      />
                       
-                      {/* System Management Routes */}
-                      <Route path="/users" element={<Users />} />
+                      {/* System Management - Admin Only */}
+                      <Route 
+                        path="/users" 
+                        element={
+                          <PermissionGuard resource="users" action="read">
+                            <Users />
+                          </PermissionGuard>
+                        } 
+                      />
                       <Route path="/document-management" element={<DocumentManagement />} />
-                      <Route path="/security" element={<Security />} />
-                      <Route path="/enhanced-access-control" element={<EnhancedAccessControl />} />
+                      <Route 
+                        path="/security" 
+                        element={
+                          <PermissionGuard resource="security" action="read">
+                            <Security />
+                          </PermissionGuard>
+                        } 
+                      />
+                      <Route 
+                        path="/enhanced-access-control" 
+                        element={
+                          <PermissionGuard resource="security" action="configure">
+                            <EnhancedAccessControl />
+                          </PermissionGuard>
+                        } 
+                      />
                       <Route path="/incident-management" element={<IncidentManagement />} />
                       <Route path="/notifications" element={<Notifications />} />
                       <Route path="/announcements" element={<Announcements />} />

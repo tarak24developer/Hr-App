@@ -31,7 +31,10 @@ export interface EmergencyContact {
   relationship: string;
 }
 
-export type UserRole = 'admin' | 'hr' | 'manager' | 'employee';
+// Extended role definitions for enterprise features
+export type BaseUserRole = 'admin' | 'hr' | 'manager' | 'employee';
+export type ExtendedUserRole = BaseUserRole | 'hr_manager' | 'payroll_admin' | 'it_admin' | 'recruiter' | 'training_coordinator';
+export type UserRole = BaseUserRole | ExtendedUserRole;
 
 // Authentication Types
 export interface AuthState {

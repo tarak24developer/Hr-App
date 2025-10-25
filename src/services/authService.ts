@@ -63,10 +63,8 @@ class AuthService {
     onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          console.log('User authenticated, fetching user data...', { uid: firebaseUser.uid, email: firebaseUser.email });
           const user = await this.getUserFromFirestore(firebaseUser.uid);
           this.currentUser = user;
-          console.log('User data loaded successfully:', { id: user.id, email: user.email, role: user.role });
           this.notifyListeners({ user, loading: false, error: null });
         } catch (error) {
           console.error('Error fetching user data:', error);
@@ -95,19 +93,12 @@ class AuthService {
           };
           
           this.currentUser = minimalUser;
-          console.log('Created minimal user object:', { id: minimalUser.id, email: minimalUser.email });
           this.notifyListeners({ user: minimalUser, loading: false, error: null });
           
           // Try to create the user document in the background
           this.createUserDocumentInBackground(firebaseUser.uid, minimalUser);
         }
       } else {
-        // Only log this if we actually had a user before
-        if (this.currentUser) {
-          console.log('User logged out, clearing state...');
-        } else {
-          console.log('No user authenticated initially...');
-        }
         this.currentUser = null;
         this.notifyListeners({ user: null, loading: false, error: null });
       }
@@ -118,7 +109,6 @@ class AuthService {
     try {
       if (db) {
         await setDoc(doc(db, 'users', uid), userData);
-        console.log('User document created successfully in background');
       }
     } catch (error) {
       console.warn('Failed to create user document in background:', error);
@@ -132,20 +122,12 @@ class AuthService {
     }
 
     try {
-      console.log('Fetching user document from Firestore:', { uid });
       const userDoc = await getDoc(doc(db, 'users', uid));
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        console.log('User document found:', { 
-          id: userData['id'], 
-          email: userData['email'], 
-          firstName: userData['firstName'],
-          role: userData['role'] 
-        });
         return userData as User;
       } else {
         // User document doesn't exist, create a default one
-        console.log('Creating new user document for:', { uid });
         const defaultUser: User = {
           id: uid,
           email: '', // Will be filled from Firebase auth
@@ -170,7 +152,6 @@ class AuthService {
 
         // Save the default user document
         await setDoc(doc(db, 'users', uid), defaultUser);
-        console.log('Default user document created successfully:', { uid, role: defaultUser.role });
         return defaultUser;
       }
     } catch (error: any) {

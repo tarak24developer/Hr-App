@@ -23,6 +23,7 @@ import {
 import { cn } from '../utils/cn';
 import { showNotification } from '../utils/notification';
 import DashboardCard from '../components/DashboardCard';
+import firebaseService from '../services/firebaseService';
 
 interface UserTrackingData {
   id?: string;
@@ -90,46 +91,24 @@ const UserTracking: React.FC = () => {
   const loadTrackingData = useCallback(async () => {
     try {
       setLoading(true);
-      // Mock data for now - replace with actual service call
-      const mockData: UserTrackingData[] = [
-        {
-          id: '1',
-          userId: 'user1',
-          userName: 'John Doe',
-          userEmail: 'john@example.com',
-          userRole: 'Employee',
-          userDepartment: 'IT',
-          isOnline: true,
-          lastSeen: new Date(),
-          currentLocation: {
-            latitude: 40.7128,
-            longitude: -74.0060,
-            accuracy: 10,
-            timestamp: Date.now(),
-            address: '123 Main St, New York, NY',
-            city: 'New York',
-            state: 'NY',
-            country: 'USA'
-          },
-          deviceInfo: {
-            userAgent: 'Mozilla/5.0...',
-            platform: 'Win32',
-            language: 'en-US',
-            timezone: 'America/New_York',
-            browser: 'Chrome',
-            deviceType: 'desktop',
-            screenResolution: '1920x1080',
-            operatingSystem: 'Windows 10'
-          },
-          status: 'online',
-          totalDistance: 5.2,
-          lastActivity: new Date(),
-          sessionId: 'session1',
-          trackingEnabled: true,
-          consentGiven: true
-        }
-      ];
-      setTrackingData(mockData);
+      
+      // Fetch real tracking data from Firebase
+      const result = await firebaseService.getCollection('user_tracking');
+      
+      if (result.success && result.data) {
+        const trackingData = result.data.map((item: any) => ({
+          ...item,
+          lastSeen: item.lastSeen ? new Date(item.lastSeen) : new Date(),
+          lastActivity: item.lastActivity ? new Date(item.lastActivity) : new Date(),
+          isOnline: item.isOnline || false,
+          status: item.status || 'offline',
+          trackingEnabled: item.trackingEnabled || false,
+          consentGiven: item.consentGiven || false
+        }));
+        setTrackingData(trackingData);
+      } else {
+        setTrackingData([]);
+      }
     } catch (error) {
       console.error('Error loading tracking data:', error);
       showNotification('Failed to load tracking data', 'error');

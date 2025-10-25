@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Package, 
   Search, 
@@ -15,6 +15,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import DashboardCard from '../components/DashboardCard';
+import firebaseService from '../services/firebaseService';
+import LoadingSpinner from '../components/UI/LoadingSpinner';
+import { showNotification } from '../utils/notification';
 
 interface Asset {
   id: string;
@@ -35,60 +38,28 @@ const Assets: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - in real app this would come from Firebase
-  const assets: Asset[] = [
-    {
-      id: '1',
-      name: 'MacBook Pro 16"',
-      type: 'Laptop',
-      status: 'assigned',
-      assignedTo: 'John Doe',
-      location: 'IT Department',
-      purchaseDate: '2023-01-15',
-      lastMaintenance: '2024-01-10',
-      nextMaintenance: '2024-07-10',
-      value: 2499,
-      condition: 'excellent'
-    },
-    {
-      id: '2',
-      name: 'Office Chair - Ergonomic',
-      type: 'Furniture',
-      status: 'available',
-      location: 'Warehouse',
-      purchaseDate: '2023-03-20',
-      lastMaintenance: '2024-02-15',
-      nextMaintenance: '2024-08-15',
-      value: 450,
-      condition: 'good'
-    },
-    {
-      id: '3',
-      name: 'Projector - Epson',
-      type: 'Electronics',
-      status: 'maintenance',
-      location: 'Conference Room A',
-      purchaseDate: '2022-11-10',
-      lastMaintenance: '2024-01-20',
-      nextMaintenance: '2024-04-20',
-      value: 1200,
-      condition: 'fair'
-    },
-    {
-      id: '4',
-      name: 'Company Vehicle - Ford Transit',
-      type: 'Vehicle',
-      status: 'assigned',
-      assignedTo: 'Sarah Wilson',
-      location: 'Parking Lot B',
-      purchaseDate: '2021-08-05',
-      lastMaintenance: '2024-02-01',
-      nextMaintenance: '2024-05-01',
-      value: 35000,
-      condition: 'good'
+  // Load assets from Firebase
+  useEffect(() => {
+    loadAssets();
+  }, []);
+
+  const loadAssets = async () => {
+    try {
+      setLoading(true);
+      const result = await firebaseService.getCollection('assets');
+      if (result.success && result.data) {
+        setAssets(result.data as Asset[]);
+      }
+    } catch (error) {
+      console.error('Error loading assets:', error);
+      showNotification('Failed to load assets', 'error');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const filteredAssets = assets.filter(asset => {
     const matchesSearch = asset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -126,6 +97,14 @@ const Assets: React.FC = () => {
       currency: 'USD'
     }).format(amount);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-4 sm:p-6">

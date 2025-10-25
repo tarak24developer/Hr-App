@@ -133,24 +133,48 @@ const Dashboard: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Load users (employees)
-      const usersResult = await firebaseService.getCollection('users');
-      const totalEmployees = usersResult?.success && usersResult.data ? usersResult.data.length : 0;
+      // Load data from Firebase collections
+      const [usersResult, leavesResult, , payrollResult] = await Promise.all([
+        firebaseService.getCollection('users'),
+        firebaseService.getCollection('leaves'),
+        firebaseService.getCollection('attendance'),
+        firebaseService.getCollection('payroll')
+      ]);
 
-      // Generate realistic mock data
-      const mockStats: DashboardStats = {
+      const totalEmployees = usersResult?.success && usersResult.data ? usersResult.data.length : 0;
+      const activeEmployees = usersResult?.success && usersResult.data 
+        ? usersResult.data.filter((user: any) => user.status === 'active').length 
+        : totalEmployees;
+      
+      const pendingLeaves = leavesResult?.success && leavesResult.data 
+        ? leavesResult.data.filter((leave: any) => leave.status === 'pending').length 
+        : 0;
+
+      // Calculate current month payroll
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      const monthlyPayroll = payrollResult?.success && payrollResult.data 
+        ? payrollResult.data
+            .filter((record: any) => {
+              const recordDate = new Date(record.month);
+              return recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear;
+            })
+            .reduce((sum: number, record: any) => sum + (record.netSalary || 0), 0)
+        : 0;
+
+      const stats: DashboardStats = {
         totalEmployees,
-        activeEmployees: Math.floor(totalEmployees * 0.87),
-        pendingLeaves: Math.floor(totalEmployees * 0.12),
-        monthlyPayroll: totalEmployees * 52000,
-        employeeChange: '+3.2%',
-        attendanceChange: '+5.8%',
-        leaveChange: '-2.1%',
-        payrollChange: '+8.5%',
+        activeEmployees,
+        pendingLeaves,
+        monthlyPayroll,
+        employeeChange: '+0%', // Calculate from historical data if needed
+        attendanceChange: '+0%',
+        leaveChange: '+0%',
+        payrollChange: '+0%',
       };
 
-      setStats(mockStats);
-      return mockStats;
+      setStats(stats);
+      return stats;
 
     } catch (err: any) {
       console.error('Error loading dashboard data:', err);

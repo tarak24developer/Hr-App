@@ -27,6 +27,7 @@ import { showNotification } from '../utils/notification';
 import { useThemeActions } from '@/stores/themeStore';
 import { useFontSizeStore, type FontSize } from '@/stores/fontSizeStore';
 import { settingsService } from '../services/settingsService';
+import firebaseService from '../services/firebaseService';
 import { UserSettings, NotificationSettings, PrivacySettings, Theme, NotificationType } from '../types';
 import { useAuthStore } from '../stores/authStore';
 
@@ -341,36 +342,30 @@ const Settings: React.FC = () => {
     
     setSaving(true);
     try {
-      // In a real app, you would fetch login history from an API
-      // For now, we'll simulate with mock data
-      const mockHistory = [
-        {
-          id: '1',
-          timestamp: new Date().toISOString(),
-          ipAddress: '192.168.1.1',
-          location: 'New York, NY',
-          device: 'Chrome on Windows',
-          status: 'success'
-        },
-        {
-          id: '2',
-          timestamp: new Date(Date.now() - 86400000).toISOString(),
-          ipAddress: '192.168.1.2',
-          location: 'New York, NY',
-          device: 'Safari on iPhone',
-          status: 'success'
-        },
-        {
-          id: '3',
-          timestamp: new Date(Date.now() - 172800000).toISOString(),
-          ipAddress: '10.0.0.1',
-          location: 'San Francisco, CA',
-          device: 'Firefox on Mac',
-          status: 'success'
-        }
-      ];
+      // Fetch login history from audit logs
+      const result = await firebaseService.getCollection('audit_logs', {
+        where: [
+          { field: 'userId', operator: '==', value: user.id },
+          { field: 'action', operator: '==', value: 'login' }
+        ],
+        orderBy: [{ field: 'timestamp', direction: 'desc' }],
+        limit: 10
+      });
       
-      setLoginHistory(mockHistory);
+      if (result.success && result.data) {
+        const history = result.data.map((log: any) => ({
+          id: log.id,
+          timestamp: log.timestamp,
+          ipAddress: log.ipAddress || 'N/A',
+          location: log.location || 'Unknown',
+          device: log.userAgent || 'Unknown Device',
+          status: log.success ? 'success' : 'failed'
+        }));
+        setLoginHistory(history);
+      } else {
+        setLoginHistory([]);
+      }
+      
       setLoginHistoryOpen(true);
     } catch (error) {
       console.error('Error fetching login history:', error);
