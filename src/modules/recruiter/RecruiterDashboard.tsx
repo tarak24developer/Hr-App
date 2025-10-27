@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
 import firebaseService from '@/services/firebaseService';
 import LoadingSpinner from '@/components/UI/LoadingSpinner';
 import { UserPlus, Users, Briefcase, Calendar } from 'lucide-react';
+import PieChartCard from '@/components/PieChartCard';
 
 const RecruiterDashboard: React.FC = () => {
   const { user } = useAuthStore();
@@ -18,6 +19,25 @@ const RecruiterDashboard: React.FC = () => {
     activeJobs: 0,
     interviewsScheduled: 0
   });
+  const [pipelineData, setPipelineData] = useState<{ name: string; value: number }[]>([
+    { name: 'Applied', value: 0 },
+    { name: 'Screening', value: 0 },
+    { name: 'Interview', value: 0 },
+    { name: 'Offer', value: 0 },
+    { name: 'Hired', value: 0 },
+  ]);
+  const [sourcesData, setSourcesData] = useState<{ name: string; value: number }[]>([
+    { name: 'Job Portals', value: 0 },
+    { name: 'Referrals', value: 0 },
+    { name: 'LinkedIn', value: 0 },
+    { name: 'Campus', value: 0 },
+  ]);
+  const [positionTypesData, setPositionTypesData] = useState<{ name: string; value: number }[]>([
+    { name: 'Full-time', value: 0 },
+    { name: 'Part-time', value: 0 },
+    { name: 'Contract', value: 0 },
+    { name: 'Intern', value: 0 },
+  ]);
 
   useEffect(() => {
     loadDashboardData();
@@ -40,6 +60,54 @@ const RecruiterDashboard: React.FC = () => {
             return hireDate >= thirtyDaysAgo;
           }).length
         : 0;
+
+      // Try to fetch candidates data
+      try {
+        const candidatesResult = await firebaseService.getCollection('candidates');
+        if (candidatesResult?.success && candidatesResult.data) {
+          const candidates = candidatesResult.data;
+          
+          // Process pipeline data
+          const pipelineCounts: Record<string, number> = {};
+          candidates.forEach((candidate: any) => {
+            const stage = candidate.stage || 'Applied';
+            pipelineCounts[stage] = (pipelineCounts[stage] || 0) + 1;
+          });
+          setPipelineData([
+            { name: 'Applied', value: pipelineCounts['Applied'] || 0 },
+            { name: 'Screening', value: pipelineCounts['Screening'] || 0 },
+            { name: 'Interview', value: pipelineCounts['Interview'] || 0 },
+            { name: 'Offer', value: pipelineCounts['Offer'] || 0 },
+            { name: 'Hired', value: pipelineCounts['Hired'] || 0 },
+          ]);
+
+          // Process sources data
+          const sourcesCounts: Record<string, number> = {};
+          candidates.forEach((candidate: any) => {
+            const source = candidate.source || 'Other';
+            sourcesCounts[source] = (sourcesCounts[source] || 0) + 1;
+          });
+          setSourcesData(Object.entries(sourcesCounts).map(([name, value]) => ({ name, value })));
+        }
+      } catch (error) {
+        console.log('Candidates collection not available');
+      }
+
+      // Try to fetch positions data
+      try {
+        const positionsResult = await firebaseService.getCollection('positions');
+        if (positionsResult?.success && positionsResult.data) {
+          const positions = positionsResult.data;
+          const typeCounts: Record<string, number> = {};
+          positions.forEach((position: any) => {
+            const type = position.type || 'Full-time';
+            typeCounts[type] = (typeCounts[type] || 0) + 1;
+          });
+          setPositionTypesData(Object.entries(typeCounts).map(([name, value]) => ({ name, value })));
+        }
+      } catch (error) {
+        console.log('Positions collection not available');
+      }
 
       setStats({
         totalEmployees,
@@ -130,6 +198,30 @@ const RecruiterDashboard: React.FC = () => {
               <Calendar className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Recruitment Analytics */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          Recruitment Analytics
+        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <PieChartCard
+            title="Candidate Pipeline"
+            data={pipelineData}
+            colors={['#3B82F6', '#8B5CF6', '#F59E0B', '#10B981', '#059669']}
+          />
+          <PieChartCard
+            title="Hiring Sources"
+            data={sourcesData}
+            colors={['#3B82F6', '#10B981', '#0EA5E9', '#8B5CF6']}
+          />
+          <PieChartCard
+            title="Position Types"
+            data={positionTypesData}
+            colors={['#10B981', '#3B82F6', '#F59E0B', '#8B5CF6']}
+          />
         </div>
       </div>
 

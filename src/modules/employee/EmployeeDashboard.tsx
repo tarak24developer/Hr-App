@@ -8,7 +8,38 @@ import { useAuthStore } from '@/stores/authStore';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import LoadingSpinner from '@/components/UI/LoadingSpinner';
+import dataService from '@/services/dataService';
 import { Calendar, Clock, FileText, Award, Book, Bell, User, DollarSign } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+
+// Chart colors
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+const LEAVE_COLORS = ['#10B981', '#3B82F6', '#F59E0B'];
+const TRAINING_COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444'];
+
+// Remove mock data - will be fetched from Firebase
+
+// Custom label renderer
+const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  const RADIAN = Math.PI / 180;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor={x > cx ? 'start' : 'end'}
+      dominantBaseline="central"
+      fontSize="12"
+      fontWeight="bold"
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
 
 const EmployeeDashboard: React.FC = () => {
   const { user } = useAuthStore();
@@ -17,6 +48,9 @@ const EmployeeDashboard: React.FC = () => {
   const [pendingLeaves, setPendingLeaves] = useState(0);
   const [recentAnnouncements, setRecentAnnouncements] = useState<any[]>([]);
   const [upcomingTraining, setUpcomingTraining] = useState<any[]>([]);
+  const [myLeaveData, setMyLeaveData] = useState<{ name: string; value: number }[]>([]);
+  const [myAttendanceData, setMyAttendanceData] = useState<{ name: string; value: number }[]>([]);
+  const [myTrainingData, setMyTrainingData] = useState<{ name: string; value: number }[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -70,6 +104,53 @@ const EmployeeDashboard: React.FC = () => {
       const trainingSnapshot = await getDocs(trainingQuery);
       setUpcomingTraining(
         trainingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      );
+
+      // Process my leave data
+      const myLeaves = leavesSnapshot.docs.map(doc => doc.data());
+      const leaveStatusCounts: Record<string, number> = {};
+      myLeaves.forEach((leave: any) => {
+        const status = leave.status === 'approved' ? 'Used' : leave.status === 'pending' ? 'Pending' : 'Rejected';
+        leaveStatusCounts[status] = (leaveStatusCounts[status] || 0) + (leave.days || 1);
+      });
+      leaveStatusCounts['Remaining'] = leaveBalance;
+      setMyLeaveData(
+        Object.entries(leaveStatusCounts).map(([name, value]) => ({ name, value }))
+      );
+
+      // Fetch and process my attendance data (last month)
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      const attendanceResponse = await dataService.fetchData('attendance');
+      const allAttendance = Array.isArray(attendanceResponse) ? attendanceResponse : (attendanceResponse?.data || []);
+      const attendanceData = allAttendance.filter((att: any) => 
+        att.employeeId === user.id && 
+        att.date && 
+        new Date(att.date) >= oneMonthAgo
+      );
+      const attStatusCounts: Record<string, number> = {};
+      attendanceData.forEach((att: any) => {
+        const status = att.status || 'Present';
+        attStatusCounts[status] = (attStatusCounts[status] || 0) + 1;
+      });
+      setMyAttendanceData(
+        Object.entries(attStatusCounts).map(([name, value]) => ({ name, value }))
+      );
+
+      // Fetch and process my training data
+      const allTrainingQuery = query(
+        collection(db, 'training'),
+        where('participants', 'array-contains', user.id)
+      );
+      const allTrainingSnapshot = await getDocs(allTrainingQuery);
+      const trainings = allTrainingSnapshot.docs.map(doc => doc.data());
+      const trainingStatusCounts: Record<string, number> = {};
+      trainings.forEach((training: any) => {
+        const status = training.status || 'Upcoming';
+        trainingStatusCounts[status] = (trainingStatusCounts[status] || 0) + 1;
+      });
+      setMyTrainingData(
+        Object.entries(trainingStatusCounts).map(([name, value]) => ({ name, value }))
       );
     } catch (error) {
       console.error('Error loading employee dashboard:', error);
@@ -170,6 +251,95 @@ const EmployeeDashboard: React.FC = () => {
           href="/documents"
           color="indigo"
         />
+      </div>
+
+      {/* Personal Analytics */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          My Analytics
+        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* My Leave Status */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Leave Status
+            </h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={myLeaveData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                {myLeaveData.map((_entry, index) => (
+                  <Cell key={`cell-${index}`} fill={LEAVE_COLORS[index % LEAVE_COLORS.length]} />
+                ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* My Attendance (Last Month) */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Attendance (Last Month)
+            </h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={myAttendanceData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                {myAttendanceData.map((_entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* My Training Progress */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Training Progress
+            </h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={myTrainingData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                {myTrainingData.map((_entry, index) => (
+                  <Cell key={`cell-${index}`} fill={TRAINING_COLORS[index % TRAINING_COLORS.length]} />
+                ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
 
       {/* Recent Announcements */}

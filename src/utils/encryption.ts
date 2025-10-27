@@ -7,7 +7,7 @@ import CryptoJS from 'crypto-js';
 
 // Use environment variable for encryption key, fallback to default for development
 // ⚠️ IMPORTANT: Set VITE_ENCRYPTION_KEY in production .env file
-const SECRET_KEY = import.meta.env.VITE_ENCRYPTION_KEY || 'hrms-default-key-change-in-production-2024';
+const SECRET_KEY = import.meta.env['VITE_ENCRYPTION_KEY'] as string || 'hrms-default-key-change-in-production-2024';
 
 // Salt for additional security
 const SALT = 'hrms-secure-salt-2024';
@@ -143,7 +143,7 @@ export const decryptFields = <T extends Record<string, any>>(
  * Check if encryption key is properly configured
  */
 export const isEncryptionConfigured = (): boolean => {
-  return import.meta.env.VITE_ENCRYPTION_KEY !== undefined;
+  return import.meta.env['VITE_ENCRYPTION_KEY'] !== undefined;
 };
 
 /**

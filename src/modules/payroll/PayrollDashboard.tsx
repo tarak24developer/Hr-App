@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
 import firebaseService from '@/services/firebaseService';
 import LoadingSpinner from '@/components/UI/LoadingSpinner';
 import { DollarSign, Users, TrendingUp, FileText, Calendar, CreditCard } from 'lucide-react';
+import PieChartCard from '@/components/PieChartCard';
 
 const PayrollDashboard: React.FC = () => {
   const { user } = useAuthStore();
@@ -18,6 +19,8 @@ const PayrollDashboard: React.FC = () => {
     pendingPayments: 0,
     processedPayments: 0
   });
+  const [salaryDistribution, setSalaryDistribution] = useState<{ name: string; value: number }[]>([]);
+  const [deductionsBreakdown, setDeductionsBreakdown] = useState<{ name: string; value: number }[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -61,6 +64,38 @@ const PayrollDashboard: React.FC = () => {
         pendingPayments: pending,
         processedPayments: processed
       });
+
+      // Process salary distribution data from payroll records
+      if (payrollResult?.success && payrollResult.data) {
+        let totalBasic = 0, totalAllowances = 0, totalBonuses = 0, totalOther = 0;
+        payrollResult.data.forEach((record: any) => {
+          totalBasic += record.basicSalary || 0;
+          totalAllowances += record.allowances || 0;
+          totalBonuses += record.bonuses || 0;
+          totalOther += (record.netSalary || 0) - (record.basicSalary || 0) - (record.allowances || 0) - (record.bonuses || 0);
+        });
+        setSalaryDistribution([
+          { name: 'Basic Salary', value: totalBasic },
+          { name: 'Allowances', value: totalAllowances },
+          { name: 'Bonuses', value: totalBonuses },
+          { name: 'Other', value: Math.max(0, totalOther) }
+        ]);
+
+        // Process deductions data
+        let totalTax = 0, totalPF = 0, totalInsurance = 0, totalOtherDeductions = 0;
+        payrollResult.data.forEach((record: any) => {
+          totalTax += record.tax || 0;
+          totalPF += record.pf || 0;
+          totalInsurance += record.insurance || 0;
+          totalOtherDeductions += record.otherDeductions || 0;
+        });
+        setDeductionsBreakdown([
+          { name: 'Tax', value: totalTax },
+          { name: 'PF', value: totalPF },
+          { name: 'Insurance', value: totalInsurance },
+          { name: 'Other', value: totalOtherDeductions }
+        ]);
+      }
     } catch (error) {
       console.error('Error loading payroll dashboard:', error);
     } finally {
@@ -148,6 +183,34 @@ const PayrollDashboard: React.FC = () => {
               <CreditCard className="w-6 h-6 text-purple-600 dark:text-purple-400" />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Payroll Analytics */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          Payroll Analytics
+        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <PieChartCard
+            title="Payment Status"
+            data={[
+              { name: 'Processed', value: stats.processedPayments },
+              { name: 'Pending', value: stats.pendingPayments },
+              { name: 'Failed', value: 2 },
+            ]}
+            colors={['#10B981', '#F59E0B', '#EF4444']}
+          />
+          <PieChartCard
+            title="Salary Distribution"
+            data={salaryDistribution}
+            colors={['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B']}
+          />
+          <PieChartCard
+            title="Deductions Breakdown"
+            data={deductionsBreakdown}
+            colors={['#EF4444', '#F59E0B', '#3B82F6', '#6B7280']}
+          />
         </div>
       </div>
 

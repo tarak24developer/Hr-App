@@ -10,6 +10,36 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/services/firebase';
 import LoadingSpinner from '@/components/UI/LoadingSpinner';
 import { Users, CheckCircle, Clock, TrendingUp, Calendar, FileText, Target, Award } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+
+// Chart colors
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+const PERFORMANCE_COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444'];
+const TASK_COLORS = ['#10B981', '#3B82F6', '#F59E0B'];
+
+// Remove mock data - will be fetched from Firebase
+
+// Custom label renderer
+const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  const RADIAN = Math.PI / 180;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor={x > cx ? 'start' : 'end'}
+      dominantBaseline="central"
+      fontSize="12"
+      fontWeight="bold"
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
 
 const ManagerDashboard: React.FC = () => {
   const { user } = useAuthStore();
@@ -17,6 +47,9 @@ const ManagerDashboard: React.FC = () => {
   const [teamSize, setTeamSize] = useState(0);
   const [pendingLeaves, setPendingLeaves] = useState(0);
   const [teamAttendance, setTeamAttendance] = useState<any>(null);
+  const [teamPerformanceData, setTeamPerformanceData] = useState<{ name: string; value: number }[]>([]);
+  const [taskStatusData, setTaskStatusData] = useState<{ name: string; value: number }[]>([]);
+  const [teamSkillsData, setTeamSkillsData] = useState<{ name: string; value: number }[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -37,8 +70,10 @@ const ManagerDashboard: React.FC = () => {
       const teamSnapshot = await getDocs(teamQuery);
       setTeamSize(teamSnapshot.size);
 
-      // Fetch pending leave requests
+      // Fetch pending leave requests and team data
       const teamMemberIds = teamSnapshot.docs.map(doc => doc.id);
+      const teamMembers = teamSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
       if (teamMemberIds.length > 0) {
         const leavesQuery = query(
           collection(db, 'leaves'),
@@ -48,6 +83,50 @@ const ManagerDashboard: React.FC = () => {
         const leavesSnapshot = await getDocs(leavesQuery);
         setPendingLeaves(leavesSnapshot.size);
       }
+
+      // Process performance data from team members
+      const performanceCounts: Record<string, number> = {};
+      teamMembers.forEach((member: any) => {
+        const performance = member.performanceRating || 'Average';
+        performanceCounts[performance] = (performanceCounts[performance] || 0) + 1;
+      });
+      setTeamPerformanceData(
+        Object.entries(performanceCounts).map(([name, value]) => ({ name, value }))
+      );
+
+      // Fetch tasks if available
+      try {
+        const tasksQuery = query(collection(db, 'tasks'));
+        const tasksSnapshot = await getDocs(tasksQuery);
+        const tasks = tasksSnapshot.docs.map(doc => doc.data());
+        const taskCounts: Record<string, number> = {};
+        tasks.forEach((task: any) => {
+          const status = task.status || 'Pending';
+          taskCounts[status] = (taskCounts[status] || 0) + 1;
+        });
+        setTaskStatusData(
+          Object.entries(taskCounts).map(([name, value]) => ({ name, value }))
+        );
+      } catch (error) {
+        console.log('Tasks collection not available');
+        setTaskStatusData([
+          { name: 'Completed', value: 0 },
+          { name: 'In Progress', value: 0 },
+          { name: 'Pending', value: 0 }
+        ]);
+      }
+
+      // Process skills data from team members
+      const skillsCounts: Record<string, number> = {};
+      teamMembers.forEach((member: any) => {
+        const skills = member.skills || [];
+        skills.forEach((skill: string) => {
+          skillsCounts[skill] = (skillsCounts[skill] || 0) + 1;
+        });
+      });
+      setTeamSkillsData(
+        Object.entries(skillsCounts).map(([name, value]) => ({ name, value }))
+      );
 
       // Get team attendance metrics
       const attMetrics = await analyticsEngine.getAttendanceMetrics({
@@ -155,6 +234,95 @@ const ManagerDashboard: React.FC = () => {
           href="/reports"
           color="gray"
         />
+      </div>
+
+      {/* Team Analytics */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          Team Analytics
+        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Team Performance Distribution */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Performance Ratings
+            </h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={teamPerformanceData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                {teamPerformanceData.map((_entry, index) => (
+                  <Cell key={`cell-${index}`} fill={PERFORMANCE_COLORS[index % PERFORMANCE_COLORS.length]} />
+                ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Task Status */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Task Status
+            </h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={taskStatusData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                {taskStatusData.map((_entry, index) => (
+                  <Cell key={`cell-${index}`} fill={TASK_COLORS[index % TASK_COLORS.length]} />
+                ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Team Skills */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Team Skills
+            </h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie
+                  data={teamSkillsData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                {teamSkillsData.map((_entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
 
       {/* Recent Activity would be shown here from Firebase */}

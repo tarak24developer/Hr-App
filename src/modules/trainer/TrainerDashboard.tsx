@@ -5,8 +5,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
+import dataService from '@/services/dataService';
 import LoadingSpinner from '@/components/UI/LoadingSpinner';
 import { GraduationCap, BookOpen, Users, TrendingUp, Award, Target } from 'lucide-react';
+import PieChartCard from '@/components/PieChartCard';
 
 const TrainerDashboard: React.FC = () => {
   const { user } = useAuthStore();
@@ -17,6 +19,9 @@ const TrainerDashboard: React.FC = () => {
     completionRate: 0,
     upcomingCourses: 0
   });
+  const [courseStatusData, setCourseStatusData] = useState<{ name: string; value: number }[]>([]);
+  const [categoryData, setCategoryData] = useState<{ name: string; value: number }[]>([]);
+  const [certificationData, setCertificationData] = useState<{ name: string; value: number }[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -26,13 +31,64 @@ const TrainerDashboard: React.FC = () => {
     try {
       setLoading(true);
 
-      // This would fetch from training collections
+      // Fetch training data
+      const trainingResponse = await dataService.fetchData('training');
+      const trainings = Array.isArray(trainingResponse) ? trainingResponse : (trainingResponse?.data || []);
+
+      // Calculate stats
+      const totalPrograms = trainings.length;
+      const activeTrainees = trainings.reduce((sum: number, training: any) => 
+        sum + (training.participants?.length || 0), 0);
+      const completedCount = trainings.filter((t: any) => t.status === 'completed').length;
+      const completionRate = totalPrograms > 0 ? Math.round((completedCount / totalPrograms) * 100) : 0;
+      const upcomingCourses = trainings.filter((t: any) => t.status === 'scheduled').length;
+
       setStats({
-        totalPrograms: 15,
-        activeTrainees: 45,
-        completionRate: 78,
-        upcomingCourses: 8
+        totalPrograms,
+        activeTrainees,
+        completionRate,
+        upcomingCourses
       });
+
+      // Process course status data
+      const statusCounts: Record<string, number> = {};
+      trainings.forEach((training: any) => {
+        const status = training.status || 'Upcoming';
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+      setCourseStatusData(
+        Object.entries(statusCounts).map(([name, value]) => ({ 
+          name: name.charAt(0).toUpperCase() + name.slice(1), 
+          value 
+        }))
+      );
+
+      // Process category data
+      const categoryCounts: Record<string, number> = {};
+      trainings.forEach((training: any) => {
+        const category = training.category || 'General';
+        categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      });
+      setCategoryData(
+        Object.entries(categoryCounts).map(([name, value]) => ({ name, value }))
+      );
+
+      // Process certification data
+      const certCounts: Record<string, number> = { 'Certified': 0, 'Pending': 0, 'Not Certified': 0 };
+      trainings.forEach((training: any) => {
+        if (training.hasCertification) {
+          if (training.status === 'completed') {
+            certCounts['Certified'] = (certCounts['Certified'] || 0) + 1;
+          } else {
+            certCounts['Pending'] = (certCounts['Pending'] || 0) + 1;
+          }
+        } else {
+          certCounts['Not Certified'] = (certCounts['Not Certified'] || 0) + 1;
+        }
+      });
+      setCertificationData(
+        Object.entries(certCounts).map(([name, value]) => ({ name, value }))
+      );
     } catch (error) {
       console.error('Error loading trainer dashboard:', error);
     } finally {
@@ -116,6 +172,30 @@ const TrainerDashboard: React.FC = () => {
               <Target className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Training Analytics */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          Training Analytics
+        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <PieChartCard
+            title="Course Status"
+            data={courseStatusData}
+            colors={['#10B981', '#3B82F6', '#F59E0B', '#EF4444']}
+          />
+          <PieChartCard
+            title="Training Categories"
+            data={categoryData}
+            colors={['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6']}
+          />
+          <PieChartCard
+            title="Certification Status"
+            data={certificationData}
+            colors={['#10B981', '#3B82F6', '#EF4444']}
+          />
         </div>
       </div>
 

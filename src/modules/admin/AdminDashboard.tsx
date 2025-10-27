@@ -8,8 +8,45 @@ import { useAuthStore } from '@/stores/authStore';
 import { analyticsEngine } from '@/lib/analytics/analyticsEngine';
 import { rbacService } from '@/lib/rbac/rbacService';
 import LoadingSpinner from '@/components/UI/LoadingSpinner';
+import employeeService from '@/services/employeeService';
 import type { AnalyticsMetric, AnalyticsInsight } from '@/lib/analytics/analyticsEngine';
 import { BarChart3, Users, Shield, Activity, AlertTriangle, TrendingUp, Settings, Database } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+
+// Chart colors
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+const STATUS_COLORS = ['#10B981', '#F59E0B', '#EF4444', '#6B7280'];
+const ROLE_COLORS = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#06B6D4'];
+const RESOURCE_COLORS = ['#3B82F6', '#10B981', '#F59E0B'];
+
+// System resource data (keep as static for now)
+const systemResourceData = [
+  { name: 'Database', value: 42 },
+  { name: 'Storage', value: 78 },
+  { name: 'Bandwidth', value: 35 },
+];
+
+// Custom label renderer for pie charts
+const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  const RADIAN = Math.PI / 180;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor={x > cx ? 'start' : 'end'}
+      dominantBaseline="central"
+      fontSize="12"
+      fontWeight="bold"
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
 
 const AdminDashboard: React.FC = () => {
   const { user } = useAuthStore();
@@ -21,6 +58,9 @@ const AdminDashboard: React.FC = () => {
     turnoverRate: AnalyticsMetric;
   } | null>(null);
   const [insights, setInsights] = useState<AnalyticsInsight[]>([]);
+  const [departmentData, setDepartmentData] = useState<{ name: string; value: number }[]>([]);
+  const [statusData, setStatusData] = useState<{ name: string; value: number }[]>([]);
+  const [roleData, setRoleData] = useState<{ name: string; value: number }[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -34,6 +74,40 @@ const AdminDashboard: React.FC = () => {
       if (user) {
         rbacService.initializeUserRoles(user);
       }
+
+      // Fetch all employees
+      const employeesResponse = await employeeService.getEmployees();
+      const employees = Array.isArray(employeesResponse) ? employeesResponse : [];
+
+      // Process department data
+      const deptCounts: Record<string, number> = {};
+      employees.forEach((emp: any) => {
+        const dept = emp.department || 'Unassigned';
+        deptCounts[dept] = (deptCounts[dept] || 0) + 1;
+      });
+      setDepartmentData(
+        Object.entries(deptCounts).map(([name, value]) => ({ name, value }))
+      );
+
+      // Process status data
+      const statusCounts: Record<string, number> = {};
+      employees.forEach((emp: any) => {
+        const status = emp.status || 'Active';
+        statusCounts[status] = (statusCounts[status] || 0) + 1;
+      });
+      setStatusData(
+        Object.entries(statusCounts).map(([name, value]) => ({ name, value }))
+      );
+
+      // Process role data
+      const roleCounts: Record<string, number> = {};
+      employees.forEach((emp: any) => {
+        const role = emp.role || 'Employee';
+        roleCounts[role] = (roleCounts[role] || 0) + 1;
+      });
+      setRoleData(
+        Object.entries(roleCounts).map(([name, value]) => ({ name, value }))
+      );
 
       // Fetch metrics
       const employeeMetrics = await analyticsEngine.getEmployeeMetrics();
@@ -168,6 +242,117 @@ const AdminDashboard: React.FC = () => {
           href="/integrations"
           color="purple"
         />
+      </div>
+
+      {/* Analytics Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Employee Distribution by Department */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Employees by Department
+          </h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={departmentData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={renderCustomLabel}
+                outerRadius={100}
+                fill="#8884d8"
+                dataKey="value"
+              >
+              {departmentData.map((_entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Employee Status Distribution */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Employee Status
+          </h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={statusData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={renderCustomLabel}
+                outerRadius={100}
+                fill="#8884d8"
+                dataKey="value"
+              >
+              {statusData.map((_entry, index) => (
+                <Cell key={`cell-${index}`} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
+              ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Role Distribution */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            Employees by Role
+          </h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={roleData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={renderCustomLabel}
+                outerRadius={100}
+                fill="#8884d8"
+                dataKey="value"
+              >
+              {roleData.map((_entry, index) => (
+                <Cell key={`cell-${index}`} fill={ROLE_COLORS[index % ROLE_COLORS.length]} />
+              ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* System Resource Usage */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+            System Resources
+          </h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={systemResourceData}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={renderCustomLabel}
+                outerRadius={100}
+                fill="#8884d8"
+                dataKey="value"
+              >
+              {systemResourceData.map((_entry, index) => (
+                <Cell key={`cell-${index}`} fill={RESOURCE_COLORS[index % RESOURCE_COLORS.length]} />
+              ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* System Health */}

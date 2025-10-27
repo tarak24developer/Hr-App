@@ -6,13 +6,50 @@
 import React, { useEffect, useState } from 'react';
 import { analyticsEngine } from '@/lib/analytics/analyticsEngine';
 import LoadingSpinner from '@/components/UI/LoadingSpinner';
+import employeeService from '@/services/employeeService';
+import dataService from '@/services/dataService';
 import { Users, Calendar, TrendingUp, DollarSign, Clock, FileText, UserPlus, Briefcase } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+
+// Chart colors
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+const LEAVE_COLORS = ['#F59E0B', '#10B981', '#EF4444'];
+const ATTENDANCE_COLORS = ['#10B981', '#EF4444', '#F59E0B', '#3B82F6'];
+const GENDER_COLORS = ['#3B82F6', '#EC4899', '#8B5CF6'];
+
+// Remove mock data - will be fetched from Firebase
+
+// Custom label renderer
+const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+  const RADIAN = Math.PI / 180;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="white"
+      textAnchor={x > cx ? 'start' : 'end'}
+      dominantBaseline="central"
+      fontSize="12"
+      fontWeight="bold"
+    >
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
 
 const HRDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [employeeMetrics, setEmployeeMetrics] = useState<any>(null);
   const [attendanceMetrics, setAttendanceMetrics] = useState<any>(null);
   const [leaveMetrics, setLeaveMetrics] = useState<any>(null);
+  const [leaveTypeData, setLeaveTypeData] = useState<{ name: string; value: number }[]>([]);
+  const [leaveStatusData, setLeaveStatusData] = useState<{ name: string; value: number }[]>([]);
+  const [attendanceStatusData, setAttendanceStatusData] = useState<{ name: string; value: number }[]>([]);
+  const [genderDistributionData, setGenderDistributionData] = useState<{ name: string; value: number }[]>([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -22,15 +59,67 @@ const HRDashboard: React.FC = () => {
     try {
       setLoading(true);
 
-      const [empMetrics, attMetrics, lvMetrics] = await Promise.all([
+      // Fetch all data
+      const [empMetrics, attMetrics, lvMetrics, employeesResponse, leavesResponse, attendanceResponse] = await Promise.all([
         analyticsEngine.getEmployeeMetrics(),
         analyticsEngine.getAttendanceMetrics(),
-        analyticsEngine.getLeaveMetrics()
+        analyticsEngine.getLeaveMetrics(),
+        employeeService.getEmployees(),
+        dataService.fetchData('leaves'),
+        dataService.fetchData('attendance')
       ]);
+
+      const employees = Array.isArray(employeesResponse) ? employeesResponse : [];
+      const leaves = Array.isArray(leavesResponse) ? leavesResponse : (leavesResponse?.data || []);
+      const attendance = Array.isArray(attendanceResponse) ? attendanceResponse : (attendanceResponse?.data || []);
 
       setEmployeeMetrics(empMetrics);
       setAttendanceMetrics(attMetrics);
       setLeaveMetrics(lvMetrics);
+
+      // Process leave type data
+      const leaveTypeCounts: Record<string, number> = {};
+      leaves.forEach((leave: any) => {
+        const type = leave.leaveType || 'Other';
+        leaveTypeCounts[type] = (leaveTypeCounts[type] || 0) + 1;
+      });
+      setLeaveTypeData(
+        Object.entries(leaveTypeCounts).map(([name, value]) => ({ name, value }))
+      );
+
+      // Process leave status data
+      const leaveStatusCounts: Record<string, number> = {};
+      leaves.forEach((leave: any) => {
+        const status = leave.status || 'Pending';
+        leaveStatusCounts[status] = (leaveStatusCounts[status] || 0) + 1;
+      });
+      setLeaveStatusData(
+        Object.entries(leaveStatusCounts).map(([name, value]) => ({ name, value }))
+      );
+
+      // Process today's attendance data
+      const today = new Date().toISOString().split('T')[0];
+      const todayAttendance = attendance.filter((att: any) => 
+        att.date?.startsWith(today) || att.checkInTime?.startsWith(today)
+      );
+      const attStatusCounts: Record<string, number> = {};
+      todayAttendance.forEach((att: any) => {
+        const status = att.status || 'Present';
+        attStatusCounts[status] = (attStatusCounts[status] || 0) + 1;
+      });
+      setAttendanceStatusData(
+        Object.entries(attStatusCounts).map(([name, value]) => ({ name, value }))
+      );
+
+      // Process gender distribution data
+      const genderCounts: Record<string, number> = {};
+      employees.forEach((emp: any) => {
+        const gender = emp.gender || 'Not Specified';
+        genderCounts[gender] = (genderCounts[gender] || 0) + 1;
+      });
+      setGenderDistributionData(
+        Object.entries(genderCounts).map(([name, value]) => ({ name, value }))
+      );
     } catch (error) {
       console.error('Error loading HR dashboard data:', error);
     } finally {
@@ -157,6 +246,122 @@ const HRDashboard: React.FC = () => {
             icon={<TrendingUp className="w-6 h-6" />}
             color="purple"
           />
+        </div>
+      </div>
+
+      {/* Analytics Charts */}
+      <div className="mb-8">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+          HR Analytics
+        </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Leave Types Distribution */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Leave Types Distribution
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={leaveTypeData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                {leaveTypeData.map((_entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Leave Request Status */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Leave Request Status
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={leaveStatusData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                {leaveStatusData.map((_entry, index) => (
+                  <Cell key={`cell-${index}`} fill={LEAVE_COLORS[index % LEAVE_COLORS.length]} />
+                ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Attendance Status */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Today's Attendance Status
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={attendanceStatusData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                {attendanceStatusData.map((_entry, index) => (
+                  <Cell key={`cell-${index}`} fill={ATTENDANCE_COLORS[index % ATTENDANCE_COLORS.length]} />
+                ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Gender Distribution */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Gender Distribution
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={genderDistributionData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                {genderDistributionData.map((_entry, index) => (
+                  <Cell key={`cell-${index}`} fill={GENDER_COLORS[index % GENDER_COLORS.length]} />
+                ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
