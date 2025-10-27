@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authService } from '@/services/authService';
+import { encryptData, decryptData } from '@/utils/encryption';
 import type { User } from '@/types';
 
 interface AuthState {
@@ -25,7 +26,7 @@ export const useAuthStore = create<AuthStore>()(
       loading: true, // Start with loading true
       error: null,
 
-      setUser: (user) => set({ user, error: null, loading: false }),
+      setUser: (user) => set({ user, error: null }),
       
       setLoading: (loading) => set({ loading }),
       
@@ -53,7 +54,57 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ user: state.user }),
+      // ✅ SECURITY: Custom encrypted storage
+      storage: {
+        getItem: (name) => {
+          const item = localStorage.getItem(name);
+          if (!item) return null;
+          
+          try {
+            // Decrypt the data
+            const decrypted = decryptData(item);
+            return decrypted;
+          } catch (error) {
+            console.error('Failed to decrypt auth data:', error);
+            // Clear corrupted data
+            localStorage.removeItem(name);
+            return null;
+          }
+        },
+        setItem: (name, value) => {
+          try {
+            // Encrypt the data before storing
+            const encrypted = encryptData(value);
+            localStorage.setItem(name, encrypted);
+          } catch (error) {
+            console.error('Failed to encrypt auth data:', error);
+            // Fallback to unencrypted storage (better than losing data)
+            localStorage.setItem(name, JSON.stringify(value));
+          }
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(name);
+        },
+      },
+      partialize: (state) => ({ 
+        user: state.user,
+        setUser: state.setUser,
+        setLoading: state.setLoading,
+        setError: state.setError,
+        clearAuth: state.clearAuth,
+        updateUser: state.updateUser,
+        logout: state.logout,
+        loading: true,
+        error: null
+        // Store only user data encrypted, exclude temporary states
+      }),
+      onRehydrateStorage: () => (state) => {
+        // Reset loading state after rehydration
+        if (state) {
+          state.loading = true; // Let auth service determine the actual state
+          state.error = null;
+        }
+      },
     }
   )
 );

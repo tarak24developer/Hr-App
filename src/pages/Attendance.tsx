@@ -352,6 +352,15 @@ const Attendance: React.FC = () => {
     setUploadErrors([]);
     setUploadRows([]);
     if (!file) return;
+    
+    // ✅ SECURITY: Validate file before processing
+    const { validateFile } = await import('@/utils/fileValidation');
+    const validation = validateFile(file, 'excel');
+    if (!validation.valid) {
+      setUploadErrors([validation.error || 'Invalid file']);
+      return;
+    }
+    
     setUploadParsing(true);
     try {
       const text = await file.text();

@@ -29,7 +29,8 @@ import {
   AlertTriangle,
   LogOut,
   Database,
-  TrendingUp
+  TrendingUp,
+  DollarSign
 } from 'lucide-react';
 
 interface NavItem {
@@ -37,6 +38,7 @@ interface NavItem {
   href: string;
   icon: any; // Using any for lucide-react icons
   badge?: string;
+  roles?: string[]; // Which roles can see this item
 }
 
 const Sidebar: React.FC = () => {
@@ -65,144 +67,197 @@ const Sidebar: React.FC = () => {
     }
   }, [isCollapsed]);
 
-  const navigation: NavItem[] = [
+  const allNavigation: NavItem[] = [
+    // Universal items (all roles)
     {
       name: 'Dashboard',
       href: '/dashboard',
-      icon: Home
+      icon: Home,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'manager', 'employee', 'payroll_admin', 'recruiter', 'training_coordinator']
     },
     {
       name: 'Employee Directory',
       href: '/employee-directory',
-      icon: Users
-    },
-    {
-      name: 'Employee Management',
-      href: '/employee-management',
-      icon: UserCircle
-    },
-    {
-      name: 'Exit Process',
-      href: '/exit-process',
-      icon: LogOut
-    },
-    {
-      name: 'Attendance',
-      href: '/attendance',
-      icon: Clock
-    },
-    {
-      name: 'Leave Management',
-      href: '/leaves',
-      icon: Calendar
-    },
-    {
-      name: 'Holidays',
-      href: '/holidays',
-      icon: Calendar
-    },
-    {
-      name: 'Training',
-      href: '/training',
-      icon: GraduationCap
-    },
-    {
-      name: 'Feedback Surveys',
-      href: '/feedback-surveys',
-      icon: MessageSquare
-    },
-    {
-      name: 'Request Portal',
-      href: '/request-portal',
-      icon: ClipboardList
-    },
-    {
-      name: 'Payroll',
-      href: '/payroll',
-      icon: CreditCard
-    },
-
-    {
-      name: 'Expense Management',
-      href: '/expense-management',
-      icon: CreditCard
-    },
-    {
-      name: 'Assets',
-      href: '/assets',
-      icon: Package
-    },
-    {
-      name: 'Inventory',
-      href: '/inventory',
-      icon: Database
-    },
-    {
-      name: 'Advanced Analytics',
-      href: '/advanced-analytics',
-      icon: TrendingUp
-    },
-    {
-      name: 'Reports',
-      href: '/reports',
-      icon: BarChart3
-    },
-    {
-      name: 'User Tracking',
-      href: '/user-tracking',
-      icon: MapPin
-    },
-    {
-      name: 'Users',
-      href: '/users',
-      icon: Users
-    },
-    {
-      name: 'Document Management',
-      href: '/document-management',
-      icon: FileText
-    },
-    {
-      name: 'Security',
-      href: '/security',
-      icon: Shield
-    },
-    {
-      name: 'Enhanced Access Control',
-      href: '/enhanced-access-control',
-      icon: Shield
-    },
-    {
-      name: 'Incident Management',
-      href: '/incident-management',
-      icon: AlertTriangle
-    },
-    {
-      name: 'Notifications',
-      href: '/notifications',
-      icon: Bell
+      icon: Users,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'manager', 'employee', 'recruiter']
     },
     {
       name: 'Announcements',
       href: '/announcements',
-      icon: MessageSquare
+      icon: MessageSquare,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'manager', 'employee', 'payroll_admin', 'recruiter', 'training_coordinator']
+    },
+    {
+      name: 'Notifications',
+      href: '/notifications',
+      icon: Bell,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'manager', 'employee', 'payroll_admin', 'recruiter', 'training_coordinator']
+    },
+    
+    // Employee Management (Admin, HR, Recruiter)
+    {
+      name: 'Employee Management',
+      href: '/employee-management',
+      icon: UserCircle,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'recruiter']
+    },
+    {
+      name: 'Exit Process',
+      href: '/exit-process',
+      icon: LogOut,
+      roles: ['admin', 'hr', 'hr_manager']
+    },
+    
+    // Attendance & Leave (Most roles)
+    {
+      name: 'Attendance',
+      href: '/attendance',
+      icon: Clock,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'manager', 'employee']
+    },
+    {
+      name: 'Leave Management',
+      href: '/leaves',
+      icon: Calendar,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'manager', 'employee']
+    },
+    {
+      name: 'Holidays',
+      href: '/holidays',
+      icon: Calendar,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'manager', 'employee']
+    },
+    
+    // Training
+    {
+      name: 'Training',
+      href: '/training',
+      icon: GraduationCap,
+      roles: ['admin', 'hr', 'hr_manager', 'manager', 'employee', 'training_coordinator']
+    },
+    {
+      name: 'Feedback Surveys',
+      href: '/feedback-surveys',
+      icon: MessageSquare,
+      roles: ['admin', 'hr', 'hr_manager', 'manager', 'employee', 'training_coordinator']
+    },
+    
+    // Requests & Expenses
+    {
+      name: 'Request Portal',
+      href: '/request-portal',
+      icon: ClipboardList,
+      roles: ['admin', 'hr', 'hr_manager', 'manager', 'employee']
+    },
+    {
+      name: 'Expense Management',
+      href: '/expense-management',
+      icon: CreditCard,
+      roles: ['admin', 'hr', 'manager', 'employee']
+    },
+    
+    // Payroll (Admin, HR, Payroll Admin)
+    {
+      name: 'Payroll',
+      href: '/payroll',
+      icon: DollarSign,
+      roles: ['admin', 'hr', 'hr_manager', 'payroll_admin']
+    },
+    
+    // Assets & Inventory
+    {
+      name: 'Assets',
+      href: '/assets',
+      icon: Package,
+      roles: ['admin', 'it_admin', 'hr']
+    },
+    {
+      name: 'Inventory',
+      href: '/inventory',
+      icon: Database,
+      roles: ['admin', 'it_admin', 'hr']
+    },
+    
+    // Analytics & Reports
+    {
+      name: 'Advanced Analytics',
+      href: '/advanced-analytics',
+      icon: TrendingUp,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager']
+    },
+    {
+      name: 'Reports',
+      href: '/reports',
+      icon: BarChart3,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'manager', 'payroll_admin']
+    },
+    
+    // User & Security Management (Admin, IT Admin)
+    {
+      name: 'Users',
+      href: '/users',
+      icon: Users,
+      roles: ['admin', 'it_admin']
+    },
+    {
+      name: 'User Tracking',
+      href: '/user-tracking',
+      icon: MapPin,
+      roles: ['admin', 'it_admin']
     },
     {
       name: 'Live Tracking Map',
       href: '/live-tracking-map',
-      icon: MapPin
+      icon: MapPin,
+      roles: ['admin', 'it_admin', 'hr']
+    },
+    {
+      name: 'Security',
+      href: '/security',
+      icon: Shield,
+      roles: ['admin', 'it_admin']
+    },
+    {
+      name: 'Enhanced Access Control',
+      href: '/enhanced-access-control',
+      icon: Shield,
+      roles: ['admin', 'it_admin']
+    },
+    {
+      name: 'Incident Management',
+      href: '/incident-management',
+      icon: AlertTriangle,
+      roles: ['admin', 'it_admin', 'hr']
+    },
+    
+    // Documents
+    {
+      name: 'Document Management',
+      href: '/document-management',
+      icon: FileText,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'manager', 'employee']
+    },
+    
+    // Profile & Settings (All)
+    {
+      name: 'Profile',
+      href: '/profile',
+      icon: UserCircle,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'manager', 'employee', 'payroll_admin', 'recruiter', 'training_coordinator']
     },
     {
       name: 'Settings',
       href: '/settings',
-      icon: Settings
-    },
-    {
-      name: 'Profile',
-      href: '/profile',
-      icon: UserCircle
+      icon: Settings,
+      roles: ['admin', 'it_admin', 'hr', 'hr_manager', 'manager', 'employee', 'payroll_admin', 'recruiter', 'training_coordinator']
     }
   ];
+
+  // Filter navigation based on user role
+  const navigation = allNavigation.filter(item => {
+    if (!item.roles || item.roles.length === 0) return true; // Show items without role restrictions
+    return user && item.roles.includes(user.role); // Show only if user role is in allowed roles
+  });
 
 
 

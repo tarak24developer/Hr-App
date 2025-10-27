@@ -1,0 +1,275 @@
+rules_version = '2';
+
+/**
+ * Firebase Storage Security Rules
+ * Protects file uploads and restricts access based on user roles
+ * 
+ * Deploy with: firebase deploy --only storage
+ */
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function hasRole(roles) {
+      return isAuthenticated() && getUserData().role in roles;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Image size validation (5MB max for general images)
+    function isValidImageSize() {
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+    
+    // Avatar size validation (2MB max)
+    function isValidAvatarSize() {
+      return request.resource.size < 2 * 1024 * 1024;
+    }
+    
+    // Document size validation (10MB max)
+    function isValidDocumentSize() {
+      return request.resource.size < 10 * 1024 * 1024;
+    }
+    
+    // Excel file size validation (20MB max)
+    function isValidExcelSize() {
+      return request.resource.size < 20 * 1024 * 1024;
+    }
+    
+    // Image file type validation
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    // Document file type validation
+    function isValidDocument() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/msword') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.*') ||
+             request.resource.contentType.matches('text/plain') ||
+             request.resource.contentType.matches('text/csv');
+    }
+    
+    // Excel file type validation
+    function isValidExcel() {
+      return request.resource.contentType.matches('application/vnd.ms-excel') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') ||
+             request.resource.contentType.matches('text/csv');
+    }
+
+    // ===================================================
+    // USER AVATARS
+    // ===================================================
+    match /avatars/{userId}/{fileName} {
+      // Anyone can read avatars (public)
+      allow read: if true;
+      
+      // Only the owner can upload/update their avatar
+      allow write: if isOwner(userId) 
+                   && isValidImage() 
+                   && isValidAvatarSize();
+      
+      // Only the owner can delete their avatar
+      allow delete: if isOwner(userId);
+    }
+
+    // ===================================================
+    // EMPLOYEE DOCUMENTS (Personal documents)
+    // ===================================================
+    match /documents/{userId}/{fileName} {
+      // User can read their own documents
+      // HR, Admin, and HR Manager can read all documents
+      allow read: if isOwner(userId) || hasRole(['admin', 'hr', 'hr_manager', 'it_admin']);
+      
+      // User can upload their own documents
+      // HR and Admin can upload for any user
+      allow write: if (isOwner(userId) || hasRole(['admin', 'hr', 'hr_manager']))
+                   && isValidDocument()
+                   && isValidDocumentSize();
+      
+      // Only HR and Admin can delete documents
+      allow delete: if hasRole(['admin', 'hr', 'hr_manager']);
+    }
+
+    // ===================================================
+    // PAYROLL DOCUMENTS (Sensitive)
+    // ===================================================
+    match /payroll/{userId}/{fileName} {
+      // User can read their own payroll documents
+      // Payroll Admin, HR, and Admin can read all
+      allow read: if isOwner(userId) || hasRole(['admin', 'hr', 'hr_manager', 'payroll_admin']);
+      
+      // Only Payroll Admin, HR Manager, and Admin can upload
+      allow write: if hasRole(['admin', 'hr_manager', 'payroll_admin'])
+                   && isValidDocument()
+                   && isValidDocumentSize();
+      
+      // Only Admin and HR Manager can delete payroll documents
+      allow delete: if hasRole(['admin', 'hr_manager']);
+    }
+
+    // ===================================================
+    // ATTENDANCE DOCUMENTS (Excel files, reports)
+    // ===================================================
+    match /attendance/{fileName} {
+      // HR, Admin, and Managers can read
+      allow read: if hasRole(['admin', 'hr', 'hr_manager', 'manager', 'it_admin']);
+      
+      // HR and Admin can upload attendance files
+      allow write: if hasRole(['admin', 'hr', 'hr_manager'])
+                   && (isValidExcel() || isValidDocument())
+                   && isValidExcelSize();
+      
+      // Only Admin can delete
+      allow delete: if hasRole(['admin', 'hr_manager']);
+    }
+
+    // ===================================================
+    // TRAINING MATERIALS
+    // ===================================================
+    match /training/{courseId}/{fileName} {
+      // All authenticated users can read training materials
+      allow read: if isAuthenticated();
+      
+      // HR, Admin, and Training Coordinator can upload
+      allow write: if hasRole(['admin', 'hr', 'training_coordinator'])
+                   && isValidDocument()
+                   && isValidDocumentSize();
+      
+      // Only Admin and Training Coordinator can delete
+      allow delete: if hasRole(['admin', 'training_coordinator']);
+    }
+
+    // ===================================================
+    // ANNOUNCEMENTS & NOTICES
+    // ===================================================
+    match /announcements/{fileName} {
+      // All authenticated users can read
+      allow read: if isAuthenticated();
+      
+      // HR and Admin can upload
+      allow write: if hasRole(['admin', 'hr', 'hr_manager'])
+                   && (isValidImage() || isValidDocument())
+                   && isValidDocumentSize();
+      
+      // Only Admin can delete
+      allow delete: if hasRole(['admin', 'hr_manager']);
+    }
+
+    // ===================================================
+    // COMPANY DOCUMENTS (Policies, handbooks)
+    // ===================================================
+    match /company/{category}/{fileName} {
+      // All authenticated users can read company documents
+      allow read: if isAuthenticated();
+      
+      // Only HR and Admin can upload company documents
+      allow write: if hasRole(['admin', 'hr', 'hr_manager'])
+                   && isValidDocument()
+                   && isValidDocumentSize();
+      
+      // Only Admin can delete
+      allow delete: if hasRole(['admin']);
+    }
+
+    // ===================================================
+    // EXPENSE RECEIPTS
+    // ===================================================
+    match /expenses/{userId}/{expenseId}/{fileName} {
+      // User can read their own receipts
+      // Manager, HR, and Admin can read all
+      allow read: if isOwner(userId) || hasRole(['admin', 'hr', 'manager', 'hr_manager']);
+      
+      // User can upload their own receipts
+      allow write: if isOwner(userId)
+                   && (isValidImage() || isValidDocument())
+                   && isValidDocumentSize();
+      
+      // User, Manager, HR, and Admin can delete
+      allow delete: if isOwner(userId) || hasRole(['admin', 'hr', 'manager']);
+    }
+
+    // ===================================================
+    // ASSETS & INVENTORY IMAGES
+    // ===================================================
+    match /assets/{assetId}/{fileName} {
+      // All authenticated users can read asset images
+      allow read: if isAuthenticated();
+      
+      // Admin and HR can upload asset images
+      allow write: if hasRole(['admin', 'hr'])
+                   && isValidImage()
+                   && isValidImageSize();
+      
+      // Only Admin can delete
+      allow delete: if hasRole(['admin']);
+    }
+
+    // ===================================================
+    // INCIDENT REPORTS
+    // ===================================================
+    match /incidents/{incidentId}/{fileName} {
+      // HR and Admin can read all incident reports
+      allow read: if hasRole(['admin', 'hr', 'hr_manager', 'it_admin']);
+      
+      // Any authenticated user can upload incident evidence
+      allow write: if isAuthenticated()
+                   && (isValidImage() || isValidDocument())
+                   && isValidDocumentSize();
+      
+      // Only Admin and HR Manager can delete
+      allow delete: if hasRole(['admin', 'hr_manager']);
+    }
+
+    // ===================================================
+    // RECRUITMENT (CV/Resume uploads)
+    // ===================================================
+    match /recruitment/{candidateId}/{fileName} {
+      // Recruiters, HR, and Admin can read
+      allow read: if hasRole(['admin', 'hr', 'hr_manager', 'recruiter']);
+      
+      // Recruiters, HR, and Admin can upload
+      allow write: if hasRole(['admin', 'hr', 'recruiter'])
+                   && isValidDocument()
+                   && isValidDocumentSize();
+      
+      // Only Admin and HR can delete
+      allow delete: if hasRole(['admin', 'hr']);
+    }
+
+    // ===================================================
+    // BACKUP & EXPORTS (System-generated files)
+    // ===================================================
+    match /exports/{fileName} {
+      // Only Admin can read exports
+      allow read: if hasRole(['admin', 'it_admin']);
+      
+      // Only Admin can create exports
+      allow write: if hasRole(['admin', 'it_admin'])
+                   && (isValidExcel() || isValidDocument())
+                   && isValidExcelSize();
+      
+      // Only Admin can delete
+      allow delete: if hasRole(['admin', 'it_admin']);
+    }
+
+    // ===================================================
+    // DEFAULT: DENY ALL ACCESS
+    // ===================================================
+    // Any path not explicitly matched above will be denied
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

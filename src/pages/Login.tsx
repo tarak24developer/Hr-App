@@ -6,6 +6,8 @@ import { Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { authService } from '@/services/authService';
 import { useAuthActions } from '@/stores/authStore';
+import { subdomainRouter } from '@/lib/subdomain/subdomainRouter';
+import { rateLimiter, RATE_LIMITS } from '@/utils/rateLimiter';
 import LoadingSpinner from '@/components/UI/LoadingSpinner';
 
 interface LoginFormData {
@@ -32,16 +34,84 @@ const Login: React.FC = () => {
   });
 
   const onSubmit = async (data: LoginFormData) => {
+    // ✅ SECURITY: Check rate limit BEFORE attempting login
+    const rateLimitKey = `login:${data.email}`;
+    
+    if (rateLimiter.isRateLimited(rateLimitKey, RATE_LIMITS.LOGIN)) {
+      const timeRemaining = rateLimiter.getTimeUntilUnblocked(rateLimitKey);
+      const minutesRemaining = Math.ceil(timeRemaining / 60000);
+      
+      toast.error(
+        `🛡️ Too many login attempts. Please try again in ${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''}.`,
+        { duration: 5000, icon: '🔒' }
+      );
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const user = await authService.login(data);
+      
+      // ✅ SUCCESS: Clear rate limit on successful login
+      rateLimiter.clear(rateLimitKey);
+      
       setUser(user);
-      toast.success('Welcome back!');
-      // Navigate to dashboard after successful login
-      navigate('/dashboard');
+      
+      // Show success message with role-specific greeting
+      const roleNames: Record<string, string> = {
+        admin: 'Administrator',
+        it_admin: 'IT Administrator',
+        hr: 'HR Manager',
+        hr_manager: 'HR Manager',
+        manager: 'Manager',
+        employee: 'Employee',
+        payroll_admin: 'Payroll Administrator',
+        recruiter: 'Recruiter',
+        training_coordinator: 'Training Coordinator'
+      };
+      
+      const roleName = roleNames[user.role] || 'User';
+      toast.success(`Welcome back, ${user.firstName}! (${roleName})`);
+      
+      // Check if subdomain routing is enabled and user needs to be redirected
+      const currentSubdomain = subdomainRouter.getSubdomain();
+      const targetSubdomain = subdomainRouter.getSubdomainForRole(user.role);
+      
+      // If on wrong subdomain, redirect to correct one
+      if (currentSubdomain !== targetSubdomain && 
+          window.location.hostname !== 'localhost' && 
+          !window.location.hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+        
+        // Redirect to role-specific subdomain
+        toast.loading(`Redirecting to ${roleName} portal...`, { duration: 2000 });
+        
+        setTimeout(() => {
+          subdomainRouter.redirectToRoleSubdomain(user.role, false);
+        }, 1500);
+      } else {
+        // If already on correct subdomain or localhost, just navigate to dashboard
+        navigate('/dashboard');
+      }
     } catch (error: any) {
       console.error('Login error:', error);
-      toast.error(error.message || 'Login failed');
+      
+      // ⚠️ SECURITY: Show remaining attempts
+      const remainingAttempts = rateLimiter.getRemainingAttempts(rateLimitKey, RATE_LIMITS.LOGIN);
+      
+      if (remainingAttempts <= 2 && remainingAttempts > 0) {
+        toast.error(
+          `${error.message || 'Login failed'}. ${remainingAttempts} attempt${remainingAttempts > 1 ? 's' : ''} remaining.`,
+          { duration: 4000, icon: '⚠️' }
+        );
+      } else if (remainingAttempts === 0) {
+        toast.error('Account locked due to too many failed attempts. Please try again later.', {
+          duration: 5000,
+          icon: '🔒'
+        });
+      } else {
+        toast.error(error.message || 'Login failed');
+      }
+      
       reset();
     } finally {
       setIsLoading(false);
@@ -51,6 +121,20 @@ const Login: React.FC = () => {
   const handleForgotPassword = async () => {
     if (!resetEmail.trim()) {
       toast.error('Please enter your email address');
+      return;
+    }
+
+    // ✅ SECURITY: Check rate limit for password reset
+    const rateLimitKey = `password-reset:${resetEmail}`;
+    
+    if (rateLimiter.isRateLimited(rateLimitKey, RATE_LIMITS.PASSWORD_RESET)) {
+      const timeRemaining = rateLimiter.getTimeUntilUnblocked(rateLimitKey);
+      const minutesRemaining = Math.ceil(timeRemaining / 60000);
+      
+      toast.error(
+        `Too many password reset attempts. Please try again in ${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''}.`,
+        { duration: 5000 }
+      );
       return;
     }
 

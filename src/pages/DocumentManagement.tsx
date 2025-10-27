@@ -148,9 +148,19 @@ const DocumentManagement: React.FC = () => {
   const totalPages = Math.ceil(filteredDocuments.length / rowsPerPage);
 
   // File upload handler
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // ✅ SECURITY: Validate file before accepting
+      const { validateFile } = await import('@/utils/fileValidation');
+      const validation = validateFile(file, 'document');
+      
+      if (!validation.valid) {
+        showNotification(validation.error || 'Invalid file', 'error');
+        event.target.value = ''; // Clear the input
+        return;
+      }
+      
       setSelectedFile(file);
       // Auto-fill type based on file extension
       const extension = file.name.split('.').pop()?.toLowerCase();

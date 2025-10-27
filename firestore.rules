@@ -1,0 +1,237 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions for role checking
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function hasRole(role) {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    function hasAnyRole(roles) {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in roles;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isManager() {
+      return hasAnyRole(['admin', 'it_admin', 'hr', 'hr_manager', 'manager']);
+    }
+    
+    function isAdmin() {
+      return hasAnyRole(['admin', 'it_admin']);
+    }
+    
+    function isHR() {
+      return hasAnyRole(['admin', 'it_admin', 'hr', 'hr_manager']);
+    }
+    
+    // Users collection - sensitive employee data
+    match /users/{userId} {
+      // Read: Users can read own data, managers can read their team, HR/Admin can read all
+      allow read: if isOwner(userId) || isManager();
+      
+      // Create: Only admins and HR can create users
+      allow create: if isHR();
+      
+      // Update: Users can update own profile (limited fields), HR/Admin can update all
+      allow update: if isOwner(userId) || isHR();
+      
+      // Delete: Only admins can delete
+      allow delete: if isAdmin();
+    }
+    
+    // Attendance records
+    match /attendance/{attendanceId} {
+      // Read: Users can read own attendance, managers can read team, HR/Admin read all
+      allow read: if isAuthenticated();
+      
+      // Create/Update: Users can mark own attendance, HR/Admin can modify all
+      allow create, update: if isAuthenticated();
+      
+      // Delete: Only HR/Admin can delete
+      allow delete: if isHR();
+    }
+    
+    // Leave requests
+    match /leaves/{leaveId} {
+      // Read: Users can read own leaves, managers can read team leaves, HR/Admin read all
+      allow read: if isAuthenticated();
+      
+      // Create: All authenticated users can create leave requests
+      allow create: if isAuthenticated();
+      
+      // Update: Users can update own pending leaves, managers can approve/reject, HR/Admin can do all
+      allow update: if isAuthenticated();
+      
+      // Delete: Users can delete own pending leaves, HR/Admin can delete all
+      allow delete: if isAuthenticated();
+    }
+    
+    // Payroll - highly sensitive
+    match /payroll/{payrollId} {
+      // Read: Users can read only own payroll, payroll_admin/HR/Admin can read all
+      allow read: if hasAnyRole(['admin', 'it_admin', 'hr', 'hr_manager', 'payroll_admin']) ||
+                     (isOwner(resource.data.userId));
+      
+      // Create/Update/Delete: Only payroll_admin, HR, and Admin
+      allow create, update, delete: if hasAnyRole(['admin', 'it_admin', 'hr', 'hr_manager', 'payroll_admin']);
+    }
+    
+    // Training records
+    match /training/{trainingId} {
+      // Read: All authenticated users
+      allow read: if isAuthenticated();
+      
+      // Create/Update: Training coordinators, HR, Admin
+      allow create, update: if hasAnyRole(['admin', 'it_admin', 'hr', 'hr_manager', 'training_coordinator']);
+      
+      // Delete: Only Admin
+      allow delete: if isAdmin();
+    }
+    
+    // Documents
+    match /documents/{documentId} {
+      // Read: Users can read own documents, HR/Admin can read all
+      allow read: if isOwner(resource.data.userId) || isHR();
+      
+      // Create/Update: Users can upload own documents, HR/Admin can manage all
+      allow create, update: if isOwner(request.resource.data.userId) || isHR();
+      
+      // Delete: Users can delete own documents, HR/Admin can delete all
+      allow delete: if isOwner(resource.data.userId) || isHR();
+    }
+    
+    // Incidents
+    match /incidents/{incidentId} {
+      // Read: Users can read own incidents, HR/Admin can read all
+      allow read: if isOwner(resource.data.reportedBy) || isHR();
+      
+      // Create: All authenticated users can report incidents
+      allow create: if isAuthenticated();
+      
+      // Update/Delete: Only HR/Admin
+      allow update, delete: if isHR();
+    }
+    
+    // Announcements
+    match /announcements/{announcementId} {
+      // Read: All authenticated users
+      allow read: if isAuthenticated();
+      
+      // Create/Update/Delete: Only HR/Admin
+      allow create, update, delete: if isHR();
+    }
+    
+    // Audit logs - read-only except for system
+    match /audit_logs/{auditId} {
+      // Read: Only Admin can read audit logs
+      allow read: if isAdmin();
+      
+      // Create: Only system (authenticated users) can create
+      allow create: if isAuthenticated();
+      
+      // No updates or deletes allowed
+      allow update, delete: if false;
+    }
+    
+    // User sessions
+    match /sessions/{sessionId} {
+      // Read: Users can read own sessions, Admin can read all
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      
+      // Create/Update: System only (authenticated)
+      allow create, update: if isAuthenticated();
+      
+      // Delete: Users can delete own sessions, Admin can delete all
+      allow delete: if isOwner(resource.data.userId) || isAdmin();
+    }
+    
+    // User tracking - sensitive location data
+    match /user_tracking/{trackingId} {
+      // Read: Only Admin/HR
+      allow read: if isHR();
+      
+      // Create/Update: System (authenticated users marking location)
+      allow create, update: if isAuthenticated();
+      
+      // Delete: Only Admin
+      allow delete: if isAdmin();
+    }
+    
+    // Assets and Inventory
+    match /assets/{assetId} {
+      // Read: All authenticated users can view assets
+      allow read: if isAuthenticated();
+      
+      // Create/Update/Delete: Only Admin/HR
+      allow create, update, delete: if isHR();
+    }
+    
+    match /inventory/{inventoryId} {
+      // Read: All authenticated users
+      allow read: if isAuthenticated();
+      
+      // Create/Update/Delete: Only Admin/HR
+      allow create, update, delete: if isHR();
+    }
+    
+    // Expenses
+    match /expenses/{expenseId} {
+      // Read: Users can read own expenses, managers can read team, HR/Admin read all
+      allow read: if isOwner(resource.data.userId) || isManager();
+      
+      // Create: All authenticated users can create expense claims
+      allow create: if isAuthenticated();
+      
+      // Update: Users can update own pending expenses, managers can approve, HR/Admin can do all
+      allow update: if isOwner(resource.data.userId) || isManager();
+      
+      // Delete: Users can delete own pending expenses, HR/Admin can delete all
+      allow delete: if isOwner(resource.data.userId) || isHR();
+    }
+    
+    // Feedback and Surveys
+    match /feedback/{feedbackId} {
+      // Read: Users can read own feedback, HR/Admin read all
+      allow read: if isOwner(resource.data.userId) || isHR();
+      
+      // Create: All authenticated users
+      allow create: if isAuthenticated();
+      
+      // Update/Delete: Only the user who created it or HR/Admin
+      allow update, delete: if isOwner(resource.data.userId) || isHR();
+    }
+    
+    // Holidays
+    match /holidays/{holidayId} {
+      // Read: All authenticated users
+      allow read: if isAuthenticated();
+      
+      // Create/Update/Delete: Only HR/Admin
+      allow create, update, delete: if isHR();
+    }
+    
+    // Settings and configurations
+    match /settings/{settingId} {
+      // Read: All authenticated users can read settings
+      allow read: if isAuthenticated();
+      
+      // Write: Only Admin
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

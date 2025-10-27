@@ -3,7 +3,7 @@
  * Enhanced with subdomain routing, RBAC, and advanced security features
  */
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useRef } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './stores/authStore';
@@ -19,6 +19,8 @@ import SubdomainGuard from './middleware/SubdomainGuard';
 import PermissionGuard from './middleware/PermissionGuard';
 import { authService } from './services/authService';
 import { lazyWithRetry } from './utils/lazyWithRetry';
+import { RealtimeProvider } from './contexts/RealtimeContext';
+import RealtimeStatusContainer from './components/RealtimeStatusContainer';
 
 // Lazy load pages with retry logic for better reliability
 const Login = lazyWithRetry(() => import('./pages/Login'));
@@ -31,6 +33,9 @@ const AdminDashboard = lazyWithRetry(() => import('./modules/admin/AdminDashboar
 const HRDashboard = lazyWithRetry(() => import('./modules/hr/HRDashboard'));
 const ManagerDashboard = lazyWithRetry(() => import('./modules/manager/ManagerDashboard'));
 const EmployeeDashboard = lazyWithRetry(() => import('./modules/employee/EmployeeDashboard'));
+const PayrollDashboard = lazyWithRetry(() => import('./modules/payroll/PayrollDashboard'));
+const RecruiterDashboard = lazyWithRetry(() => import('./modules/recruiter/RecruiterDashboard'));
+const TrainerDashboard = lazyWithRetry(() => import('./modules/trainer/TrainerDashboard'));
 
 // Core pages - load on demand
 const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
@@ -70,36 +75,39 @@ function App() {
   const { isDark } = useThemeStore();
   const { fontSize } = useFontSizeStore();
   const [firebaseError, setFirebaseError] = useState<string | null>(null);
+  const initializedUserRef = useRef<string | null>(null);
 
   // Initialize authentication, subdomain routing, and security
   useEffect(() => {
     // Get subdomain configuration (for future use)
     // const config = subdomainRouter.getCurrentSubdomainConfig();
     
-    const unsubscribe = authService.subscribeToAuthState(async (state) => {
-      
+    const unsubscribe = authService.subscribeToAuthState((state) => {
+      // Update both user and loading state together
       setUser(state.user);
       setLoading(state.loading);
 
-      // Handle authenticated user
-      if (state.user && !state.loading) {
+      // Handle authenticated user - only run initialization once per user
+      if (state.user && !state.loading && state.user.id !== initializedUserRef.current) {
+        initializedUserRef.current = state.user.id;
+        
         // Initialize RBAC for user
         rbacService.initializeUserRoles(state.user);
         
-        // Create session
-        try {
-          await sessionManager.createSession(state.user.id);
-        } catch (error) {
+        // Create session (run in background, don't await)
+        sessionManager.createSession(state.user.id).catch((error) => {
           console.error('Error creating session:', error);
-        }
+        });
         
-        // Log successful authentication
-        await auditLogger.logLogin(
+        // Log successful authentication (run in background, don't await)
+        auditLogger.logLogin(
           state.user.id,
           state.user.email,
           `${state.user.firstName} ${state.user.lastName}`,
           true
-        );
+        ).catch((error) => {
+          console.error('Error logging authentication:', error);
+        });
 
         // Check if user is on correct subdomain
         const isCorrect = subdomainRouter.isOnCorrectSubdomain(state.user.role);
@@ -107,6 +115,11 @@ function App() {
           // Uncomment below to enable subdomain redirection
           // subdomainRouter.redirectToRoleSubdomain(state.user.role, false);
         }
+      }
+      
+      // Reset initialized user when logging out
+      if (!state.user && initializedUserRef.current) {
+        initializedUserRef.current = null;
       }
     });
 
@@ -122,7 +135,7 @@ function App() {
     }
 
     return unsubscribe;
-  }, []);
+  }, [setUser, setLoading]);
 
   // Apply theme
   useEffect(() => {
@@ -142,10 +155,16 @@ function App() {
             break;
           case 'hr':
           case 'hr_manager':
-          case 'recruiter':
-          case 'payroll_admin':
-          case 'training_coordinator':
             import('./modules/hr/HRDashboard');
+            break;
+          case 'recruiter':
+            import('./modules/recruiter/RecruiterDashboard');
+            break;
+          case 'payroll_admin':
+            import('./modules/payroll/PayrollDashboard');
+            break;
+          case 'training_coordinator':
+            import('./modules/trainer/TrainerDashboard');
             break;
           case 'manager':
             import('./modules/manager/ManagerDashboard');
@@ -222,10 +241,13 @@ function App() {
         return <AdminDashboard />;
       case 'hr':
       case 'hr_manager':
-      case 'recruiter':
-      case 'payroll_admin':
-      case 'training_coordinator':
         return <HRDashboard />;
+      case 'recruiter':
+        return <RecruiterDashboard />;
+      case 'payroll_admin':
+        return <PayrollDashboard />;
+      case 'training_coordinator':
+        return <TrainerDashboard />;
       case 'manager':
         return <ManagerDashboard />;
       case 'employee':
@@ -238,21 +260,22 @@ function App() {
   // If authenticated, show main app
   return (
     <ErrorBoundary>
-      <div className={`min-h-screen ${isDark ? 'dark' : ''}`}>
-        <div className={`flex flex-col lg:flex-row min-h-screen bg-gray-50 dark:bg-gray-900 text-${fontSize}`}>
-          <Suspense fallback={<LoadingSpinner />}>
-            <SubdomainGuard>
-              <Sidebar />
-            </SubdomainGuard>
-          </Suspense>
-          <div className="flex-1 flex flex-col overflow-hidden">
+      <RealtimeProvider>
+        <div className={`min-h-screen ${isDark ? 'dark' : ''}`}>
+          <div className={`flex flex-col lg:flex-row min-h-screen bg-gray-50 dark:bg-gray-900 text-${fontSize}`}>
             <Suspense fallback={<LoadingSpinner />}>
-              <Header />
+              <SubdomainGuard>
+                <Sidebar />
+              </SubdomainGuard>
             </Suspense>
-            <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
+            <div className="flex-1 flex flex-col overflow-hidden">
               <Suspense fallback={<LoadingSpinner />}>
-                <Layout>
-                  <Suspense fallback={<LoadingSpinner />}>
+                <Header />
+              </Suspense>
+              <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
+                <Suspense fallback={<LoadingSpinner />}>
+                  <Layout>
+                    <Suspense fallback={<LoadingSpinner />}>
                     <Routes>
                       <Route path="/" element={<Navigate to="/dashboard" replace />} />
                       <Route path="/dashboard" element={getRoleDashboard()} />
@@ -365,7 +388,10 @@ function App() {
           </div>
         </div>
       </div>
+      {/* Real-time connection status indicator - will show/hide automatically */}
+      <RealtimeStatusContainer />
       <Toaster position="top-right" />
+      </RealtimeProvider>
     </ErrorBoundary>
   );
 }

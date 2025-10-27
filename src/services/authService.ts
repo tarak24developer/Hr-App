@@ -105,6 +105,10 @@ class AuthService {
     });
   }
 
+  private notifyListeners(state: AuthState) {
+    this.authStateListeners.forEach(listener => listener(state));
+  }
+
   private async createUserDocumentInBackground(uid: string, userData: any) {
     try {
       if (db) {
@@ -159,10 +163,6 @@ class AuthService {
       // Don't throw error - let the calling method handle it
       throw new Error('Failed to fetch or create user data');
     }
-  }
-
-  private notifyListeners(state: AuthState) {
-    this.authStateListeners.forEach(listener => listener(state));
   }
 
   public subscribeToAuthState(listener: (state: AuthState) => void) {
